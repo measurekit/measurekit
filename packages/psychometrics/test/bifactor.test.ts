@@ -338,8 +338,7 @@ function calibrateCase(
   fixture: Case,
   extra: Partial<BifactorOptions<Parameters>> = {},
 ): MultidimensionalCalibration<Parameters> {
-  return calibrateBifactor(matrixOf(fixture), {
-    specific: fixture.specific,
+  return calibrateBifactor(matrixOf(fixture), fixture.specific, {
     primary: fixture.primary,
     model: modelOf(fixture.model),
     ...(fixture.priors === undefined
@@ -422,13 +421,13 @@ describe("structure", () => {
   const ids = ["q1", "q2", "q3", "q4", "q5"];
 
   it("lists the primary dimensions and then the specific ones, each in order of first appearance", () => {
-    const structure = structureOf(
-      {
-        specific: { q1: "b", q2: "b", q3: "a", q4: "a", q5: null },
-        primary: { q1: ["g"], q2: ["g"], q3: ["g"], q4: ["g"], q5: ["g"] },
-      },
-      ids,
-    );
+    const structure = structureOf({ q1: "b", q2: "b", q3: "a", q4: "a", q5: null }, ids, {
+      q1: ["g"],
+      q2: ["g"],
+      q3: ["g"],
+      q4: ["g"],
+      q5: ["g"],
+    });
     expect(structure.design.dimensionNames).toEqual(["g", "b", "a"]);
     expect(structure.primaryCount).toBe(1);
     expect(structure.design.correlated).toBe(false);
@@ -447,13 +446,13 @@ describe("structure", () => {
   });
 
   it("makes the dimensions correlated when there are two primary dimensions", () => {
-    const structure = structureOf(
-      {
-        specific: { q1: "s", q2: "s", q3: null, q4: null, q5: null },
-        primary: { q1: ["x"], q2: ["x", "y"], q3: ["y"], q4: ["y"], q5: ["x"] },
-      },
-      ids,
-    );
+    const structure = structureOf({ q1: "s", q2: "s", q3: null, q4: null, q5: null }, ids, {
+      q1: ["x"],
+      q2: ["x", "y"],
+      q3: ["y"],
+      q4: ["y"],
+      q5: ["x"],
+    });
     expect(structure.design.dimensionNames).toEqual(["x", "y", "s"]);
     expect(structure.design.correlated).toBe(true);
     expect(structure.primaryCount).toBe(2);
@@ -461,20 +460,20 @@ describe("structure", () => {
 
   it("refuses a specification that is not valid", () => {
     const specific = { q1: "s", q2: "s", q3: null, q4: null, q5: null };
-    expect(() => structureOf({ specific: { ...specific, q9: "s" } }, ids)).toThrow(DataError);
-    expect(() => structureOf({ specific: { q1: "s", q2: "s" } }, ids)).toThrow(/specific dimension of item "q3"/);
-    expect(() =>
-      structureOf({ specific: JSON.parse('{"q1":["s","t"],"q2":"s","q3":null,"q4":null,"q5":null}') }, ids),
-    ).toThrow(/at most one specific dimension/);
-    expect(() => structureOf({ specific: { ...specific, q3: "t" } }, ids)).toThrow(/"t" has one item/);
-    expect(() =>
-      structureOf({ specific, primary: { q1: ["a"], q2: ["b"], q3: ["c"], q4: ["a"], q5: ["a"] } }, ids),
-    ).toThrow(/found 3: a, b, c/);
-    expect(() =>
-      structureOf({ specific, primary: { q1: ["s"], q2: ["s"], q3: ["s"], q4: ["s"], q5: ["s"] } }, ids),
-    ).toThrow(/"s" names a primary and a specific dimension/);
-    expect(() => structureOf({ specific, primary: { q1: ["g", "g"] } }, ids)).toThrow(DataError);
-    expect(() => structureOf({ specific, primary: { q1: ["g"] } }, ids)).toThrow(/primary dimensions of item "q2"/);
+    expect(() => structureOf({ ...specific, q9: "s" }, ids)).toThrow(DataError);
+    expect(() => structureOf({ q1: "s", q2: "s" }, ids)).toThrow(/specific dimension of item "q3"/);
+    expect(() => structureOf(JSON.parse('{"q1":["s","t"],"q2":"s","q3":null,"q4":null,"q5":null}'), ids)).toThrow(
+      /at most one specific dimension/,
+    );
+    expect(() => structureOf({ ...specific, q3: "t" }, ids)).toThrow(/"t" has one item/);
+    expect(() => structureOf(specific, ids, { q1: ["a"], q2: ["b"], q3: ["c"], q4: ["a"], q5: ["a"] })).toThrow(
+      /found 3: a, b, c/,
+    );
+    expect(() => structureOf(specific, ids, { q1: ["s"], q2: ["s"], q3: ["s"], q4: ["s"], q5: ["s"] })).toThrow(
+      /"s" names a primary and a specific dimension/,
+    );
+    expect(() => structureOf(specific, ids, { q1: ["g", "g"] })).toThrow(DataError);
+    expect(() => structureOf(specific, ids, { q1: ["g"] })).toThrow(/primary dimensions of item "q2"/);
   });
 });
 
@@ -642,9 +641,8 @@ describe("calibrateBifactor", () => {
     // specific dimensions and the general one are the three dimensions that EM integrates in full.
     const { matrix, specific } = simulatedCase(7, 600);
     const settings = { points: 11, tolerance: 0, maxIterations: 60, standardErrors: "hessian" } as const;
-    const reduced = calibrateBifactor(matrix, { specific, ...settings });
-    const full = calibrateMultidimensional(matrix, {
-      model: multidimensionalTwoParameterLogistic,
+    const reduced = calibrateBifactor(matrix, specific, { ...settings });
+    const full = calibrateMultidimensional(matrix, multidimensionalTwoParameterLogistic, {
       loadings: Object.fromEntries(matrix.itemIds.map((id) => [id, ["general", specific[id] ?? ""]])),
       correlated: false,
       ...settings,
@@ -669,10 +667,9 @@ describe("calibrateBifactor", () => {
     const { matrix, specific } = simulatedCase(7, 600);
     const priors = { a: normalPrior(1, 0.4), intercept: normalPrior(0, 1) };
     const settings = { points: 11, tolerance: 0, maxIterations: 60 } as const;
-    const reduced = calibrateBifactor(matrix, { specific, priors, ...settings });
-    const plain = calibrateBifactor(matrix, { specific, ...settings });
-    const full = calibrateMultidimensional(matrix, {
-      model: multidimensionalTwoParameterLogistic,
+    const reduced = calibrateBifactor(matrix, specific, { priors, ...settings });
+    const plain = calibrateBifactor(matrix, specific, { ...settings });
+    const full = calibrateMultidimensional(matrix, multidimensionalTwoParameterLogistic, {
       loadings: Object.fromEntries(matrix.itemIds.map((id) => [id, ["general", specific[id] ?? ""]])),
       correlated: false,
       priors,
@@ -701,24 +698,27 @@ describe("calibrateBifactor", () => {
           response === null ? [] : [{ person: `p${person}`, item: defined(fixture.itemIds[item]), response }],
         ),
       );
-      const fromRecords = calibrateBifactor(buildResponseRecords(records, { itemIds: [...fixture.itemIds] }), {
-        specific: fixture.specific,
-        ...quick,
-      });
-      const fromMatrix = calibrateBifactor(matrixOf(fixture), { specific: fixture.specific, ...quick });
+      const fromRecords = calibrateBifactor(
+        buildResponseRecords(records, { itemIds: [...fixture.itemIds] }),
+        fixture.specific,
+        {
+          ...quick,
+        },
+      );
+      const fromMatrix = calibrateBifactor(matrixOf(fixture), fixture.specific, { ...quick });
       expect(fromRecords).toEqual(fromMatrix);
     });
 
     it("leaves a person without responses out of the calibration", () => {
       const silent = fixture.itemIds.map(() => null);
       const padded = buildResponseMatrix([...fixture.responses, silent], { itemIds: [...fixture.itemIds] });
-      const fit = calibrateBifactor(padded, { specific: fixture.specific, ...quick });
-      const plain = calibrateBifactor(matrixOf(fixture), { specific: fixture.specific, ...quick });
+      const fit = calibrateBifactor(padded, fixture.specific, { ...quick });
+      const plain = calibrateBifactor(matrixOf(fixture), fixture.specific, { ...quick });
       expect(fit).toEqual(plain);
     });
 
     it("names the dimensions of the default model: one general dimension and the specific ones", () => {
-      const fit = calibrateBifactor(matrixOf(fixture), { specific: fixture.specific, ...quick });
+      const fit = calibrateBifactor(matrixOf(fixture), fixture.specific, { ...quick });
       expect(fit.dimensions).toEqual(["general", "s1", "s2", "s3"]);
       expect(fit.correlationStandardErrors).toBeNull();
       expect(fit.items.every((item) => item.standardErrors === null)).toBe(true);
@@ -727,31 +727,31 @@ describe("calibrateBifactor", () => {
     it("refuses input of other types, as JavaScript and JSON pass it", () => {
       const { specific } = fixture;
       const matrix = matrixOf(fixture);
-      const refused = (data: unknown, options: unknown): void => {
-        expect(() => calibrateBifactor(JSON.parse(JSON.stringify(data)), JSON.parse(JSON.stringify(options)))).toThrow(
-          DataError,
-        );
+      const clone = (value: unknown): unknown => (value === undefined ? undefined : JSON.parse(JSON.stringify(value)));
+      const refused = (data: unknown, specific: unknown, ...options: unknown[]): void => {
+        // @ts-expect-error: the arguments are the types of JavaScript and JSON.
+        expect(() => calibrateBifactor(clone(data), clone(specific), ...options.map(clone))).toThrow(DataError);
       };
-      refused(null, { specific });
-      refused("responses", { specific });
+      refused(null, specific);
+      refused("responses", specific);
+      refused(matrix, specific, null);
+      refused(matrix, undefined);
       refused(matrix, null);
-      refused(matrix, {});
-      refused(matrix, { specific: null });
-      refused(matrix, { specific: [] });
-      refused(matrix, { specific: "s1" });
-      refused(matrix, { specific, primary: null });
-      refused(matrix, { specific, primary: [] });
-      refused(matrix, { specific, points: "9" });
-      refused(matrix, { specific, points: 1 });
-      refused(matrix, { specific, points: 2.5 });
-      refused(matrix, { specific, standardErrors: "oakes" });
-      refused(matrix, { specific, standardErrors: null });
-      refused(matrix, { specific, tolerance: "1e-4" });
-      refused(matrix, { specific, tolerance: -1 });
-      refused(matrix, { specific, maxIterations: 0 });
-      refused(matrix, { specific, maxIterations: null });
-      refused(matrix, { specific, model: {} });
-      refused(matrix, { specific, model: null });
+      refused(matrix, []);
+      refused(matrix, "s1");
+      refused(matrix, specific, { primary: null });
+      refused(matrix, specific, { primary: [] });
+      refused(matrix, specific, { points: "9" });
+      refused(matrix, specific, { points: 1 });
+      refused(matrix, specific, { points: 2.5 });
+      refused(matrix, specific, { standardErrors: "oakes" });
+      refused(matrix, specific, { standardErrors: null });
+      refused(matrix, specific, { tolerance: "1e-4" });
+      refused(matrix, specific, { tolerance: -1 });
+      refused(matrix, specific, { maxIterations: 0 });
+      refused(matrix, specific, { maxIterations: null });
+      refused(matrix, specific, { model: {} });
+      refused(matrix, specific, { model: null });
     });
 
     it("refuses a two-tier model of no more persons than its two correlated primary dimensions", () => {
@@ -765,10 +765,10 @@ describe("calibrateBifactor", () => {
       );
       const primary = { q1: ["P1"], q2: ["P1"], q3: ["P2"], q4: ["P2"] };
       const specific = { q1: "s", q2: "s", q3: null, q4: null };
-      expect(() => calibrateBifactor(two, { specific, primary })).toThrow(
+      expect(() => calibrateBifactor(two, specific, { primary })).toThrow(
         "The calibration has 2 persons with a response, no more than its 2 correlated dimensions",
       );
-      expect(calibrateBifactor(two, { specific, maxIterations: 1 }).items).toHaveLength(4);
+      expect(calibrateBifactor(two, specific, { maxIterations: 1 }).items).toHaveLength(4);
     });
 
     it("refuses a calibration without responses", () => {
@@ -779,11 +779,11 @@ describe("calibrateBifactor", () => {
         ],
         { itemIds: ["a", "b"] },
       );
-      expect(() => calibrateBifactor(silent, { specific: { a: "s", b: "s" } })).toThrow(/at least one response/);
+      expect(() => calibrateBifactor(silent, { a: "s", b: "s" })).toThrow(/at least one response/);
     });
 
     it("refuses a grid of more nodes than a calibration allows", () => {
-      expect(() => calibrateBifactor(matrixOf(fixture), { specific: fixture.specific, points: 1001 })).toThrow(
+      expect(() => calibrateBifactor(matrixOf(fixture), fixture.specific, { points: 1001 })).toThrow(
         /more than 1000000 nodes/,
       );
     });
@@ -796,7 +796,7 @@ describe("calibrateBifactor", () => {
         { itemIds: ids },
       );
       const specific = Object.fromEntries(ids.map((id) => [id, "passage"]));
-      expect(() => calibrateBifactor(wide, { specific, points: 1000, maxIterations: 1 })).toThrow(
+      expect(() => calibrateBifactor(wide, specific, { points: 1000, maxIterations: 1 })).toThrow(
         "The items of the calibration would keep 34000000 values at the nodes of their grids, more than 16777216; use fewer points.",
       );
     });
@@ -808,19 +808,21 @@ describe("calibrateBifactor", () => {
         [Array.from({ length: 5 }, (_, j) => j % 2), Array.from({ length: 5 }, (_, j) => 1 - (j % 2))],
         { itemIds: ids },
       );
+      const optionsSpecific = Object.fromEntries(ids.map((id) => [id, "passage"]));
       const options = {
-        specific: Object.fromEntries(ids.map((id) => [id, "passage"])),
         points: 1000,
         maxIterations: 1,
       };
-      expect(() => calibrateBifactor(wide, { ...options, standardErrors: "hessian" })).toThrow(
+      expect(() => calibrateBifactor(wide, optionsSpecific, { ...options, standardErrors: "hessian" })).toThrow(
         "The items of the calibration would keep 50000000 values at the nodes of their grids, more than 16777216; use fewer points.",
       );
-      expect(calibrateBifactor(wide, { ...options, standardErrors: "cross-product" }).items).toHaveLength(5);
+      expect(
+        calibrateBifactor(wide, optionsSpecific, { ...options, standardErrors: "cross-product" }).items,
+      ).toHaveLength(5);
     });
 
     it("scores persons from its items, as any multidimensional calibration", () => {
-      const fit = calibrateBifactor(matrixOf(fixture), { specific: fixture.specific, ...quick });
+      const fit = calibrateBifactor(matrixOf(fixture), fixture.specific, { ...quick });
       const prior = { mean: fit.dimensions.map(() => 0), covariance: fit.correlations };
       const scored = multidimensionalEstimates(matrixOf(fixture), fit.items, {
         estimator: (items, responses) => multidimensionalPosteriorModeEstimate(items, responses, { prior }),
@@ -853,7 +855,7 @@ describe("calibrateBifactor", () => {
     ]);
     const matrix = simulateMultidimensionalResponses(items, thetas, random);
     const specific = Object.fromEntries(matrix.itemIds.map((id, i) => [id, `passage${1 + Math.floor(i / 4)}`]));
-    const fit = calibrateBifactor(matrix, { specific, standardErrors: "hessian" });
+    const fit = calibrateBifactor(matrix, specific, { standardErrors: "hessian" });
     expect(fit.dimensions).toEqual(["general", "passage1", "passage2", "passage3"]);
     const first = defined(fit.items[0]);
     expect(first.parameters.a.map((value) => Number(value.toFixed(2)))).toEqual([1.19, 1.07, 0, 0]);
@@ -891,11 +893,14 @@ describe("calibrateBifactor", () => {
     });
 
     it("recovers the slopes and the correlation of a two-tier model of 80 items on 21 nodes", { timeout: SLOW }, () => {
-      const fit = calibrateBifactor(buildResponseMatrix(recovery.responses, { itemIds: recovery.itemIds }), {
-        specific: recovery.specific,
-        primary: recovery.primary,
-        tolerance: 1e-3,
-      });
+      const fit = calibrateBifactor(
+        buildResponseMatrix(recovery.responses, { itemIds: recovery.itemIds }),
+        recovery.specific,
+        {
+          primary: recovery.primary,
+          tolerance: 1e-3,
+        },
+      );
       expect(fit.converged).toBe(true);
       expect(slopeError(fit, recovery.truth.slopes, 0, 2)).toBeLessThan(RECOVERY.primary);
       expect(slopeError(fit, recovery.truth.slopes, 2, 18)).toBeLessThan(RECOVERY.specific);
@@ -930,7 +935,7 @@ describe("standard errors of many parameters", () => {
     // specific slope and an intercept each.
     const matrix = buildResponseMatrix([0, 1, 2].map((k) => Array.from({ length: 1000 }, (_, j) => (j + k) % 2)));
     const specific = Object.fromEntries(matrix.itemIds.map((id, i) => [id, i < 500 ? "s1" : "s2"]));
-    expect(() => calibrateBifactor(matrix, { specific, standardErrors: "cross-product" })).toThrow(
+    expect(() => calibrateBifactor(matrix, specific, { standardErrors: "cross-product" })).toThrow(
       "Standard errors take at most 2000 estimated parameters, as their information holds every pair of them; found 3000.",
     );
   });
@@ -948,12 +953,12 @@ describe("properties", () => {
     );
 
   const fitOf = (rows: readonly (readonly (number | null)[])[]): MultidimensionalCalibration<Parameters> =>
-    calibrateBifactor(buildResponseMatrix(rows, { itemIds }), { specific, points: 5, maxIterations: 25 });
+    calibrateBifactor(buildResponseMatrix(rows, { itemIds }), specific, { points: 5, maxIterations: 25 });
 
   it("does not depend on the order of the persons", { timeout: SLOW }, () => {
     const { matrix, specific: groups } = simulatedCase(5, 1000);
-    const settings = { specific: groups, points: 9, tolerance: 1e-8, maxIterations: 1000 };
-    const first = calibrateBifactor(matrix, settings);
+    const settings = { points: 9, tolerance: 1e-8, maxIterations: 1000 };
+    const first = calibrateBifactor(matrix, groups, settings);
     expect(first.converged).toBe(true);
     const permutations = fc.shuffledSubarray(
       Array.from({ length: matrix.responses.length }, (_, person) => person),
@@ -962,7 +967,7 @@ describe("properties", () => {
     fc.assert(
       fc.property(permutations, (permutation) => {
         const rows = permutation.map((person) => defined(matrix.responses[person]));
-        const second = calibrateBifactor(buildResponseMatrix(rows, { itemIds: matrix.itemIds }), settings);
+        const second = calibrateBifactor(buildResponseMatrix(rows, { itemIds: matrix.itemIds }), groups, settings);
         expectClose(first.logLikelihood, second.logLikelihood, 1e-6);
         first.items.forEach((item, i) => {
           const other = defined(second.items[i]);

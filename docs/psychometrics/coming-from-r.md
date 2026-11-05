@@ -37,7 +37,7 @@ import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/ps
 const random = createRandom(7);
 const truth = simulateItems(twoParameterLogistic, 10, random);
 const data = simulateResponses(truth, simulateThetas(1000, random), random);
-const fit = calibrate(data, { model: twoParameterLogistic });
+const fit = calibrate(data, twoParameterLogistic);
 fit.items[0]?.parameters; // => { a: 0.83, b: -0.18, c: 0, d: 1 }: coef(fit, IRTpars = TRUE)
 const coefficients = fit.items.map(writeMirtSlopeIntercept);
 coefficients[0]; // => { a1: 0.83, d: 0.15, g: 0, u: 1 }: coef(fit, IRTpars = FALSE)

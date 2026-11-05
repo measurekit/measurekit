@@ -370,7 +370,8 @@ const calibration = calibrate(
     responses.map((row) => row.slice(0, 16)),
     { itemIds: ids.slice(0, 16) },
   ),
-  { model: twoParameterLogistic, standardErrors: "hessian" },
+  twoParameterLogistic,
+  { standardErrors: "hessian" },
 );
 const regression = itemFeatureRegression(calibration.items, features);
 regression.effects;
@@ -391,8 +392,8 @@ const sparse = buildResponseMatrix(
 );
 const fixed = Object.fromEntries(calibration.items.map(({ id, parameters }) => [id, parameters]));
 const itemPriors = { new1: { b: normalPrior(b.mean, b.sd), a: logNormalPrior(a.mean, a.sd) } };
-calibrate(sparse, { model: twoParameterLogistic, fixed }).items[16]?.parameters; // => { a: 1.00, b: 0.59, c: 0, d: 1 }
-calibrate(sparse, { model: twoParameterLogistic, fixed, itemPriors }).items[16]?.parameters;
+calibrate(sparse, twoParameterLogistic, { fixed }).items[16]?.parameters; // => { a: 1.00, b: 0.59, c: 0, d: 1 }
+calibrate(sparse, twoParameterLogistic, { fixed, itemPriors }).items[16]?.parameters;
 // => { a: 1.05, b: 0.75, c: 0, d: 1 }
 ```
 

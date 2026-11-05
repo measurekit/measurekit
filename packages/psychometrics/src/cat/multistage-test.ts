@@ -43,10 +43,6 @@ const MULTISTAGE_MODULE_FIELDS: FieldNames<MultistageModule> = { id: true, items
 
 /** Options of {@link createMultistageTest}. */
 export interface MultistageTestOptions {
-  /** The stages of the panel, in order, each a list of modules. The first stage has one module. */
-  readonly stages: readonly (readonly MultistageModule[])[];
-  /** What routes a person between stages. */
-  readonly routing: MultistageRouting;
   /**
    * Estimates theta after each module, and before the first, without responses.
    *
@@ -55,7 +51,7 @@ export interface MultistageTestOptions {
   readonly estimator?: AbilityEstimator;
 }
 
-const MULTISTAGE_TEST_OPTIONS: FieldNames<MultistageTestOptions> = { stages: true, routing: true, estimator: true };
+const MULTISTAGE_TEST_OPTIONS: FieldNames<MultistageTestOptions> = { estimator: true };
 
 /** The state of a multistage test: plain data, which JSON serializes, so that a test can resume from a stored state. */
 export interface MultistageTestState extends TestState {
@@ -88,16 +84,22 @@ export const ROUTINGS: readonly MultistageRouting[] = ["number-correct", "theta"
  * Returns a multistage test of a panel. Every person takes the module of the first stage, then one module of each
  * following stage, chosen by the cut points of the module before.
  *
- * @param options - The stages and their modules, the routing and the estimator; each option has its default.
+ * @param stages - The stages of the panel, in order, each a list of modules. The first stage has one module.
+ * @param routing - What routes a person between stages.
+ * @param options - The estimator; each option has its default.
  * @returns The test: `start` gives the state before the first response, and `answer` the state after a response.
  * @throws `DataError` when the panel has no stages, a stage has no modules, the first stage has more than one, a module
  * has no items, ids of modules or items repeat, an item's parameters are invalid, cut points do not match the next
  * stage, the routing is unknown, or the estimator is not a function.
  */
-export function createMultistageTest(options: MultistageTestOptions): MultistageTest {
+export function createMultistageTest(
+  stages: readonly (readonly MultistageModule[])[],
+  routing: MultistageRouting,
+  options: MultistageTestOptions = {},
+): MultistageTest {
   checkOptions(options, MULTISTAGE_TEST_OPTIONS);
-  const { stages, routing, estimator = posteriorMeanEstimate } = options;
-  checkChoice(routing, "The option routing", ROUTINGS);
+  const { estimator = posteriorMeanEstimate } = options;
+  checkChoice(routing, "The routing", ROUTINGS);
   checkFunction(
     estimator,
     "The option estimator must be a function of items and responses, such as posteriorMeanEstimate",
@@ -177,7 +179,7 @@ export function locateModules(stages: readonly (readonly MultistageModule[])[]):
  * is not an object with a string id and at least one item, or module ids repeat.
  */
 export function locateStages(stages: readonly (readonly MultistageModule[])[]): Map<string, LocatedModule> {
-  checkArray(stages, "The option stages must be an array of stages");
+  checkArray(stages, "The stages must be an array of stages");
   const valid = stages.length > 0 && stages.every((modules) => Array.isArray(modules) && modules.length > 0);
   if (!valid) {
     throw new DataError("A multistage test needs at least one stage, and every stage an array of at least one module.");

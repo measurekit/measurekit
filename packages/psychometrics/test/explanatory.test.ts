@@ -336,7 +336,7 @@ describe("itemFeatureRegression", () => {
       random,
     );
     const fixed = { q1: defined(bank[0]).parameters, q2: defined(bank[1]).parameters };
-    const fit = calibrate(responses, { model: twoParameterLogistic, fixed, standardErrors: "cross-product" });
+    const fit = calibrate(responses, twoParameterLogistic, { fixed, standardErrors: "cross-product" });
     const features = oneFeature(truth.map((_, i) => i));
     const regression = itemFeatureRegression(fit.items, features);
     expect(regression.itemIds).toEqual(bank.slice(2).map(({ id }) => id));
@@ -393,7 +393,7 @@ describe("itemFeatureRegression", () => {
       Array.from({ length: 3000 }, () => random.normal()),
       random,
     );
-    const fit = calibrate(responses, { model: twoParameterLogistic, standardErrors: "cross-product" });
+    const fit = calibrate(responses, twoParameterLogistic, { standardErrors: "cross-product" });
     const features = Object.fromEntries(bank.map(({ steps, open }, i) => [`q${i + 1}`, { steps, open }]));
     const regression = itemFeatureRegression(fit.items, features);
     const [intercept, steps, open] = regression.effects;
@@ -1131,7 +1131,7 @@ describe("lltm", () => {
   it("gives items that are the anchors of a calibration on the scale of its theta, N(0, sd²)", () => {
     const model = fitted(0);
     const fixed = Object.fromEntries(model.items.map(({ id, parameters }) => [id, parameters]));
-    const calibration = calibrate(lltmData(0), { model: twoParameterLogistic, fixed, latent: "normal" });
+    const calibration = calibrate(lltmData(0), twoParameterLogistic, { fixed, latent: "normal" });
     const [group] = calibration.groups;
     expectClose(defined(group).mean, 0, 1e-3);
     expectClose(defined(group).sd, model.sd, 1e-3);
@@ -1541,13 +1541,17 @@ describe("predictItemParameter", () => {
     expectClose(mean, 2, 1e-9);
     expect(sd).toBeGreaterThan(0);
     const fixed = Object.fromEntries(bank.map(({ id, parameters }) => [id, parameters]));
-    const options = { model: twoParameterLogistic, fixed } as const;
-    const free = calibrate(sparse, options).items[7]?.parameters;
-    const informed = calibrate(sparse, { ...options, itemPriors: { q8: { b: normalPrior(mean, sd) } } }).items[7]
-      ?.parameters;
+    const options = { fixed } as const;
+    const free = calibrate(sparse, twoParameterLogistic, options).items[7]?.parameters;
+    const informed = calibrate(sparse, twoParameterLogistic, {
+      ...options,
+      itemPriors: { q8: { b: normalPrior(mean, sd) } },
+    }).items[7]?.parameters;
     expect(Math.abs(defined(informed).b - mean)).toBeLessThan(Math.abs(defined(free).b - mean));
-    const strong = calibrate(sparse, { ...options, itemPriors: { q8: { b: normalPrior(mean, 1e-4) } } }).items[7]
-      ?.parameters;
+    const strong = calibrate(sparse, twoParameterLogistic, {
+      ...options,
+      itemPriors: { q8: { b: normalPrior(mean, 1e-4) } },
+    }).items[7]?.parameters;
     expectClose(defined(strong).b, mean, 1e-3);
   });
 
@@ -1784,7 +1788,8 @@ describe("documentation examples", () => {
         responses.map((row) => row.slice(0, 16)),
         { itemIds: ids.slice(0, 16) },
       ),
-      { model: twoParameterLogistic, standardErrors: "hessian" },
+      twoParameterLogistic,
+      { standardErrors: "hessian" },
     );
     const regression = itemFeatureRegression(calibration.items, features);
     const [intercept, steps, open] = regression.effects;
@@ -1807,8 +1812,8 @@ describe("documentation examples", () => {
     );
     const fixed = Object.fromEntries(calibration.items.map(({ id, parameters }) => [id, parameters]));
     const itemPriors = { new1: { b: normalPrior(b.mean, b.sd), a: logNormalPrior(a.mean, a.sd) } };
-    const free = calibrate(sparse, { model: twoParameterLogistic, fixed }).items[16]?.parameters;
-    const informed = calibrate(sparse, { model: twoParameterLogistic, fixed, itemPriors }).items[16]?.parameters;
+    const free = calibrate(sparse, twoParameterLogistic, { fixed }).items[16]?.parameters;
+    const informed = calibrate(sparse, twoParameterLogistic, { fixed, itemPriors }).items[16]?.parameters;
     expect([defined(free).a, defined(free).b]).toEqual([expect.closeTo(1.0, 2), expect.closeTo(0.59, 2)]);
     expect([defined(informed).a, defined(informed).b]).toEqual([expect.closeTo(1.05, 2), expect.closeTo(0.75, 2)]);
   });

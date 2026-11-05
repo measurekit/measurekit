@@ -27,12 +27,6 @@ export interface BifactorStructure {
   readonly groups: readonly ItemGroup[];
 }
 
-/** The options of a bifactor calibration that fix its dimensions. */
-interface StructureOptions {
-  readonly specific: Readonly<Record<string, string | null>>;
-  readonly primary?: LoadingPattern;
-}
-
 /**
  * Returns the dimensions of a bifactor model and the groups of items that share a specific dimension.
  *
@@ -41,9 +35,12 @@ interface StructureOptions {
  * items, there are more than two primary dimensions, a name belongs to a primary and a specific dimension, or there are
  * more than 100 dimensions, primary and specific.
  */
-export function structureOf(options: StructureOptions, itemIds: readonly string[]): BifactorStructure {
-  const { specific, primary } = options;
-  checkRecordById(specific, "The option specific must be an object of specific dimension names by item id");
+export function structureOf(
+  specific: Readonly<Record<string, string | null>>,
+  itemIds: readonly string[],
+  primary?: LoadingPattern,
+): BifactorStructure {
+  checkRecordById(specific, "The specific dimensions must be an object of specific dimension names by item id");
   const specificByItem = specificDimensions(specific, itemIds);
   const primaryByItem = primary === undefined ? itemIds.map(() => [GENERAL]) : primaryDimensions(primary, itemIds);
   const primaryNames = namesInOrder(primaryByItem.flat());

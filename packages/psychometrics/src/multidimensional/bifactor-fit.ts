@@ -10,6 +10,7 @@ import { type Latent, latentDistribution } from "./correlation.js";
 import { expectationMaximization } from "./em.js";
 import { checkTables, type Grid, productGrid } from "./grid.js";
 import { type ItemMaximization, itemMaximization } from "./m-step.js";
+import type { MultidimensionalModel } from "./model.js";
 import type { Settings, Solution } from "./solution.js";
 import { type EmModel, parameterCount } from "./standard-errors.js";
 
@@ -44,7 +45,8 @@ export interface BifactorFit<TParameters> extends EmModel<TParameters> {
  */
 export function bifactorFit<TParameters>(
   responses: CompressedResponses,
-  options: Pick<MultidimensionalCalibrationOptions<TParameters>, "model" | "priors">,
+  model: MultidimensionalModel<TParameters>,
+  options: Pick<MultidimensionalCalibrationOptions<TParameters>, "priors">,
   structure: BifactorStructure,
   points: number,
   pairs: boolean,
@@ -59,7 +61,7 @@ export function bifactorFit<TParameters>(
   table.groups.forEach(({ group }, s) => {
     for (const item of group.items) nodesOfItem[item] = grids[s]?.count ?? 0;
   });
-  const unplaced = setUp(responses, options, design, 0);
+  const unplaced = setUp(responses, model, options, design, 0);
   checkTables(tableEntries(unplaced, table.groups, grids, pairs));
   const items = unplaced.map((item, i) => ({
     ...item,

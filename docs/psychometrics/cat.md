@@ -21,7 +21,7 @@ import { simulateItems } from "@measurekit/psychometrics/sim";
 
 const random = createRandom(7);
 const pool = simulateItems(twoParameterLogistic, 50, random).map((item, j) => ({ id: `q${j + 1}`, ...item }));
-const test = createAdaptiveTest({ pool, stopping: anyOf(standardErrorThreshold(0.4), testLength(20)) });
+const test = createAdaptiveTest(pool, anyOf(standardErrorThreshold(0.4), testLength(20)));
 
 // The person answers each item with its 2PL probability at theta 1.
 let state = test.start(random);
@@ -35,8 +35,8 @@ state.estimate; // => { theta: 0.85, standardError: 0.40 }
 
 ## Adaptive tests
 
-`createAdaptiveTest(options)` returns a test with two functions, `start` and `answer`. Each returns a new state and
-leaves the one it was given unchanged.
+`createAdaptiveTest(pool, stopping, options)` returns a test with two functions, `start` and `answer`. Each returns a
+new state and leaves the one it was given unchanged.
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
@@ -79,11 +79,9 @@ const pool = [
     contentAreas: ["geometry"],
   },
 ];
-const test = createAdaptiveTest({
-  pool,
+const test = createAdaptiveTest(pool, anyOf(testLength(5), allOf(testLength(3), standardErrorThreshold(0.5))), {
   selection: kullbackLeibler,
   estimator: untilMixed(posteriorMeanEstimate, weightedLikelihoodEstimate),
-  stopping: anyOf(testLength(5), allOf(testLength(3), standardErrorThreshold(0.5))),
   contentTargets: { algebra: 0.6, geometry: 0.4 },
 });
 
@@ -95,10 +93,11 @@ while (state.next !== null) state = test.answer(state, answers[state.next] ?? 0,
 state.estimate; // => { theta: 0.485, standardError: 0.66 }
 ```
 
+`pool` holds the items `{ id, model, parameters }`, with an optional `contentAreas`, `testlet` and `exposure`, and
+`stopping` is a [stopping rule](#stopping-rules).
+
 | Option           | Default                 | Meaning                                                                                             |
 | ---------------- | ----------------------- | --------------------------------------------------------------------------------------------------- |
-| `pool`           | required                | Items `{ id, model, parameters }`, with an optional `contentAreas`, `testlet` and `exposure`.       |
-| `stopping`       | required                | A [stopping rule](#stopping-rules).                                                                 |
 | `selection`      | `maximumInformation`    | An [item selection rule](#item-selection).                                                          |
 | `estimator`      | `posteriorMeanEstimate` | An [estimator](#estimators).                                                                        |
 | `contentTargets` | none                    | Target proportions by content area, for [content balancing](#content-balancing). Need not sum to 1. |
@@ -171,8 +170,8 @@ flowchart LR
 | `discriminationIndex`                   | The variance of P(θ) over theta, weighted by L; items of two categories                  | `GDI`                           |
 | `posteriorDiscriminationIndex(options)` | The variance of P(θ) over theta, weighted by L π; items of two categories                | `GDIP`                          |
 | `expectedPosteriorVariance(options)`    | -Σ_k P_k(θ̂) Var(θ \| the responses and k)                                                | `MEPV`                          |
-| `progressive(options)`                  | w I(θ̂) + (1 - w) U max I, U uniform, w from 0 at the first item to 1 at the last planned | `progressive`                   |
-| `proportional(options)`                 | Drawn with probability ∝ I(θ̂)^(Q w)                                                      | `proportional`                  |
+| `progressive(length, options)`          | w I(θ̂) + (1 - w) U max I, U uniform, w from 0 at the first item to 1 at the last planned | `progressive`                   |
+| `proportional(length, options)`         | Drawn with probability ∝ I(θ̂)^(Q w)                                                      | `proportional`                  |
 | `aStratified(lengths)`                  | -\|θ_max - θ̂\| in the scheduled stratum, θ_max where the item's information is largest   | `thOpt` in `aStratified` strata |
 | `randomesque(rule, count)`              | A uniform draw for the `count` items `rule` scores highest, `-Infinity` for the others   | the `randomesque` count         |
 | `startingItems(ids, rule)`              | The first eligible of `ids` for the first `ids.length` selections, then `rule`           | `startItems(fixItems)`          |
@@ -199,30 +198,27 @@ const pool = Array.from({ length: 12 }, (_, i) => ({
   parameters: { a: 0.8 + (i % 4) * 0.3, b: -1.5 + (i * 3) / 11, c: 0, d: 1 },
 }));
 const stopping = testLength(6);
-const fixed = createAdaptiveTest({
-  pool,
-  stopping,
+const fixed = createAdaptiveTest(pool, stopping, {
   selection: startingItems(["q6", "q7"], posteriorWeightedInformation()),
 });
-const expected = createAdaptiveTest({
-  pool,
-  stopping,
+const expected = createAdaptiveTest(pool, stopping, {
   selection: expectedInformation(),
   estimator: posteriorModeEstimate,
 });
-const random = createAdaptiveTest({ pool, stopping, selection: progressive({ length: 6 }) });
+const random = createAdaptiveTest(pool, stopping, { selection: progressive(6) });
 fixed.start(createRandom(1)).next; // => "q6"
 expected.start(createRandom(1)).next; // => "q8": the most information expected after its response
 random.start(createRandom(1)).next; // => "q12", at random: the weight of information is 0 at the first item
 ```
 
-| Option of the rules                       | Default                 | Meaning                                                                     |
-| ----------------------------------------- | ----------------------- | --------------------------------------------------------------------------- |
-| `prior` of the posterior rules            | `{ mean: 0, sd: 1 }`    | The normal prior π of MPWI, KLP, GDIP and MEPV                              |
-| `estimator` of `expectedInformation`      | `posteriorModeEstimate` | The estimate θ̂_k after each possible response; it must estimate any pattern |
-| `information` of `expectedInformation`    | `"observed"`            | `"observed"`, (P'_k / P_k)² - P''_k / P_k of the response k, or `"fisher"`  |
-| `length` of `progressive`, `proportional` | required                | The planned length Q of the test                                            |
-| `acceleration`                            | `1`                     | t of the weight w = Σ_(i ≤ k) i^t / Σ_(i < Q) i^t after k items             |
+| Option of the rules                    | Default                 | Meaning                                                                     |
+| -------------------------------------- | ----------------------- | --------------------------------------------------------------------------- |
+| `prior` of the posterior rules         | `{ mean: 0, sd: 1 }`    | The normal prior π of MPWI, KLP, GDIP and MEPV                              |
+| `estimator` of `expectedInformation`   | `posteriorModeEstimate` | The estimate θ̂_k after each possible response; it must estimate any pattern |
+| `information` of `expectedInformation` | `"observed"`            | `"observed"`, (P'_k / P_k)² - P''_k / P_k of the response k, or `"fisher"`  |
+| `acceleration`                         | `1`                     | t of the weight w = Σ_(i ≤ k) i^t / Σ_(i < Q) i^t after k items             |
+
+`progressive(length)` and `proportional(length)` take the planned length Q of the test as their first argument.
 
 - **The grid.** MLWI, MPWI, KL, KLP and MEPV integrate by the trapezoid rule on 33 points from -4 to 4, catR's default
   `parInt`; GDI and GDIP take a weighted sum on the same points, as catR does. The likelihood, times the prior's density
@@ -369,11 +365,16 @@ const constraints = [
   { area: "recall", minimum: 12, maximum: 18 },
   { area: "apply", minimum: 12, maximum: 18 },
 ];
-const test = createAdaptiveTest({
+const test = createAdaptiveTest(
   pool,
-  selection: randomesque(contentBounds(maximumPriorityIndex(maximumInformation, constraints, 30), constraints, 30), 3),
-  stopping: anyOf(testLength(30), allOf(standardErrorThreshold(0.3), contentMinimumsMet(constraints))),
-});
+  anyOf(testLength(30), allOf(standardErrorThreshold(0.3), contentMinimumsMet(constraints))),
+  {
+    selection: randomesque(
+      contentBounds(maximumPriorityIndex(maximumInformation, constraints, 30), constraints, 30),
+      3,
+    ),
+  },
+);
 const random = createRandom(7);
 let state = test.start(random);
 while (state.next !== null) state = test.answer(state, random.uniform() < 0.6 ? 1 : 0, random);
@@ -484,7 +485,7 @@ const pool = [
 const answers: Record<string, number> = { q1: 1, p1: 1, p2: 0, p3: 1, q2: 0, q3: 1 };
 
 const run = (withinTestlet: "in-order" | "adaptive") => {
-  const test = createAdaptiveTest({ pool, stopping: testLength(3), withinTestlet });
+  const test = createAdaptiveTest(pool, testLength(3), { withinTestlet });
   const random = createRandom(1);
   let state = test.start(random);
   while (state.next !== null) state = test.answer(state, answers[state.next] ?? 0, random);
@@ -510,17 +511,17 @@ An item with an `exposure` parameter k in [0, 1] is subject to Sympson-Hetter co
 when selected, it is administered with probability k, otherwise withheld for the rest of the test, and the rule
 selects again. Items without `exposure`, or with 1, take no random draw. The last eligible item is never withheld.
 
-`calibrateExposure(test, thetas, random, options)` sets the exposure parameters by repeated simulation (Sympson and
-Hetter, 1985). Every item starts at k = 1. Each round simulates `test`, the options of `createAdaptiveTest`, for persons
-with the given thetas; with r the largest exposure rate allowed and P(S) the share of persons who had the item selected,
-administered or withheld, it sets k = r / P(S) where P(S) > r and k = 1 elsewhere, and simulates again until no exposure
-rate exceeds r by more than `tolerance`.
+`calibrateExposure(pool, stopping, thetas, random, maxRate, options)` sets the exposure parameters by repeated
+simulation (Sympson and Hetter, 1985). Every item starts at k = 1. Each round simulates the test of `pool` and
+`stopping` for persons with the given thetas; with r, `maxRate`, the largest exposure rate allowed, above 0 and at most
+1, and P(S) the share of persons who had the item selected, administered or withheld, it sets k = r / P(S) where P(S) >
+r and k = 1 elsewhere, and simulates again until no exposure rate exceeds r by more than `tolerance`. The options are
+those of `createAdaptiveTest` for the test, and:
 
-| Option          | Default  | Meaning                                                     |
-| --------------- | -------- | ----------------------------------------------------------- |
-| `maxRate`       | required | r, the largest exposure rate allowed, above 0 and at most 1 |
-| `tolerance`     | `0.02`   | How far a rate may exceed r at convergence                  |
-| `maxIterations` | `50`     | The most simulations                                        |
+| Option          | Default | Meaning                                    |
+| --------------- | ------- | ------------------------------------------ |
+| `tolerance`     | `0.02`  | How far a rate may exceed r at convergence |
+| `maxIterations` | `50`    | The most simulations                       |
 
 The result holds the `pool` with each item's `exposure`, ready for `createAdaptiveTest`, the `exposureRates` of the last
 simulation, `converged` and `iterations`. Rates vary between simulations by √(r (1 - r) / n) for n thetas, and the
@@ -536,11 +537,14 @@ import { simulateItems, simulateThetas } from "@measurekit/psychometrics/sim";
 
 const random = createRandom(3);
 const pool = simulateItems(twoParameterLogistic, 100, random).map((item, i) => ({ ...item, id: `q${i + 1}` }));
-const options = { pool, stopping: testLength(10) };
-const { pool: controlled, converged } = calibrateExposure(options, simulateThetas(3000, random), random, {
-  maxRate: 0.25,
-});
-const test = createAdaptiveTest({ ...options, pool: controlled });
+const { pool: controlled, converged } = calibrateExposure(
+  pool,
+  testLength(10),
+  simulateThetas(3000, random),
+  random,
+  0.25,
+);
+const test = createAdaptiveTest(controlled, testLength(10));
 ```
 
 ### Recipe: restricted exposure
@@ -563,7 +567,7 @@ const thetas = simulateThetas(500, random);
 let pool = simulateItems(twoParameterLogistic, 60, random).map((item, i) => ({ ...item, id: `q${i + 1}` }));
 const counts = new Map<string, number>();
 for (const theta of thetas) {
-  const test = createAdaptiveTest({ pool, stopping: testLength(15) });
+  const test = createAdaptiveTest(pool, testLength(15));
   const [person] = simulateAdaptiveTest(test, [theta], random).persons;
   for (const id of person?.state.items ?? []) counts.set(id, (counts.get(id) ?? 0) + 1);
   pool = pool.map((item) => ((counts.get(item.id) ?? 0) >= cap * thetas.length ? { ...item, exposure: 0 } : item));
@@ -644,7 +648,7 @@ const sprt = sequentialProbabilityRatio([
   { lower: -0.8, upper: -0.2 },
   { lower: 0.2, upper: 0.8 },
 ]);
-const test = createAdaptiveTest({ pool, stopping: anyOf(testLength(40), allOf(testLength(5), sprt)) });
+const test = createAdaptiveTest(pool, anyOf(testLength(40), allOf(testLength(5), sprt)));
 const { persons } = simulateAdaptiveTest(test, [1.1, -0.1], random);
 persons.map(({ state }) => {
   const administered = state.items.map((id) => pool.findIndex((item) => item.id === id));
@@ -688,7 +692,7 @@ function thetaChangeBelow(threshold: number): StoppingRule {
 
 const random = createRandom(6);
 const pool = simulateItems(twoParameterLogistic, 50, random).map((item, i) => ({ id: `item${i + 1}`, ...item }));
-const test = createAdaptiveTest({ pool, stopping: anyOf(testLength(30), thetaChangeBelow(0.05)) });
+const test = createAdaptiveTest(pool, anyOf(testLength(30), thetaChangeBelow(0.05)));
 const [person] = simulateAdaptiveTest(test, [0.5], random).persons;
 person?.state.items.length; // => 25: the 25th response moved θ̂ by less than 0.05, to 0.44
 ```
@@ -722,11 +726,11 @@ written for one kind of test, such as `maximumInformation`, has the types of tha
 
 ## Diagnostic adaptive tests
 
-`createDiagnosticAdaptiveTest(options)` classifies which attributes a person has mastered. Its estimate is the posterior
-over the 2^K profiles of K attributes, the prior times the probability of each response in the item's latent group of
-the profile, from the items of a [cognitive diagnosis calibration](cdm.md#calibration). The rules use only each item's
-success probabilities by latent group, so items of any model, the G-DINA, DINA and DINO included, work. Like
-`createAdaptiveTest`, it returns a test with `start` and `answer`, each returning a new state.
+`createDiagnosticAdaptiveTest(pool, attributes, stopping, options)` classifies which attributes a person has mastered.
+Its estimate is the posterior over the 2^K profiles of K attributes, the prior times the probability of each response in
+the item's latent group of the profile, from the items of a [cognitive diagnosis calibration](cdm.md#calibration). The
+rules use only each item's success probabilities by latent group, so items of any model, the G-DINA, DINA and DINO
+included, work. Like `createAdaptiveTest`, it returns a test with `start` and `answer`, each returning a new state.
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
@@ -760,11 +764,8 @@ const matrix = simulateCdmResponses({ attributes, items: bank }, profiles, rando
 
 // Calibrate the bank, then test from the calibration: its items are the pool and its profiles the prior.
 const fit = calibrateCdm(matrix, Object.fromEntries(bank.map(({ id, attributes }) => [id, attributes])));
-const test = createDiagnosticAdaptiveTest({
-  pool: fit.items,
-  attributes: fit.attributes,
+const test = createDiagnosticAdaptiveTest(fit.items, fit.attributes, anyOf(testLength(8), posteriorThreshold(0.85)), {
   prior: fit.profiles,
-  stopping: anyOf(testLength(8), posteriorThreshold(0.85)),
 });
 
 // The first person answers the items the test selects.
@@ -782,16 +783,17 @@ result.attributeAccuracy; // => [0.938, 0.934, 0.946]
 result.meanLength; // => 6.726
 ```
 
-| Option           | Default                    | Meaning                                                                                                       |
-| ---------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `pool`           | required                   | Items `{ id, attributes, probabilities }`, with an optional `contentAreas`, `testlet`, `exposure`; see below. |
-| `attributes`     | required                   | From 1 to 20 distinct attribute names, in the order of the profiles. A calibration's `attributes`.            |
-| `prior`          | uniform over the profiles  | `{ profile, proportion }` for each profile: a calibration's `profiles`. A [hierarchy](#prior) has zeros.      |
-| `stopping`       | required                   | A [stopping rule](#stopping-of-diagnostic-tests).                                                             |
-| `selection`      | `gdinaDiscriminationIndex` | An [item selection rule](#selection-of-diagnostic-tests).                                                     |
-| `contentTargets` | none                       | As for [`createAdaptiveTest`](#content-balancing).                                                            |
-| `enemies`        | none                       | As for [`createAdaptiveTest`](#enemy-sets).                                                                   |
-| `withinTestlet`  | `"in-order"`               | As for [`createAdaptiveTest`](#testlets): items with a `testlet` are administered together.                   |
+`pool` holds the items `{ id, attributes, probabilities }`, with an optional `contentAreas`, `testlet`, `exposure`; see
+below. `attributes` are from 1 to 20 distinct attribute names, in the order of the profiles: a calibration's
+`attributes`. `stopping` is a [stopping rule](#stopping-of-diagnostic-tests).
+
+| Option           | Default                    | Meaning                                                                                                  |
+| ---------------- | -------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `prior`          | uniform over the profiles  | `{ profile, proportion }` for each profile: a calibration's `profiles`. A [hierarchy](#prior) has zeros. |
+| `selection`      | `gdinaDiscriminationIndex` | An [item selection rule](#selection-of-diagnostic-tests).                                                |
+| `contentTargets` | none                       | As for [`createAdaptiveTest`](#content-balancing).                                                       |
+| `enemies`        | none                       | As for [`createAdaptiveTest`](#enemy-sets).                                                              |
+| `withinTestlet`  | `"in-order"`               | As for [`createAdaptiveTest`](#testlets): items with a `testlet` are administered together.              |
 
 The pool is an array of calibrated items; a calibration's `items` are one. `attributes` of an item lists the attributes
 it measures, each among the test's, and `probabilities` the probability of a correct response in each of its latent
@@ -879,11 +881,11 @@ random choices, so a seed reproduces the result. The option `testRandom` makes t
 
 ## Multidimensional adaptive tests
 
-`createMultidimensionalAdaptiveTest(options)` administers items of a [multidimensional model](multidimensional.md), such
-as a calibration's, and estimates a vector of thetas, one per dimension. Like `createAdaptiveTest` it returns a test
-with `start` and `answer`, each returning a new state, and runs on the same engine: content balancing, enemy sets,
-exposure control and the stopping rules work alike. It selects by D-optimality: the next item is the one that shrinks
-the confidence ellipsoid of theta the most.
+`createMultidimensionalAdaptiveTest(pool, stopping, options)` administers items of a [multidimensional
+model](multidimensional.md), such as a calibration's, and estimates a vector of thetas, one per dimension. Like
+`createAdaptiveTest` it returns a test with `start` and `answer`, each returning a new state, and runs on the same
+engine: content balancing, enemy sets, exposure control and the stopping rules work alike. It selects by D-optimality:
+the next item is the one that shrinks the confidence ellipsoid of theta the most.
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
@@ -921,9 +923,7 @@ const prior = {
     [0.5, 1],
   ],
 };
-const test = createMultidimensionalAdaptiveTest({
-  pool,
-  stopping: anyOf(testLength(20), standardErrorThreshold(0.5)),
+const test = createMultidimensionalAdaptiveTest(pool, anyOf(testLength(20), standardErrorThreshold(0.5)), {
   selection: maximumDeterminant({ prior }),
   estimator: (items, responses) => multidimensionalPosteriorModeEstimate(items, responses, { prior }),
 });
@@ -946,10 +946,11 @@ result.rootMeanSquareError; // => [0.538, 0.478]
 result.meanLength; // => 16.34
 ```
 
+`pool` holds the items `{ id, model, parameters }`, with an optional `contentAreas`, `testlet`, `exposure`, and
+`stopping` is a [stopping rule](#stopping-rules-of-multidimensional-tests).
+
 | Option           | Default                      | Meaning                                                                                    |
 | ---------------- | ---------------------------- | ------------------------------------------------------------------------------------------ |
-| `pool`           | required                     | Items `{ id, model, parameters }`, with an optional `contentAreas`, `testlet`, `exposure`  |
-| `stopping`       | required                     | A [stopping rule](#stopping-rules-of-multidimensional-tests)                               |
 | `selection`      | `maximumDeterminant()`       | An [item selection rule](#selection-of-multidimensional-tests)                             |
 | `estimator`      | posterior mode under N(0, I) | A [multidimensional estimator](#estimates-of-multidimensional-tests), with a prior         |
 | `contentTargets` | none                         | As for [`createAdaptiveTest`](#content-balancing)                                          |
@@ -1025,8 +1026,8 @@ draws them; the same `random` then makes the test's random choices, so a seed re
 
 ## Multistage tests
 
-`createMultistageTest(options)` administers a panel: stages of modules, one module per stage. Every person takes the
-single module of the first stage; the module's cut points then route to a module of the next stage.
+`createMultistageTest(stages, routing, options)` administers a panel: stages of modules, one module per stage. Every
+person takes the single module of the first stage; the module's cut points then route to a module of the next stage.
 
 ```ts
 import { createMultistageTest } from "@measurekit/psychometrics/cat";
@@ -1041,13 +1042,13 @@ const module = (id: string, difficulties: number[], cuts?: number[]) => ({
   })),
   ...(cuts && { cuts }),
 });
-const test = createMultistageTest({
-  stages: [
+const test = createMultistageTest(
+  [
     [module("routing", [-1, -0.3, 0.3, 1], [2, 3])],
     [module("easy", [-1.5, -1, -0.5]), module("medium", [-0.5, 0, 0.5]), module("hard", [0.5, 1, 1.5])],
   ],
-  routing: "number-correct",
-});
+  "number-correct",
+);
 
 let state = test.start(); // => { modules: [], items: [], responses: [], estimate: { ... }, next: "routing" }
 state = test.answer(state, [1, 1, 0, 0]); // => { modules: ["routing"], next: "medium", ... }: score 2, from 2 to below 3
@@ -1055,10 +1056,11 @@ state = test.answer(state, [1, 0, 1]); // => { modules: ["routing", "medium"], n
 state.estimate; // => { theta: 0.20, standardError: 0.64 }
 ```
 
+`stages` are the stages in order, each a list of modules, the first with one; `routing` is `"number-correct"` or
+`"theta"`.
+
 | Option      | Default                 | Meaning                                                          |
 | ----------- | ----------------------- | ---------------------------------------------------------------- |
-| `stages`    | required                | Stages in order, each a list of modules; the first has one       |
-| `routing`   | required                | `"number-correct"` or `"theta"`                                  |
 | `estimator` | `posteriorMeanEstimate` | An [estimator](#estimators), used after each module and at start |
 
 Modules are `{ id, items, cuts }`. Module and item ids are unique in the panel.
@@ -1111,10 +1113,7 @@ const stages = [
 ];
 multistageCuts(stages); // => [[-0.5, 0.5]]: the routing module's cuts in theta, where the modules' information is equal
 const [cuts] = multistageCuts(stages, { scale: "number-correct" }); // => [2, 3]
-const test = createMultistageTest({
-  stages: [[{ ...module("routing", [-1, -0.3, 0.3, 1]), cuts }], stages[1]],
-  routing: "number-correct",
-});
+const test = createMultistageTest([[{ ...module("routing", [-1, -0.3, 0.3, 1]), cuts }], stages[1]], "number-correct");
 ```
 
 | Option       | Default                 | Meaning                                                                                                    |
@@ -1173,7 +1172,7 @@ import { simulateItems, simulateThetas } from "@measurekit/psychometrics/sim";
 const random = createRandom(7);
 const pool = simulateItems(twoParameterLogistic, 50, random).map((item, i) => ({ ...item, id: `q${i + 1}` }));
 const result = simulateAdaptiveTest(
-  createAdaptiveTest({ pool, stopping: anyOf(testLength(20), standardErrorThreshold(0.4)) }),
+  createAdaptiveTest(pool, anyOf(testLength(20), standardErrorThreshold(0.4))),
   simulateThetas(500, random),
   random,
 );
@@ -1211,7 +1210,7 @@ import { simulateItems } from "@measurekit/psychometrics/sim";
 
 const pool = simulateItems(twoParameterLogistic, 50, createRandom(7)).map((item, i) => ({ ...item, id: `q${i + 1}` }));
 // Each item is drawn from the three most informative.
-const test = createAdaptiveTest({ pool, selection: randomesque(maximumInformation, 3), stopping: testLength(10) });
+const test = createAdaptiveTest(pool, testLength(10), { selection: randomesque(maximumInformation, 3) });
 // The host's generator of a step of a person's session.
 const stepRandom = (person: number, step: number) => createRandom(1000 * (person + 1) + step);
 const [simulated] = simulateAdaptiveTest(test, [0.5], createRandom(8), { testRandom: stepRandom }).persons;
@@ -1226,10 +1225,11 @@ state.items.join() === simulated?.state.items.join(); // => true
 
 ## Form assembly
 
-`assembleForms({ pool, length, content, target, enemies, forms, overlap, random })` assembles fixed forms, such as the modules
-of a multistage panel or parallel forms, by Swanson and Stocking's weighted deviations method, a heuristic that needs no
-solver. The forms take one unit each in rotation, so that no form always chooses first. A unit is an item, or the items of
-a testlet, which a form takes whole.
+`assembleForms(pool, length, options)` assembles fixed forms, such as the modules of a multistage panel or parallel
+forms, by Swanson and Stocking's weighted deviations method, a heuristic that needs no solver. `pool` holds items with
+ids and `contentAreas`, as for an adaptive test, and items with one `testlet` go on a form together; `length` is the
+number of items of each form, from 1 to the pool size. The forms take one unit each in rotation, so that no form always
+chooses first. A unit is an item, or the items of a testlet, which a form takes whole.
 
 ```mermaid
 flowchart LR
@@ -1240,16 +1240,14 @@ flowchart LR
   P --> C["Take the unit with the smallest weighted deviation from the bounds"]
 ```
 
-| Option    | Default                            | Meaning                                                                                                    |
-| --------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `pool`    | required                           | Items with ids and `contentAreas`, as for an adaptive test; items with one `testlet` go on a form together |
-| `length`  | required                           | The number of items of each form, from 1 to the pool size                                                  |
-| `content` | none                               | `{ area, minimum, maximum, weight }`: bounds on the number of items of an area; `weight` defaults to 1     |
-| `target`  | none                               | `{ theta, information, weight }`: the test information wanted at a theta; `weight` defaults to 1           |
-| `enemies` | none                               | Sets of item ids of which a form holds at most one                                                         |
-| `forms`   | `1`                                | The number of forms, a positive integer; forms × (forms + pool items) at most 2^26                         |
-| `overlap` | `0`                                | The most items two forms may share, an integer from 0                                                      |
-| `random`  | none: ties go to the first in pool | A `Random` that orders the pool before assembly, which settles ties                                        |
+| Option    | Default                            | Meaning                                                                                                |
+| --------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `content` | none                               | `{ area, minimum, maximum, weight }`: bounds on the number of items of an area; `weight` defaults to 1 |
+| `target`  | none                               | `{ theta, information, weight }`: the test information wanted at a theta; `weight` defaults to 1       |
+| `enemies` | none                               | Sets of item ids of which a form holds at most one                                                     |
+| `forms`   | `1`                                | The number of forms, a positive integer; forms × (forms + pool items) at most 2^26                     |
+| `overlap` | `0`                                | The most items two forms may share, an integer from 0                                                  |
+| `random`  | none: ties go to the first in pool | A `Random` that orders the pool before assembly, which settles ties                                    |
 
 | Rule                | Meaning                                                                                                                                                                        |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -1265,13 +1263,13 @@ pool of 66,000, which take about 5 s.
 
 `assembleForms` returns one result for each form: the `items` in the order of selection, the `contentCounts` of the
 constrained areas and the test `information` at each target theta, to check the forms against their specification. One
-form is `assembleForms(options)[0]`. A form is short, with fewer than `length` items, where the pool, the enemies or
-`overlap` leave it no unit; two forms share the ids that their items share. A count deviates by items and information by its own units:
-weight the targets to balance them. The method meets feasible blueprints in practice, but it does not prove optimality or
-feasibility as integer programming does: on 85 blueprints built from a hidden feasible form of 30 items, two or three facets and margins of 0
-or 1, it met every bound of four forms, 340 forms in all, and kept all but 3 within 5% of the information target, the worst
-within 7.3% and the median within 1.4%. A solver's minimax forms were within 0.3% of the target. Check the counts,
-the information and the length of each form.
+form is `assembleForms(pool, length, options)[0]`. A form is short, with fewer than `length` items, where the pool, the
+enemies or `overlap` leave it no unit; two forms share the ids that their items share. A count deviates by items and
+information by its own units: weight the targets to balance them. The method meets feasible blueprints in practice, but
+it does not prove optimality or feasibility as integer programming does: on 85 blueprints built from a hidden feasible
+form of 30 items, two or three facets and margins of 0 or 1, it met every bound of four forms, 340 forms in all, and
+kept all but 3 within 5% of the information target, the worst within 7.3% and the median within 1.4%. A solver's minimax
+forms were within 0.3% of the target. Check the counts, the information and the length of each form.
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
@@ -1285,9 +1283,7 @@ const pool = simulateItems(twoParameterLogistic, 300, createRandom(4)).map((item
   id: `q${i + 1}`,
   contentAreas: [areas[i % 3]],
 }));
-const forms = assembleForms({
-  pool,
-  length: 30,
+const forms = assembleForms(pool, 30, {
   forms: 3,
   content: [
     { area: "algebra", minimum: 12, maximum: 14 },

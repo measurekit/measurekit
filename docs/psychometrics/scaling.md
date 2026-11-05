@@ -453,7 +453,7 @@ const thetas = x.map((value, person) => 0.6 * value + (noise[person] ?? 0));
 const responses = simulateResponses(items, thetas, random);
 
 // Free slopes fix σ at 1, so β is in units of the residual SD: 0.6 / 0.8 = 0.75.
-const fit = calibrate(responses, { model: twoParameterLogistic, covariates: { x } });
+const fit = calibrate(responses, twoParameterLogistic, { covariates: { x } });
 const coefficient = fit.regression?.coefficients.x ?? 0; // => 0.72
 const residualSd = fit.regression?.residualSd ?? 1;
 

@@ -3,8 +3,6 @@ import type { ItemSelectionRule } from "./selection.js";
 
 /** Options of {@link progressive} and {@link proportional}. */
 export interface ProgressiveOptions {
-  /** The planned length of the test, Q, catR's `thr` with `rule = "length"`. Required. */
-  readonly length: number;
   /**
    * The acceleration t of the weight: how fast selection turns from chance to information, catR's `AP`.
    *
@@ -13,19 +11,18 @@ export interface ProgressiveOptions {
   readonly acceleration?: number;
 }
 
-const PROGRESSIVE_OPTIONS: FieldNames<ProgressiveOptions> = { length: true, acceleration: true };
+const PROGRESSIVE_OPTIONS: FieldNames<ProgressiveOptions> = { acceleration: true };
 
 /**
  * Returns the weight of each selection of a test: 0 at the first item, Σ_(i ≤ k) i^t / Σ_(i < Q) i^t after k items, and
  * 1 from the last planned item on.
  *
- * @throws `DataError` when the options are not an object, `length` is not a positive integer or `acceleration` is not a
- * non-negative number.
+ * @throws `DataError` when `length` is not a positive integer or `acceleration` is not a non-negative number.
  */
-function progressiveWeight(options: ProgressiveOptions): (administered: number) => number {
+function progressiveWeight(length: number, options: ProgressiveOptions): (administered: number) => number {
   checkOptions(options, PROGRESSIVE_OPTIONS);
-  const { length, acceleration = 1 } = options;
-  checkPositiveInteger(length, "The option length");
+  const { acceleration = 1 } = options;
+  checkPositiveInteger(length, "The planned length");
   checkNonNegative(acceleration, "The option acceleration");
   // Each power is taken of i over the last planned i, so that the largest is 1 and none overflows at a high acceleration.
   const last = length - 1;
@@ -40,6 +37,20 @@ function progressiveWeight(options: ProgressiveOptions): (administered: number) 
   };
 }
 
+/** Returns the rule that scores by `score` at the weight of each selection, as `progressiveWeight` gives it. */
+function weighted(
+  length: number,
+  options: ProgressiveOptions,
+  score: (weight: number, ...context: Parameters<ItemSelectionRule["scores"]>) => void,
+): ItemSelectionRule {
+  const weightAfter = progressiveWeight(length, options);
+  return {
+    scores(context, out) {
+      score(weightAfter(context.administered.length), context, out);
+    },
+  };
+}
+
 /**
  * Returns the progressive method, catR's `progressive` with `rule = "length"`: each item scored by w I(θ̂) + (1 - w) U
  * max I, a weighted sum of its information and a uniform draw up to the largest information of the eligible items.
@@ -50,32 +61,28 @@ function progressiveWeight(options: ProgressiveOptions): (administered: number) 
  * stays 1. Early items spread over the pool, which keeps their exposure low, and late ones are the most informative.
  * The rule draws one uniform number for each eligible item, in pool order, from `context.random`.
  *
- * @param options - The planned length and the acceleration.
+ * @param length - The planned length of the test, Q, catR's `thr` with `rule = "length"`.
+ * @param options - The acceleration.
  * @returns The selection rule.
- * @throws `DataError` when the options are not an object, `length` is not a positive integer or `acceleration` is not a
- * non-negative number.
+ * @throws `DataError` when `length` is not a positive integer or `acceleration` is not a non-negative number.
  * @see {@link https://doi.org/10.1111/j.1745-3984.1998.tb00541.x | Revuelta and Ponsoda (1998)}
  * @see {@link https://doi.org/10.1348/000711007X230937 | Barrada, Olea, Ponsoda and Abad (2008)}
  */
-export function progressive(options: ProgressiveOptions): ItemSelectionRule {
-  const weightAfter = progressiveWeight(options);
-  return {
-    scores({ pool, administered, estimate, eligible, random }, out) {
-      const weight = weightAfter(administered.length);
-      let largest = 0;
-      pool.forEach(({ model, parameters }, index) => {
-        if (eligible[index] !== 1) return;
-        const information = model.information(parameters, estimate.theta);
-        out[index] = information;
-        largest = Math.max(largest, information);
-      });
-      pool.forEach((_, index) => {
-        if (eligible[index] === 1) {
-          out[index] = weight * (out[index] ?? 0) + (1 - weight) * random.uniform() * largest;
-        }
-      });
-    },
-  };
+export function progressive(length: number, options: ProgressiveOptions = {}): ItemSelectionRule {
+  return weighted(length, options, (weight, { pool, estimate, eligible, random }, out) => {
+    let largest = 0;
+    pool.forEach(({ model, parameters }, index) => {
+      if (eligible[index] !== 1) return;
+      const information = model.information(parameters, estimate.theta);
+      out[index] = information;
+      largest = Math.max(largest, information);
+    });
+    pool.forEach((_, index) => {
+      if (eligible[index] === 1) {
+        out[index] = weight * (out[index] ?? 0) + (1 - weight) * random.uniform() * largest;
+      }
+    });
+  });
 }
 
 /**
@@ -89,22 +96,19 @@ export function progressive(options: ProgressiveOptions): ItemSelectionRule {
  * score wins with the probability above. An item without information at the estimate is never drawn once the power is
  * above 0.
  *
- * @param options - The planned length and the acceleration.
+ * @param length - The planned length of the test, Q, catR's `thr` with `rule = "length"`.
+ * @param options - The acceleration.
  * @returns The selection rule.
- * @throws `DataError` when the options are not an object, `length` is not a positive integer or `acceleration` is not a
- * non-negative number.
+ * @throws `DataError` when `length` is not a positive integer or `acceleration` is not a non-negative number.
  * @see {@link https://doi.org/10.1348/000711007X230937 | Barrada, Olea, Ponsoda and Abad (2008)}
  */
-export function proportional(options: ProgressiveOptions): ItemSelectionRule {
-  const weightAfter = progressiveWeight(options);
-  return {
-    scores({ pool, administered, estimate, eligible, random }, out) {
-      const power = options.length * weightAfter(administered.length);
-      pool.forEach(({ model, parameters }, index) => {
-        if (eligible[index] !== 1) return;
-        const logWeight = power === 0 ? 0 : power * Math.log(model.information(parameters, estimate.theta));
-        out[index] = logWeight - Math.log(-Math.log(1 - random.uniform()));
-      });
-    },
-  };
+export function proportional(length: number, options: ProgressiveOptions = {}): ItemSelectionRule {
+  return weighted(length, options, (weight, { pool, estimate, eligible, random }, out) => {
+    const power = length * weight;
+    pool.forEach(({ model, parameters }, index) => {
+      if (eligible[index] !== 1) return;
+      const logWeight = power === 0 ? 0 : power * Math.log(model.information(parameters, estimate.theta));
+      out[index] = logWeight - Math.log(-Math.log(1 - random.uniform()));
+    });
+  });
 }

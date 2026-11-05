@@ -41,7 +41,7 @@ export interface CheckedPool {
  * groups over all items.
  */
 export function checkPool(pool: readonly DiagnosticPoolItem[], attributes: readonly string[]): CheckedPool {
-  checkArray(pool, "The option pool must be an array of items");
+  checkArray(pool, "The pool must be an array of items");
   const positions = new Map(attributes.map((attribute, k) => [attribute, k]));
   const indices = new Map<string, number>();
   const items = pool.map((item, index) => {

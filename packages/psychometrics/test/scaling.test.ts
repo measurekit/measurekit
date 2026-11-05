@@ -1824,8 +1824,7 @@ describe("the recipe for plausible values", () => {
    * responses and own prior, which is the calibration's regression on the covariate if `conditional` is true.
    */
   function plausibleValues(conditional: boolean): { values: number[][]; eap: number[]; coefficient: number } {
-    const fit = calibrate(matrix, {
-      model: twoParameterLogistic,
+    const fit = calibrate(matrix, twoParameterLogistic, {
       ...(conditional && { covariates: { x: [...covariate] } }),
     });
     const coefficient = fit.regression?.coefficients.x ?? 0;

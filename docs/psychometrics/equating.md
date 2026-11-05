@@ -535,8 +535,7 @@ import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/ps
 const random = createRandom(7);
 const truth = simulateItems(twoParameterLogistic, 14, random);
 const matrix = simulateResponses(truth, simulateThetas(2000, random), random);
-const { calibration, covariance } = calibrateWithCovariance(matrix, {
-  model: twoParameterLogistic,
+const { calibration, covariance } = calibrateWithCovariance(matrix, twoParameterLogistic, {
   standardErrors: "hessian",
 });
 if (covariance === null) throw new Error("The calibration has no covariance.");
@@ -599,8 +598,7 @@ const calibrated = (first: number, shift: number) => {
   const ids = Array.from({ length: 10 }, (_, j) => `q${first + j}`);
   const thetas = simulateThetas(1500, random).map((theta) => theta + shift);
   const matrix = simulateResponses(truth.slice(first - 1, first + 9), thetas, random);
-  const { calibration, covariance } = calibrateWithCovariance(matrix, {
-    model: twoParameterLogistic,
+  const { calibration, covariance } = calibrateWithCovariance(matrix, twoParameterLogistic, {
     standardErrors: "hessian",
   });
   if (covariance === null) throw new Error("The calibration has no covariance.");

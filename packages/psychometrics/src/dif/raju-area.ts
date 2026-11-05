@@ -1,6 +1,7 @@
 import { checkBoolean, checkOptions, DataError, logistic, logLogistic, normalCdf } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import type { ScaleTransformation } from "../equating/internal.js";
+import type { IrtModel, LogisticItem } from "../irt/internal.js";
 import { checkGroups, type DifGroup } from "./groups.js";
 import {
   estimatedParameters,
@@ -43,7 +44,7 @@ const UNDEFINED_AREA = {
  * difR's `difRaju`, purified on request.
  *
  * @remarks
- * Each group is calibrated separately and linked as {@link lordChiSquare} does: `calibrate` with `options` and the
+ * Each group is calibrated separately and linked as {@link lordChiSquare} does: `calibrate` with `model`, `options` and the
  * observed information, and the focal group's estimates moved to the reference scale by the mean-sigma transformation
  * over the anchors, a / A and A b + B. With Δb = b_F - b_R and Y = a_F a_R Δb / (a_F - a_R), the signed area of a 2PL
  * item is Δb and the unsigned area |2 (a_F - a_R) ln(1 + e^Y) / (a_F a_R) - Δb|, or |Δb| when the slopes are equal.
@@ -56,8 +57,9 @@ const UNDEFINED_AREA = {
  *
  * @param matrix - The responses of the persons, dichotomous.
  * @param groups - The group of each person, in the order of the matrix.
- * @param options - The model, the held parameters, the quadrature and stopping rules of each group's calibration and
- *   whether to purify the link.
+ * @param model - The model of every item, or one model per item, in item order: the 2PL, 3PL or 4PL.
+ * @param options - The held parameters, the quadrature and stopping rules of each group's calibration and whether to
+ *   purify the link.
  * @returns The areas of every item, and the purification when it was asked for.
  * @throws `DataError` when the matrix or the groups are invalid, a group has no person, a model is not the 2PL, 3PL or
  * 4PL, an item estimates a parameter other than its slope and location, `fixedParameters` is invalid for the items
@@ -69,11 +71,12 @@ const UNDEFINED_AREA = {
 export function rajuAreaDif(
   matrix: ResponseMatrix,
   groups: readonly DifGroup[],
-  options: LinkedDifOptions,
+  model: IrtModel<LogisticItem> | readonly IrtModel<LogisticItem>[],
+  options: LinkedDifOptions = {},
 ): DifAnalysis<RajuArea> {
   checkGroups(matrix, groups);
   checkOptions(options, LINKED_DIF_OPTIONS);
-  const models = linkedModels(options.model, matrix.itemIds.length, "Raju's area");
+  const models = linkedModels(model, matrix.itemIds.length, "Raju's area");
   estimatedParameters(matrix.itemIds, models, options.fixedParameters, "Raju's area").forEach((names, item) => {
     if (names.join() !== AREA_PARAMETERS) {
       throw new DataError(
@@ -83,7 +86,7 @@ export function rajuAreaDif(
   });
   const { purify = false, ...calibration } = options;
   checkBoolean(purify, "The option purify");
-  const calibrations = linkedCalibrations(matrix, groups, calibration, models, "Raju's area");
+  const calibrations = linkedCalibrations(matrix, groups, models, calibration, "Raju's area");
   return purified(
     matrix.itemIds,
     purify,

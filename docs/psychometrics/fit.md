@@ -55,7 +55,7 @@ const raschThetas = matrix.responses.map((row) => weightedLikelihoodEstimate(ras
 itemFit(matrix, rasch.items, raschThetas); // => [{ id: "item1", infitMeanSquare: 0.50, outfitMeanSquare: 0.48, ... }, ...]
 
 // Items of any model: S-X², lz and Q3. With few persons, a prior keeps the slopes finite.
-const { items } = calibrate(matrix, { model: twoParameterLogistic, priors: { a: logNormalPrior(0, 0.5) } });
+const { items } = calibrate(matrix, twoParameterLogistic, { priors: { a: logNormalPrior(0, 0.5) } });
 const thetas = matrix.responses.map((row) => posteriorMeanEstimate(items, row).theta);
 summedScoreFit(matrix, items);
 // => [{ id: "item1", chiSquare: null, degreesOfFreedom: 0, significance: null }, ...]: these few persons leave no
@@ -168,7 +168,7 @@ import {
 const random = createRandom(11);
 const items = simulateItems(twoParameterLogistic, 6, random);
 const matrix = simulateResponses(items, simulateThetas(1000, random), random);
-const calibration = calibrate(matrix, { model: twoParameterLogistic });
+const calibration = calibrate(matrix, twoParameterLogistic);
 rootMeanSquareDeviation(matrix, calibration.items)[0]; // => { id: "item1", rmsd: 0.0020, meanDeviation: -2.7e-7 }
 localDependenceChiSquare(matrix, calibration.items)[0];
 // => { items: ["item1", "item2"], chiSquare: 0.041, degreesOfFreedom: 1, significance: 0.84, cramersV: -0.0064 }
@@ -302,7 +302,7 @@ const matrix = buildResponseMatrix(
 );
 
 // The calibration takes the items as independent; the bootstrap repeats it with the items' models.
-const fit = calibrate(matrix, { model: twoParameterLogistic });
+const fit = calibrate(matrix, twoParameterLogistic);
 const q3 = yenQ3CriticalValue(matrix, fit.items, createRandom(1), { replications: 100 });
 q3.criticalExcess; // => 0.115
 q3.flagged.map((pair) => pair.items); // => [["item2", "item3"], ["item1", "item2"], ["item1", "item3"]]
@@ -413,7 +413,7 @@ import {
 const random = createRandom(7);
 const items = simulateItems(twoParameterLogistic, 12, random);
 const matrix = simulateResponses(items, simulateThetas(1000, random), random);
-const fit = limitedInformationFit(matrix, calibrate(matrix, { model: twoParameterLogistic }));
+const fit = limitedInformationFit(matrix, calibrate(matrix, twoParameterLogistic));
 fit.statistic; // => 39.90
 fit.degreesOfFreedom; // => 54
 fit.significance; // => 0.92

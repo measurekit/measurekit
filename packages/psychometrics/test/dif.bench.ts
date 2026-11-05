@@ -41,13 +41,13 @@ test("tests 30 items of 2,000 persons in two groups for differential functioning
   await benchmark(
     context,
     "dif.lordChiSquare",
-    () => lordChiSquare(dichotomous, groups, { model: twoParameterLogistic }),
+    () => lordChiSquare(dichotomous, groups, twoParameterLogistic),
     SLOW_OPTIONS,
   );
   await benchmark(
     context,
     "dif.lordChiSquarePurified",
-    () => lordChiSquare(dichotomous, groups, { model: twoParameterLogistic, purify: true }),
+    () => lordChiSquare(dichotomous, groups, twoParameterLogistic, { purify: true }),
     SLOW_OPTIONS,
   );
 });
@@ -59,13 +59,12 @@ test("tests 10 items of 4 categories of 1,000 persons in two groups by ordinal l
 test("tests 15 items of 2,000 persons in two groups by IRT and by SIBTEST", async (context) => {
   const matrix = buildResponseMatrix(irtFixture.responses, { itemIds: irtFixture.itemIds });
   const irtGroups = groupsOf(irtFixture.focal);
-  const options = { model: twoParameterLogistic };
   await benchmark(
     context,
     "dif.irtLikelihoodRatio",
-    () => irtLikelihoodRatioDif(matrix, irtGroups, options),
+    () => irtLikelihoodRatioDif(matrix, irtGroups, twoParameterLogistic),
     SLOW_OPTIONS,
   );
-  await benchmark(context, "dif.rajuArea", () => rajuAreaDif(matrix, irtGroups, options), SLOW_OPTIONS);
+  await benchmark(context, "dif.rajuArea", () => rajuAreaDif(matrix, irtGroups, twoParameterLogistic), SLOW_OPTIONS);
   await benchmark(context, "dif.sibtest", () => sibtest(matrix, irtGroups));
 });

@@ -22,7 +22,7 @@ import {
   regressionEstimate,
 } from "./latent.js";
 import { type Maximization, maximization, unboundedCoordinates } from "./m-step.js";
-import type { TestItem } from "./model.js";
+import type { IrtModel, TestItem } from "./model.js";
 import type { ParameterCovariance } from "./parameter-covariance.js";
 import { quadratureRule } from "./quadrature.js";
 import { type CompressedResponses, compressResponses, respondentsOf } from "./responses.js";
@@ -108,8 +108,10 @@ const DEFAULT_MAX_ITERATIONS = 500;
  * expected counts, the log-likelihood, the starting values and the cross-products.
  *
  * @param data - The responses of the persons, as a matrix or as records.
- * @param options - The model, fixed items and their covariance, priors, quadrature, groups, distributions of theta,
- *   covariates, standard errors, testlets, person weights and stopping rules; each option has its default.
+ * @param model - The model of every item, or one model per item, in item order. A list of models with different
+ *   parameters needs its type written out, such as `IrtModel<LogisticItem | ThresholdItem>[]`.
+ * @param options - Fixed items and their covariance, priors, quadrature, groups, distributions of theta, covariates,
+ *   standard errors, testlets, person weights and stopping rules; each option has its default.
  * @returns The items with their parameters, the groups, the regression, the testlets, the log-likelihood, AIC and BIC,
  *   whether the EM converged and the iterations run.
  * @throws `DataError` when the matrix or an option is invalid, there are no responses, a fixed item's parameters are
@@ -136,16 +138,17 @@ const DEFAULT_MAX_ITERATIONS = 500;
  * const random = createRandom(7);
  * const items = simulateItems(twoParameterLogistic, 5, random);
  * const responses = simulateResponses(items, simulateThetas(200, random), random);
- * const fit = calibrate(responses, { model: twoParameterLogistic });
+ * const fit = calibrate(responses, twoParameterLogistic);
  * fit.items[0]?.parameters; // => { a: 1.43, b: 0.16, c: 0, d: 1 }
  * fit.converged; // => true
  * ```
  */
 export function calibrate<TParameters>(
   data: ResponseMatrix | ResponseRecords,
-  options: CalibrationOptions<TParameters>,
+  model: IrtModel<TParameters> | readonly IrtModel<TParameters>[],
+  options: CalibrationOptions<TParameters> = {},
 ): Calibration<TParameters> {
-  return calibrateWithCovariance(data, options).calibration;
+  return calibrateWithCovariance(data, model, options).calibration;
 }
 
 /** A calibration with the covariance matrix of its estimated item parameters. */
@@ -171,16 +174,18 @@ export interface CovarianceCalibration<TParameters> {
  * delta method for a function of the item parameters, such as an equated score, is `gᵀ Σ g` with `g` the gradient.
  *
  * @param data - The responses of the persons, as a matrix or as records.
+ * @param model - The model of every item, as `calibrate` takes it.
  * @param options - The options of `calibrate`.
  * @returns The calibration and the covariance matrix of the estimated item parameters.
  * @throws `DataError` as {@link calibrate} does.
  */
 export function calibrateWithCovariance<TParameters>(
   data: ResponseMatrix | ResponseRecords,
-  options: CalibrationOptions<TParameters>,
+  model: IrtModel<TParameters> | readonly IrtModel<TParameters>[],
+  options: CalibrationOptions<TParameters> = {},
 ): CovarianceCalibration<TParameters> {
   checkOptions(options, CALIBRATION_OPTIONS);
-  return calibrateResponses(compressResponses(data), options);
+  return calibrateResponses(compressResponses(data), model, options);
 }
 
 /**
@@ -192,6 +197,7 @@ export function calibrateWithCovariance<TParameters>(
  */
 export function calibrateResponses<TParameters>(
   responses: CompressedResponses,
+  model: IrtModel<TParameters> | readonly IrtModel<TParameters>[],
   options: CalibrationOptions<TParameters>,
   starts?: readonly TParameters[],
 ): CovarianceCalibration<TParameters> {
@@ -202,7 +208,7 @@ export function calibrateResponses<TParameters>(
   const { answered, respondents } = respondentsOf(responses);
   const rule = quadratureRule(options.quadrature);
   const { nodes } = rule;
-  const setup = setUp(responses, options, answered, rule, starts);
+  const setup = setUp(responses, model, options, answered, rule, starts);
   const { items, values, population: latent, design } = setup;
   const fixedError = fixedErrorOf(options.fixedCovariance, items, standardErrors);
   if (standardErrors !== "none") {

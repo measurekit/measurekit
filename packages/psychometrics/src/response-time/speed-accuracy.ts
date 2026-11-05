@@ -190,11 +190,10 @@ export function calibrateSpeedAccuracy<TParameters>(
   const { answered, respondents } = respondentsOf(timed);
   const rule = quadratureRule(quadrature);
   const irtOptions: CalibrationOptions<TParameters> = {
-    model,
     ...(priors === undefined ? {} : { priors }),
     ...(quadrature === undefined ? {} : { quadrature }),
   };
-  const setup = setUp(timed, irtOptions, answered, rule);
+  const setup = setUp(timed, model, irtOptions, answered, rule);
   const itemCount = timed.itemIds.length;
   const estimated = setup.values.length + 2 * itemCount + 2;
   if (standardErrors === "hessian") checkStandardErrorSize(estimated);

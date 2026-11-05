@@ -67,13 +67,12 @@ describe("a record whose keys are parameter names", () => {
       const matrix = buildResponseMatrix(fourItemRows());
       const prior = { mean: 0, sd: 1 };
       expect(() =>
-        calibrate(matrix, {
-          model: twoParameterLogistic,
+        calibrate(matrix, twoParameterLogistic, {
           priors: JSON.parse(`{ "${key}": ${JSON.stringify(prior)} }`),
         }),
       ).toThrow(`found the reserved key "${key}".`);
       const fixedParameters = record([[defined(matrix.itemIds[0]), JSON.parse(`{ "${key}": 1 }`)]]);
-      expect(() => calibrate(matrix, { model: twoParameterLogistic, fixedParameters })).toThrow(
+      expect(() => calibrate(matrix, twoParameterLogistic, { fixedParameters })).toThrow(
         `found the reserved key "${key}".`,
       );
     });
@@ -145,7 +144,7 @@ describe("a record whose keys are the user's identifiers", () => {
   it("holds them in the specific and primary dimensions, and in the loadings, of a design", () => {
     const specific = record(ids.map((id, index) => [id, index < 2 ? "s" : null]));
     const primary = record(ids.map((id) => [id, ["g"]]));
-    expect(structureOf({ specific, primary }, ids).design.dimensionNames).toEqual(["g", "s"]);
+    expect(structureOf(specific, ids, primary).design.dimensionNames).toEqual(["g", "s"]);
     const loadings = record(ids.map((id) => [id, ["g"]]));
     expect(designOf({ loadings }, ids).dimensionNames).toEqual(["g"]);
   });
@@ -205,25 +204,22 @@ describe("a record whose keys are the user's identifiers", () => {
   it("holds them as the items that a calibration fixes, and as testlets and covariates", () => {
     const matrix = buildResponseMatrix(fourItemRows(), { itemIds: ids });
     const fixed = record([["constructor", { a: 1, b: 0, c: 0, d: 1 }]]);
-    const held = calibrate(matrix, { model: twoParameterLogistic, fixed, maxIterations: 20 });
+    const held = calibrate(matrix, twoParameterLogistic, { fixed, maxIterations: 20 });
     expect(held.items.find(({ id }) => id === "constructor")?.parameters).toMatchObject({ a: 1, b: 0 });
     const testlets = record([
       ["constructor", ["__proto__", "constructor"]],
       ["__proto__", ["prototype", "item4"]],
     ]);
     const quadrature = { method: "rectangular", points: 11 } as const;
-    expect(
-      calibrate(matrix, { model: twoParameterLogistic, testlets, quadrature, maxIterations: 2 }).items,
-    ).toHaveLength(4);
+    expect(calibrate(matrix, twoParameterLogistic, { testlets, quadrature, maxIterations: 2 }).items).toHaveLength(4);
     const covariates = record([["constructor", matrix.personIds.map((_, person) => person % 2)]]);
-    expect(calibrate(matrix, { model: twoParameterLogistic, covariates, maxIterations: 2 }).regression).toBeDefined();
+    expect(calibrate(matrix, twoParameterLogistic, { covariates, maxIterations: 2 }).regression).toBeDefined();
   });
 
   it("holds them as the items that a multidimensional calibration fixes", () => {
     const matrix = buildResponseMatrix(fourItemRows(), { itemIds: ids });
     const fixed = record([["constructor", { a: [1], intercept: 0, c: 0, d: 1 }]]);
-    const { items } = calibrateMultidimensional(matrix, {
-      model: multidimensionalTwoParameterLogistic,
+    const { items } = calibrateMultidimensional(matrix, multidimensionalTwoParameterLogistic, {
       dimensions: 1,
       fixed,
       maxIterations: 2,
@@ -240,6 +236,6 @@ describe("a record whose keys are the user's identifiers", () => {
       ["constructor", 1],
       ["__proto__", 1],
     ]);
-    expect(createAdaptiveTest({ pool, stopping: testLength(2), contentTargets })).toBeDefined();
+    expect(createAdaptiveTest(pool, testLength(2), { contentTargets })).toBeDefined();
   });
 });

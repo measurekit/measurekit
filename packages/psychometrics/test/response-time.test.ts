@@ -564,7 +564,7 @@ describe("calibrateSpeedAccuracy", () => {
       { ...PRECISE },
     );
     expect(listed).toEqual(joint);
-    const separate = calibrate(matrix, { model: twoParameterLogistic, tolerance: 1e-10 });
+    const separate = calibrate(matrix, twoParameterLogistic, { tolerance: 1e-10 });
     expect(Math.abs(joint.correlation)).toBeLessThan(0.15);
     joint.items.forEach((item, i) => {
       const alone = defined(separate.items[i]);
@@ -665,7 +665,7 @@ describe("calibrateSpeedAccuracy", () => {
       'There is no option "verbose"',
     );
     expect(() => calibrateSpeedAccuracy(matrix, JSON.parse("{}"))).toThrow(
-      "The option model must be an IRT model such as twoParameterLogistic, found an object.",
+      "The model must be an IRT model such as twoParameterLogistic, found an object.",
     );
     expect(() => calibrateSpeedAccuracy(matrix, model, { standardErrors: JSON.parse('"exact"') })).toThrow(
       'The option standardErrors must be "none" or "hessian", found "exact".',

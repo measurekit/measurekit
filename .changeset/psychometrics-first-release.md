@@ -14,6 +14,10 @@ simulation, standard setting, rater agreement and rater effects, including the m
 times with the joint model of speed and accuracy, and change between two occasions: gains, the reliability of a
 difference and reliable change.
 
+A function takes what it needs as arguments, `calibrate(data, model, options)`, `createAdaptiveTest(pool, stopping, options)` and
+`assembleForms(pool, length, options)`, and its options hold only what has a default, which a strict reader refuses to
+misspell.
+
 The EM calibrations of the multidimensional models, the many-facet Rasch model and the linear logistic test model
 accelerate EM with SQUAREM, and the posterior means of a data set tabulate the log probabilities of each item once. At the
 default tolerance the estimates stop closer to the maximum than plain EM would, by up to about 1e-3, and the iterations

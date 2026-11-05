@@ -10,11 +10,10 @@ import {
 import { type AdaptiveTestOptions, createAdaptiveTest } from "./adaptive-test.js";
 import type { PoolItem } from "./items.js";
 import { type ExposureRate, simulateAdaptiveTest } from "./simulation.js";
+import type { StoppingRule } from "./stopping.js";
 
-/** Options of {@link calibrateExposure}. */
-export interface ExposureCalibrationOptions {
-  /** The largest exposure rate allowed, r: above 0 and at most 1. */
-  readonly maxRate: number;
+/** Options of {@link calibrateExposure}: those of the test it simulates, and its own. */
+export interface ExposureCalibrationOptions extends AdaptiveTestOptions {
   /**
    * The procedure has converged when no exposure rate exceeds `maxRate` by more than this. Take it above the sampling
    * error of a rate, √(r (1 - r) / n) for n thetas, several times over, as the largest of many rates exceeds r by about
@@ -32,7 +31,11 @@ export interface ExposureCalibrationOptions {
 }
 
 const EXPOSURE_CALIBRATION_OPTIONS: FieldNames<ExposureCalibrationOptions> = {
-  maxRate: true,
+  selection: true,
+  estimator: true,
+  contentTargets: true,
+  enemies: true,
+  withinTestlet: true,
   tolerance: true,
   maxIterations: true,
 };
@@ -56,46 +59,56 @@ const DEFAULT_MAX_ITERATIONS = 50;
  * Calibrates Sympson-Hetter exposure parameters by repeated simulation.
  *
  * @remarks
- * Every item starts at k = 1; each round simulates the adaptive test of `test` for persons with the given thetas, and,
+ * Every item starts at k = 1; each round simulates the adaptive test of the pool for persons with the given thetas, and,
  * with P(S) the share of persons who had an item selected, administered or withheld, sets k = r / P(S) where P(S) > r
- * and k = 1 elsewhere, until no exposure rate exceeds r by more than `tolerance`. Exposure parameters in `test.pool`
- * are ignored. The same `random` draws every simulation, so a seed reproduces the calibration. When the test length
+ * and k = 1 elsewhere, until no exposure rate exceeds r by more than `tolerance`. Exposure parameters in `pool` are
+ * ignored. The same `random` draws every simulation, so a seed reproduces the calibration. When the test length
  * divided by the pool size exceeds r, no parameters can meet r and the procedure does not converge.
  *
- * @param test - The options of the test, with the pool whose exposure parameters are calibrated.
+ * @param pool - The pool whose exposure parameters are calibrated.
+ * @param stopping - The rule that ends the test, as `createAdaptiveTest` takes it.
  * @param thetas - The abilities of the persons simulated.
  * @param random - The generator of the simulations.
- * @param options - The largest exposure rate, the tolerance and the most iterations.
+ * @param maxRate - The largest exposure rate allowed, r: above 0 and at most 1.
+ * @param options - The options of `createAdaptiveTest`, the tolerance and the most iterations.
  * @returns The pool with the calibrated exposure parameters, the exposure rate of each item, whether the calibration
  *   converged and the iterations run.
- * @throws `DataError` when the options of the test or of the procedure are invalid, or without thetas.
+ * @throws `DataError` when `maxRate` or the options of the test or of the procedure are invalid, or without thetas.
  * @see {@link https://doi.org/10.1037/10244-014 | Hetter and Sympson (1997)}
  */
 export function calibrateExposure(
-  test: AdaptiveTestOptions,
+  pool: readonly PoolItem[],
+  stopping: StoppingRule,
   thetas: readonly number[],
   random: Random,
-  options: ExposureCalibrationOptions,
+  maxRate: number,
+  options: ExposureCalibrationOptions = {},
 ): ExposureCalibration {
   checkOptions(options, EXPOSURE_CALIBRATION_OPTIONS);
-  const { maxRate, tolerance = DEFAULT_TOLERANCE, maxIterations = DEFAULT_MAX_ITERATIONS } = options;
+  const { tolerance = DEFAULT_TOLERANCE, maxIterations = DEFAULT_MAX_ITERATIONS, ...test } = options;
   if (!(typeof maxRate === "number" && maxRate > 0 && maxRate <= 1)) {
-    throw new DataError(`The option maxRate must be a number above 0 and at most 1, found ${describe(maxRate)}.`);
+    throw new DataError(`The maximum rate must be a number above 0 and at most 1, found ${describe(maxRate)}.`);
   }
   checkStopping(tolerance, maxIterations);
   checkRandom(random);
-  const items = createAdaptiveTest(test).pool;
+  const items = createAdaptiveTest(pool, stopping, test).pool;
   let parameters = items.map(() => 1);
   for (let iteration = 1; ; iteration++) {
-    const pool = items.map((item, i) => ({ ...item, exposure: parameters[i] ?? 1 }));
-    const { persons, exposureRates } = simulateAdaptiveTest(createAdaptiveTest({ ...test, pool }), thetas, random);
+    const calibrated = items.map((item, i) => ({ ...item, exposure: parameters[i] ?? 1 }));
+    const { persons, exposureRates } = simulateAdaptiveTest(
+      createAdaptiveTest(calibrated, stopping, test),
+      thetas,
+      random,
+    );
     const converged = exposureRates.every(({ rate }) => rate <= maxRate + tolerance);
-    if (converged || iteration === maxIterations) return { pool, exposureRates, converged, iterations: iteration };
-    const selected = new Map(pool.map(({ id }) => [id, 0]));
+    if (converged || iteration === maxIterations) {
+      return { pool: calibrated, exposureRates, converged, iterations: iteration };
+    }
+    const selected = new Map(calibrated.map(({ id }) => [id, 0]));
     for (const { state } of persons) {
       for (const id of [...state.items, ...state.withheld]) selected.set(id, (selected.get(id) ?? 0) + 1);
     }
-    parameters = pool.map(({ id }) => {
+    parameters = calibrated.map(({ id }) => {
       const rate = (selected.get(id) ?? 0) / persons.length;
       return rate > maxRate ? maxRate / rate : 1;
     });

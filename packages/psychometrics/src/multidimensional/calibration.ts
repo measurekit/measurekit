@@ -12,7 +12,7 @@ import { calibrateByEm, MAX_EM_DIMENSIONS } from "./em.js";
 import { checkCorrelatedGroups } from "./groups.js";
 import { standardizedLoadings } from "./loadings.js";
 import { calibrateByMhrm } from "./mhrm.js";
-import type { MultidimensionalTestItem } from "./model.js";
+import type { MultidimensionalModel, MultidimensionalTestItem } from "./model.js";
 import type { Settings, Solution } from "./solution.js";
 
 /** An item with its calibrated parameters. */
@@ -129,8 +129,11 @@ const METHODS: readonly CalibrationMethod[] = ["em", "mhrm"];
  * An exploratory solution is determined up to the signs of its dimensions; {@link rotateLoadings} rotates it.
  *
  * @param data - The responses of the persons, as a matrix or as records.
- * @param options - The model, the method, the dimensions or loadings, the groups, fixed items and held parameters, the
- *   priors, the quadrature, the standard errors and the stopping rules; each option has its default.
+ * @param model - The model of every item, or one model per item, in item order. A list of models with different
+ *   parameters needs its type written out, such as `MultidimensionalModel<MultidimensionalLogisticParameters |
+ *   MultidimensionalGradedParameters>[]`.
+ * @param options - The method, the dimensions or loadings, the groups, fixed items and held parameters, the priors, the
+ *   quadrature, the standard errors and the stopping rules; each option has its default.
  * @returns The items with their parameters, the correlations of the dimensions, the groups, the standardized loadings
  *   and communalities, the log-likelihood, AIC and BIC, whether the estimation converged and the iterations run.
  * @throws `DataError` when the data or an option is invalid, there are no responses, neither or both of `dimensions`
@@ -160,7 +163,7 @@ const METHODS: readonly CalibrationMethod[] = ["em", "mhrm"];
  * const thetas = Array.from({ length: 500 }, () => [random.normal(), random.normal()]);
  * const matrix = simulateMultidimensionalResponses(items, thetas, random);
  * const loadings = Object.fromEntries(matrix.itemIds.map((id, i) => [id, [i < 3 ? "verbal" : "quantitative"]]));
- * const fit = calibrateMultidimensional(matrix, { model: multidimensionalTwoParameterLogistic, loadings });
+ * const fit = calibrateMultidimensional(matrix, multidimensionalTwoParameterLogistic, { loadings });
  * fit.dimensions; // => ["verbal", "quantitative"]
  * fit.converged; // => true
  * fit.items[0]?.parameters; // => { a: [1.08, 0], intercept: -0.9, c: 0, d: 1 }
@@ -169,7 +172,8 @@ const METHODS: readonly CalibrationMethod[] = ["em", "mhrm"];
  */
 export function calibrateMultidimensional<TParameters>(
   data: ResponseMatrix | ResponseRecords,
-  options: MultidimensionalCalibrationOptions<TParameters>,
+  model: MultidimensionalModel<TParameters> | readonly MultidimensionalModel<TParameters>[],
+  options: MultidimensionalCalibrationOptions<TParameters> = {},
 ): MultidimensionalCalibration<TParameters> {
   checkOptions(options, MULTIDIMENSIONAL_CALIBRATION_OPTIONS);
   const responses = compressResponses(data);
@@ -188,14 +192,15 @@ export function calibrateMultidimensional<TParameters>(
   checkStopping(tolerance, maxIterations);
   const settings: Settings = { tolerance, maxIterations, seed, standardErrors, points: options.points };
   const solution = em
-    ? calibrateByEm(responses, options, design, settings)
-    : mhrm(responses, options, design, settings);
+    ? calibrateByEm(responses, model, options, design, settings)
+    : mhrm(responses, model, options, design, settings);
   return assemble(design, solution, respondents);
 }
 
 /** Estimates by MH-RM, which takes neither a grid nor the cross-product standard errors. */
 function mhrm<TParameters>(
   responses: CompressedResponses,
+  model: MultidimensionalModel<TParameters> | readonly MultidimensionalModel<TParameters>[],
   options: MultidimensionalCalibrationOptions<TParameters>,
   design: Design,
   settings: Settings,
@@ -212,7 +217,7 @@ function mhrm<TParameters>(
   }
   if (design.correlated)
     checkCorrelatedGroups([null], [respondentsOf(responses).respondents], design.dimensionNames.length);
-  const items = setUp(responses, options, design, 0);
+  const items = setUp(responses, model, options, design, 0);
   const fit = calibrateByMhrm(responses, items, design, {
     tolerance: settings.tolerance,
     maxIterations: settings.maxIterations,

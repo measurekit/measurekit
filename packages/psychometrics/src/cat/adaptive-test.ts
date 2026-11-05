@@ -9,10 +9,6 @@ import type { TestControlOptions } from "./test-controls.js";
 
 /** Options of {@link createAdaptiveTest}. */
 export interface AdaptiveTestOptions extends TestControlOptions {
-  /** The item pool. */
-  readonly pool: readonly PoolItem[];
-  /** The rule that ends the test. The test also ends when no item is left or the selection rule scores every eligible item `-Infinity`. */
-  readonly stopping: StoppingRule;
   /**
    * The rule that selects the next item.
    *
@@ -28,8 +24,6 @@ export interface AdaptiveTestOptions extends TestControlOptions {
 }
 
 const ADAPTIVE_TEST_OPTIONS: FieldNames<AdaptiveTestOptions> = {
-  pool: true,
-  stopping: true,
   selection: true,
   estimator: true,
   contentTargets: true,
@@ -46,8 +40,11 @@ const ADAPTIVE_TEST_OPTIONS: FieldNames<AdaptiveTestOptions> = {
  * Sympson-Hetter exposure control administers or withholds the selected item. Items administered, withheld or enemies
  * of an administered item are not eligible. Items that share a `testlet` are administered together: see the guide.
  *
- * @param options - The pool, the stopping and selection rules, the estimator, and the content balancing, enemy sets and
- *   testlet order; each option has its default.
+ * @param pool - The item pool.
+ * @param stopping - The rule that ends the test. The test also ends when no item is left or the selection rule scores
+ *   every eligible item `-Infinity`.
+ * @param options - The selection rule, the estimator, and the content balancing, enemy sets and testlet order; each
+ *   option has its default.
  * @returns The test: `start` gives the state before the first response, and `answer` the state after a response.
  * @throws `DataError` when `stopping`, `selection` or `estimator` is not a rule or function, an item's id or
  * parameters are invalid, ids repeat, an exposure parameter is outside [0, 1], a testlet is not a non-empty string, a
@@ -64,7 +61,7 @@ const ADAPTIVE_TEST_OPTIONS: FieldNames<AdaptiveTestOptions> = {
  *   { id: "q2", model: twoParameterLogistic, parameters: { a: 1.2, b: 0, c: 0, d: 1 } },
  *   { id: "q3", model: twoParameterLogistic, parameters: { a: 0.8, b: 1, c: 0, d: 1 } },
  * ];
- * const test = createAdaptiveTest({ pool, stopping: testLength(2) });
+ * const test = createAdaptiveTest(pool, testLength(2));
  * const random = createRandom(1);
  * let state = test.start(random);
  * state.next; // => "q2", the id of the first item
@@ -72,11 +69,13 @@ const ADAPTIVE_TEST_OPTIONS: FieldNames<AdaptiveTestOptions> = {
  * state.next; // => "q3"; null when the test has ended
  * ```
  */
-export function createAdaptiveTest(options: AdaptiveTestOptions): AdaptiveTest {
+export function createAdaptiveTest(
+  pool: readonly PoolItem[],
+  stopping: StoppingRule,
+  options: AdaptiveTestOptions = {},
+): AdaptiveTest {
   checkOptions(options, ADAPTIVE_TEST_OPTIONS);
   const {
-    pool,
-    stopping,
     selection = maximumInformation,
     estimator = posteriorMeanEstimate,
     contentTargets,

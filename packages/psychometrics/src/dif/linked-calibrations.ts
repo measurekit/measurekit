@@ -38,7 +38,6 @@ export const LINKED_DIF_OPTIONS: FieldNames<LinkedDifOptions> = {
   testlets: true,
   priors: true,
   itemPriors: true,
-  model: true,
   quadrature: true,
   tolerance: true,
   maxIterations: true,
@@ -107,7 +106,7 @@ export function estimatedParameters(
  * Calibrates each group separately with the observed information, for the statistics that compare an item's estimates.
  * The asymptotes `fixedParameters` holds are held in both groups, and compared in neither.
  *
- * @param models - The model of each item, in item order, as checked from `options.model`.
+ * @param models - The model of each item, in item order, as checked by `linkedModels`.
  * @param statistic - Names the statistic in error messages.
  * @throws `DataError` when `fixedParameters` is invalid for the items, a group has no person, or a group's calibration
  * throws it.
@@ -115,14 +114,14 @@ export function estimatedParameters(
 export function linkedCalibrations(
   matrix: ResponseMatrix,
   groups: readonly DifGroup[],
-  options: LinkedDifOptions,
   models: readonly IrtModel<LogisticItem>[],
+  options: LinkedDifOptions,
   statistic: string,
 ): LinkedCalibrations {
   const estimated = estimatedParameters(matrix.itemIds, models, options.fixedParameters, statistic);
   const groupOptions = { ...options, standardErrors: "hessian" } as const;
-  const reference = calibrateWithCovariance(groupMatrix(matrix, groups, "reference", statistic), groupOptions);
-  const focal = calibrateWithCovariance(groupMatrix(matrix, groups, "focal", statistic), groupOptions);
+  const reference = calibrateWithCovariance(groupMatrix(matrix, groups, "reference", statistic), models, groupOptions);
+  const focal = calibrateWithCovariance(groupMatrix(matrix, groups, "focal", statistic), models, groupOptions);
   const referenceBlocks = itemBlocks(reference.covariance);
   const focalBlocks = itemBlocks(focal.covariance);
   return {

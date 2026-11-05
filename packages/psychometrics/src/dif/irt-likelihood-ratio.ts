@@ -7,6 +7,7 @@ import {
   checkHeldParameters,
   checkModel,
   type FixedParameters,
+  type IrtModel,
   modelsOf,
   readFixedParameters,
 } from "../irt/internal.js";
@@ -14,13 +15,13 @@ import { checkGroups, type DifGroup } from "./groups.js";
 import { type DifAnalysis, type PurificationOptions, purified, significant } from "./purification.js";
 
 /**
- * Options of {@link irtLikelihoodRatioDif}: the model, the parameters held in both groups (`fixedParameters`), the
+ * Options of {@link irtLikelihoodRatioDif}: the parameters held in both groups (`fixedParameters`), the
  * quadrature and stopping rules of the calibrations, and `purify`. The groups and their distributions of theta are the
  * test's own, priors would turn the likelihood ratio into a ratio of posteriors, and person weights would turn it into
  * a ratio of pseudo-likelihoods, which is not chi-square.
  */
-export type IrtDifOptions<TParameters> = Omit<
-  CalibrationOptions<TParameters>,
+export type IrtDifOptions = Omit<
+  CalibrationOptions<unknown>,
   | "fixed"
   | "fixedCovariance"
   | "groups"
@@ -34,8 +35,7 @@ export type IrtDifOptions<TParameters> = Omit<
 > &
   PurificationOptions;
 
-const IRT_DIF_OPTIONS: FieldNames<IrtDifOptions<unknown>> = {
-  model: true,
+const IRT_DIF_OPTIONS: FieldNames<IrtDifOptions> = {
   fixedParameters: true,
   quadrature: true,
   tolerance: true,
@@ -98,8 +98,9 @@ const LATENT = { focal: "normal" } as const;
  *
  * @param matrix - The responses of the persons.
  * @param groups - The group of each person, in the order of the matrix.
- * @param options - The model, the held parameters, the quadrature, which must be rectangular, and the stopping rules of
- *   the calibrations, and whether to purify.
+ * @param model - The model of every item, or one model per item, in item order.
+ * @param options - The held parameters, the quadrature, which must be rectangular, and the stopping rules of the
+ *   calibrations, and whether to purify.
  * @returns The test of every item, the purification when it was asked for, and the constrained calibration of the last
  *   round.
  * @throws `DataError` when the matrix or the groups are invalid, there are fewer than two items, `fixedParameters` is
@@ -110,18 +111,19 @@ const LATENT = { focal: "normal" } as const;
 export function irtLikelihoodRatioDif<TParameters>(
   matrix: ResponseMatrix,
   groups: readonly DifGroup[],
-  options: IrtDifOptions<TParameters>,
+  model: IrtModel<TParameters> | readonly IrtModel<TParameters>[],
+  options: IrtDifOptions = {},
 ): IrtDif<TParameters> {
   checkGroups(matrix, groups);
   checkOptions(options, IRT_DIF_OPTIONS);
-  const { purify = false, model, fixedParameters = {}, quadrature, tolerance, maxIterations } = options;
+  const { purify = false, fixedParameters = {}, quadrature, tolerance, maxIterations } = options;
   checkBoolean(purify, "The option purify");
   const { itemIds } = matrix;
   if (itemIds.length < MINIMUM_ITEMS) {
     throw new DataError(`IRT likelihood-ratio DIF needs at least ${MINIMUM_ITEMS} items, found ${itemIds.length}.`);
   }
   const models = modelsOf(model, itemIds.length, (each) => {
-    checkModel(each, "The option model must be an IRT model such as twoParameterLogistic");
+    checkModel(each, "The model must be an IRT model such as twoParameterLogistic");
   });
   const highest = highestResponses(matrix);
   const heldOfItem = readFixedParameters(fixedParameters, itemIds, new Set());
@@ -134,15 +136,18 @@ export function irtLikelihoodRatioDif<TParameters>(
   });
   const testable = itemIds.map((_, item) => answersEveryCategory(matrix, groups, item, highest[item] ?? 0));
   const fit = (free: Uint8Array): Calibration<TParameters> =>
-    calibrate(splitMatrix(matrix, groups, free), {
-      model: models.flatMap((each, item) => (free[item] === 1 ? [each, each] : [each])),
-      fixedParameters: splitHeld(fixedParameters, itemIds, free),
-      quadrature,
-      tolerance,
-      maxIterations,
-      groups,
-      latent: LATENT,
-    });
+    calibrate(
+      splitMatrix(matrix, groups, free),
+      models.flatMap((each, item) => (free[item] === 1 ? [each, each] : [each])),
+      {
+        fixedParameters: splitHeld(fixedParameters, itemIds, free),
+        quadrature,
+        tolerance,
+        maxIterations,
+        groups,
+        latent: LATENT,
+      },
+    );
   let constrained: Calibration<TParameters> | undefined;
   const statistics = (anchors: Uint8Array): IrtDifTest[] => {
     const free = anchors.map((anchor) => 1 - anchor);

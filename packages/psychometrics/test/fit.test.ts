@@ -837,8 +837,7 @@ function calibratedCase(
   fixed?: Readonly<Record<string, FixtureParameters>>,
   latent?: string,
 ): Calibration<unknown> {
-  return calibrate(matrix, {
-    model: defined(MODELS[model]),
+  return calibrate(matrix, defined(MODELS[model]), {
     tolerance: LIMITED_EM_TOLERANCE,
     maxIterations: 100_000,
     ...(fixed !== undefined && { fixed: definedEntries(fixed) }),
@@ -933,12 +932,15 @@ describe("limitedInformationFit", () => {
   it("matches the M2* written out for a calibration with held parameters, which add no columns to Δ", () => {
     const { held } = limited;
     const matrix = buildResponseMatrix(held.responses);
-    const calibration = calibrate(matrix, {
-      model: held.models.map((name) => defined(MODELS[name])),
-      fixedParameters: held.fixedParameters,
-      tolerance: LIMITED_EM_TOLERANCE,
-      maxIterations: 100_000,
-    });
+    const calibration = calibrate(
+      matrix,
+      held.models.map((name) => defined(MODELS[name])),
+      {
+        fixedParameters: held.fixedParameters,
+        tolerance: LIMITED_EM_TOLERANCE,
+        maxIterations: 100_000,
+      },
+    );
     const result = limitedInformationFit(matrix, calibration);
     expectLimitedFit(result, held.expected, "held parameters");
     expect(held.mirtStatistic).toBeLessThan(defined(result.statistic));
@@ -966,7 +968,7 @@ describe("limitedInformationFit", () => {
       const matrix = buildResponseMatrix(responses.map((row) => Array.from(row, Number)));
       const result = limitedInformationFit(
         matrix,
-        calibrate(matrix, { model: twoParameterLogistic, tolerance: 1e-6, maxIterations: 10_000 }),
+        calibrate(matrix, twoParameterLogistic, { tolerance: 1e-6, maxIterations: 10_000 }),
       );
       expectClose(result.statistic, statistic, REJECTION_TOLERANCE, "M2 of a set");
       expect(result.degreesOfFreedom).toBe(degreesOfFreedom);
@@ -1000,7 +1002,7 @@ describe("limitedInformationFit", () => {
 
   it("leaves the statistic null without degrees of freedom, with SRMSR", () => {
     const { matrix } = simulated(21, 300, 3);
-    const result = limitedInformationFit(matrix, calibrate(matrix, { model: twoParameterLogistic }));
+    const result = limitedInformationFit(matrix, calibrate(matrix, twoParameterLogistic));
     expect(result).toMatchObject({
       statistic: null,
       degreesOfFreedom: 0,
@@ -1017,8 +1019,7 @@ describe("limitedInformationFit", () => {
     const rows = simulated(22, 300, 5).matrix.responses.map((row) => [1, ...row]);
     const matrix = buildResponseMatrix(rows);
     const anchor = { a: 1, b: -3, c: 0, d: 1 };
-    const calibration = calibrate(matrix, {
-      model: twoParameterLogistic,
+    const calibration = calibrate(matrix, twoParameterLogistic, {
       fixed: { [defined(matrix.itemIds[0])]: anchor },
     });
     const result = limitedInformationFit(matrix, calibration);
@@ -1031,14 +1032,14 @@ describe("limitedInformationFit", () => {
     const factorial = buildResponseMatrix(
       Array.from({ length: 64 }, (_, person) => [0, 1, 2, 3, 4, 5].map((i) => (person >> i) & 1)),
     );
-    const result = limitedInformationFit(factorial, calibrate(factorial, { model: oneParameterLogistic }));
+    const result = limitedInformationFit(factorial, calibrate(factorial, oneParameterLogistic));
     expect(defined(result.statistic)).toBeGreaterThan(0);
     expect(result).toMatchObject({ tli: null, cfi: null });
   });
 
   it("refuses more than 60 items", () => {
     const { matrix } = simulated(24, 50, 61);
-    const calibration = calibrate(matrix, { model: twoParameterLogistic, maxIterations: 1 });
+    const calibration = calibrate(matrix, twoParameterLogistic, { maxIterations: 1 });
     expect(() => limitedInformationFit(matrix, calibration)).toThrow(/at most 60 items, found 61/);
   });
 
@@ -1048,7 +1049,7 @@ describe("limitedInformationFit", () => {
       Array.from({ length: 60 }, (_, item) => (person + item) % 3),
     );
     const matrix = buildResponseMatrix(rows);
-    const calibration = calibrate(matrix, { model: gradedResponse, maxIterations: 1 });
+    const calibration = calibrate(matrix, gradedResponse, { maxIterations: 1 });
     expect(limitedInformationFit(matrix, calibration, { statistic: "m2-star" }).degreesOfFreedom).toBeGreaterThan(0);
     expect(() => limitedInformationFit(matrix, calibration, { statistic: "c2" })).toThrow(
       'The statistic "c2" has 1890 moments, a category above the lowest of each item and each pair of items, and takes at most 1830, as many as 60 dichotomous items have; test fewer items, or items of fewer categories.',
@@ -1059,16 +1060,16 @@ describe("limitedInformationFit", () => {
     const { matrix } = simulated(25, 200, 6);
     const groups = matrix.personIds.map((_, person) => (person % 2 === 0 ? "a" : "b"));
     const model = twoParameterLogistic;
-    const grouped = calibrate(matrix, { model, groups, maxIterations: 2 });
+    const grouped = calibrate(matrix, model, { groups, maxIterations: 2 });
     expect(() => limitedInformationFit(matrix, grouped)).toThrow(/one group, found 2/);
     const covariates = { x: matrix.personIds.map((_, person) => person % 3) };
-    const regression = calibrate(matrix, { model, covariates, maxIterations: 2 });
+    const regression = calibrate(matrix, model, { covariates, maxIterations: 2 });
     expect(() => limitedInformationFit(matrix, regression)).toThrow(/does not take covariates/);
     const testlets = { passage: matrix.itemIds.slice(0, 2) };
-    const local = calibrate(matrix, { model, testlets, maxIterations: 2 });
+    const local = calibrate(matrix, model, { testlets, maxIterations: 2 });
     expect(() => limitedInformationFit(matrix, local)).toThrow(/does not take testlets/);
     const anchors = { [defined(matrix.itemIds[0])]: { a: 1, b: 0, c: 0, d: 1 } };
-    const histogram = calibrate(matrix, { model, fixed: anchors, latent: "empirical-histogram", maxIterations: 2 });
+    const histogram = calibrate(matrix, model, { fixed: anchors, latent: "empirical-histogram", maxIterations: 2 });
     expect(() => limitedInformationFit(matrix, histogram)).toThrow(/empirical histogram/);
   });
 
@@ -1099,16 +1100,16 @@ describe("limitedInformationFit", () => {
       [1, 1, 1],
       [2, 2, 2],
     ]);
-    const graded = calibrate(matrix, { model: defined(MODELS.grm), maxIterations: 2 });
+    const graded = calibrate(matrix, defined(MODELS.grm), { maxIterations: 2 });
     expect(() => limitedInformationFit(matrix, graded, { statistic: "m2" })).toThrow(/"m2" needs dichotomous/);
-    const nominal = calibrate(matrix, { model: nominalResponse, maxIterations: 2 });
+    const nominal = calibrate(matrix, nominalResponse, { maxIterations: 2 });
     expect(() => limitedInformationFit(matrix, nominal)).toThrow(/ordered categories/);
     expect(() => limitedInformationFit(matrix, nominal, { statistic: "c2" })).toThrow(/ordered categories/);
   });
 
   it("needs two persons who answered every item", () => {
     const { matrix } = simulated(26, 50, 5);
-    const calibration = calibrate(matrix, { model: twoParameterLogistic, maxIterations: 2 });
+    const calibration = calibrate(matrix, twoParameterLogistic, { maxIterations: 2 });
     const few = buildResponseMatrix(
       matrix.responses.map((row, person) => (person === 0 ? row : [null, ...row.slice(1)])),
     );
@@ -1119,14 +1120,14 @@ describe("limitedInformationFit", () => {
 
   it("refuses a calibration of other items", () => {
     const { matrix } = simulated(27, 50, 5);
-    const calibration = calibrate(matrix, { model: twoParameterLogistic, maxIterations: 2 });
+    const calibration = calibrate(matrix, twoParameterLogistic, { maxIterations: 2 });
     const other = { ...matrix, itemIds: [...matrix.itemIds].reverse() };
     expect(() => limitedInformationFit(other, calibration)).toThrow(/but the calibration has/);
   });
 
   it("refuses arguments of other types", () => {
     const { matrix } = simulated(28, 50, 5);
-    const calibration = calibrate(matrix, { model: twoParameterLogistic, maxIterations: 2 });
+    const calibration = calibrate(matrix, twoParameterLogistic, { maxIterations: 2 });
     expect(() => limitedInformationFit(JSON.parse("null"), calibration)).toThrow(DataError);
     expect(() => limitedInformationFit(matrix, JSON.parse("null"))).toThrow(/must be the result of calibrate/);
     expect(() => limitedInformationFit(matrix, JSON.parse("[]"))).toThrow(DataError);
@@ -1685,7 +1686,7 @@ describe("yenQ3CriticalValue", () => {
         row.map((response, j) => ((matrix.responses[person]?.[j] ?? null) === null ? null : response)),
       );
       const replicated = buildResponseMatrix(rows, { itemIds: matrix.itemIds });
-      const fit = calibrate(replicated, { model: twoParameterLogistic });
+      const fit = calibrate(replicated, twoParameterLogistic);
       const thetas = abilityEstimates(replicated, fit.items).map((estimate) => estimate.theta ?? 0);
       const q3 = yenQ3(replicated, fit.items, thetas).flatMap((row, i) =>
         row.flatMap((value, j) => (j > i && value !== null ? [value] : [])),
@@ -1809,7 +1810,7 @@ describe("properties", () => {
       fc.property(seeds, fc.constantFrom<"m2" | "m2-star" | "c2">("m2", "m2-star", "c2"), (seed, statistic) => {
         const { matrix } = simulated(seed, 150, 5);
         const model: IrtModel = oneParameterLogistic;
-        const calibration = calibrate(matrix, { model, maxIterations: 50 });
+        const calibration = calibrate(matrix, model, { maxIterations: 50 });
         const fit = limitedInformationFit(matrix, calibration, { statistic });
         expect(defined(fit.statistic)).toBeGreaterThanOrEqual(0);
         const persons = buildResponseMatrix([...matrix.responses].reverse(), { itemIds: matrix.itemIds });

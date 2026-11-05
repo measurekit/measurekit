@@ -50,7 +50,7 @@ const responses = simulated.responses.map((row, person) =>
   person === 3 ? [...(simulated.responses[2] ?? []).slice(0, 20), ...row.slice(20)] : row,
 );
 const matrix = buildResponseMatrix(responses);
-const { items } = calibrate(matrix, { model: nominalResponse });
+const { items } = calibrate(matrix, nominalResponse);
 const thetas = abilityEstimates(matrix, items).map(({ theta }) => theta ?? 0);
 
 const rooms = matrix.personIds.map((_, person) => `room${Math.floor(person / 20) + 1}`);

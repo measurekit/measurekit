@@ -38,7 +38,7 @@ console.log("Easiest item:", byMean.at(-1)?.id, "p =", byMean.at(-1)?.mean?.toFi
 console.log("Cronbach's alpha:", cronbachAlpha(matrix).toFixed(3));
 
 // Item response theory: calibrate, then check the fit of the items to the estimated abilities.
-const irt = calibrate(matrix, { model: twoParameterLogistic, standardErrors: "hessian" });
+const irt = calibrate(matrix, twoParameterLogistic, { standardErrors: "hessian" });
 console.log("Converged in", irt.iterations, "iterations; log-likelihood", irt.logLikelihood.toFixed(1));
 const estimates = abilityEstimates(matrix, irt.items);
 const thetas = estimates.map((estimate) => estimate.theta ?? 0);
@@ -58,7 +58,7 @@ const flagged = mantelHaenszel(matrix, groups).items.filter((item) => item.etsCa
 console.log("Items with DIF:", flagged.map((item) => `${item.id} (${item.etsCategory})`).join(", "));
 
 // An adaptive test of the first person on the calibrated items: each next item is the most informative one.
-const test = createAdaptiveTest({ pool: irt.items, stopping: anyOf(testLength(12), standardErrorThreshold(0.4)) });
+const test = createAdaptiveTest(irt.items, anyOf(testLength(12), standardErrorThreshold(0.4)));
 const answers = Object.fromEntries(matrix.itemIds.map((id, j) => [id, matrix.responses[0]?.[j] ?? 0]));
 let state = test.start(random);
 while (state.next !== null) state = test.answer(state, answers[state.next] ?? 0, random);

@@ -595,7 +595,7 @@ describe("recovery", () => {
     const random = createRandom(20261029);
     const items = simulateItems(twoParameterLogistic, 20, random);
     const matrix = simulateResponses(items, simulateThetas(2000, random), random);
-    const result = calibrate(matrix, { model: twoParameterLogistic, standardErrors: "hessian" });
+    const result = calibrate(matrix, twoParameterLogistic, { standardErrors: "hessian" });
     expect(result.converged).toBe(true);
     const errors: Record<"a" | "b", number[]> = { a: [], b: [] };
     result.items.forEach((estimate, j) => {
@@ -641,8 +641,7 @@ describe("recovery", () => {
     });
     const matrix = simulateMultidimensionalResponses(items, thetas, random);
     const loadings = Object.fromEntries(items.map((_, i) => [`item${i + 1}`, [`D${(i % 3) + 1}`]]));
-    const result = calibrateMultidimensional(matrix, {
-      model: multidimensionalTwoParameterLogistic,
+    const result = calibrateMultidimensional(matrix, multidimensionalTwoParameterLogistic, {
       loadings,
       points: 11,
       standardErrors: "cross-product",
@@ -703,8 +702,7 @@ describe("recovery", () => {
     });
     const matrix = simulateMultidimensionalResponses(items, thetas, random);
     const loadings = Object.fromEntries(items.map((_, i) => [`item${i + 1}`, [`D${(i % dimensions) + 1}`]]));
-    const result = calibrateMultidimensional(matrix, {
-      model: multidimensionalTwoParameterLogistic,
+    const result = calibrateMultidimensional(matrix, multidimensionalTwoParameterLogistic, {
       loadings,
       method: "mhrm",
       seed: 20261029,

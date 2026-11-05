@@ -19,7 +19,7 @@ import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/ps
 const random = createRandom(7);
 const truth = simulateItems(twoParameterLogistic, 10, random);
 const matrix = simulateResponses(truth, simulateThetas(1000, random), random);
-const { items, converged } = calibrate(matrix, { model: twoParameterLogistic });
+const { items, converged } = calibrate(matrix, twoParameterLogistic);
 converged; // => true
 truth[0]?.parameters; // => { a: 0.85, b: -0.13, c: 0, d: 1 }
 items[0]?.parameters; // => { a: 0.83, b: -0.18, c: 0, d: 1 }: the estimates of the first item
@@ -132,8 +132,7 @@ const models: IrtModel<LogisticItem | ThresholdItem>[] = [
   threeParameterLogistic,
   generalizedPartialCredit,
 ];
-const result = calibrate(matrix, {
-  model: models,
+const result = calibrate(matrix, models, {
   fixed: { item1: { a: 1.2, b: -0.5, c: 0.2, d: 1 } },
   priors: { a: logNormalPrior(0, 0.5), c: betaPrior(5, 17) },
   standardErrors: "hessian",
@@ -144,13 +143,12 @@ result.items[3];
 result.logLikelihood; // => -23.3; the result also has aic, bic, converged and iterations
 ```
 
-`calibrate(data, options)` takes a [response matrix](data.md) or, for sparse
-data, [response records](data.md#response-records): both give the same calibration, and records take memory
-in proportion to the responses only.
+`calibrate(data, model, options)` takes a [response matrix](data.md) or, for sparse data, [response
+records](data.md#response-records): both give the same calibration, and records take memory in proportion to the
+responses only. `model` is one model for every item, or an array with one per item, such as the 3PL and the GPCM.
 
 | Option            | Default             | Meaning                                                                                                                                    |
 | ----------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `model`           | required            | One model for every item, or an array with one per item, such as the 3PL and the GPCM.                                                     |
 | `fixed`           | none                | Parameters of anchor items by item id. They are not estimated; the others take their scale.                                                |
 | `fixedCovariance` | none                | The covariance of the `fixed` items' estimates, whose error the standard errors then carry: [error of fixed items](#error-of-fixed-items). |
 | `priors`          | none                | A prior per vector entry name, such as `{ c: betaPrior(5, 17) }`, for every item estimating it.                                            |
@@ -222,17 +220,16 @@ may have more categories than its responses reach.
 
 ### Covariance of the item parameters
 
-`calibrateWithCovariance(data, options)` calibrates as `calibrate` does, with the same options, and also returns the
-covariance matrix of all the estimated item parameters, with the covariances between items that the items' own
-standard errors leave out. A function of the parameters of several items, such as an equated score, has the variance
-gᵀ Σ g by the delta method, g its gradient and Σ this matrix.
+`calibrateWithCovariance(data, model, options)` calibrates as `calibrate` does, with the same model and options, and
+also returns the covariance matrix of all the estimated item parameters, with the covariances between items that the
+items' own standard errors leave out. A function of the parameters of several items, such as an equated score, has the
+variance gᵀ Σ g by the delta method, g its gradient and Σ this matrix.
 
 ```ts continues
 import { betaPrior, calibrateWithCovariance, logNormalPrior } from "@measurekit/psychometrics/irt";
 
 // `matrix` and `models` are those of the example above.
-const { covariance } = calibrateWithCovariance(matrix, {
-  model: models,
+const { covariance } = calibrateWithCovariance(matrix, models, {
   fixed: { item1: { a: 1.2, b: -0.5, c: 0.2, d: 1 } },
   priors: { a: logNormalPrior(0, 0.5), c: betaPrior(5, 17) },
   standardErrors: "hessian",
@@ -303,8 +300,7 @@ const thetas = [
   ...simulateThetas(500, random),
   ...simulateThetas(500, random, { distribution: normalDistribution(0.5, 1.2) }),
 ];
-const result = calibrate(simulateResponses(items, thetas, random), {
-  model: twoParameterLogistic,
+const result = calibrate(simulateResponses(items, thetas, random), twoParameterLogistic, {
   groups: thetas.map((_, person) => (person < 500 ? "2025" : "2026")),
   latent: { "2026": "normal" },
 });
@@ -351,12 +347,12 @@ const thetas = x.map((value, person) => 0.6 * value + (noise[person] ?? 0));
 const responses = simulateResponses(items, thetas, random);
 
 // Free slopes: sigma is 1, so the coefficient is 0.6 / 0.8 in units of the residual SD.
-const free = calibrate(responses, { model: twoParameterLogistic, covariates: { x }, standardErrors: "hessian" });
+const free = calibrate(responses, twoParameterLogistic, { covariates: { x }, standardErrors: "hessian" });
 free.regression; // => { coefficients: { x: 0.72 }, residualSd: 1, standardErrors: { x: 0.04 } }
 
 // Six items fixed at their generating values fix the scale, so sigma is estimated.
 const anchors = Object.fromEntries(items.slice(0, 6).map((item, j) => [`item${j + 1}`, item.parameters]));
-const anchored = calibrate(responses, { model: twoParameterLogistic, covariates: { x }, fixed: anchors });
+const anchored = calibrate(responses, twoParameterLogistic, { covariates: { x }, fixed: anchors });
 anchored.regression; // => { coefficients: { x: 0.57 }, residualSd: 0.79, standardErrors: null }
 
 // A person's ability given the responses: the prior is N(xᵀβ, σ²) with the person's own mean.
@@ -407,8 +403,7 @@ const data = buildResponseRecords(
   ),
 );
 const fixed = Object.fromEntries(items.slice(0, 20).map((item, j) => [`item${j + 1}`, item.parameters]));
-const result = calibrate(data, {
-  model: twoParameterLogistic,
+const result = calibrate(data, twoParameterLogistic, {
   fixed,
   latent: "normal",
   standardErrors: "cross-product",
@@ -442,16 +437,19 @@ import { normalDistribution, simulateItems, simulateResponses, simulateThetas } 
 // Items 1 to 10 are calibrated on 300 persons; 1,000 others of N(0.3, 1.1²) take them with the pretest items 11 and 12.
 const random = createRandom(7);
 const items = simulateItems(twoParameterLogistic, 12, random);
-const bank = calibrateWithCovariance(simulateResponses(items.slice(0, 10), simulateThetas(300, random), random), {
-  model: twoParameterLogistic,
-  standardErrors: "hessian",
-});
+const bank = calibrateWithCovariance(
+  simulateResponses(items.slice(0, 10), simulateThetas(300, random), random),
+  twoParameterLogistic,
+  {
+    standardErrors: "hessian",
+  },
+);
 const fixed = Object.fromEntries(bank.calibration.items.map((item) => [item.id, item.parameters]));
 const thetas = simulateThetas(1000, random, { distribution: normalDistribution(0.3, 1.1) });
 const pretest = simulateResponses(items, thetas, random);
-const options = { model: twoParameterLogistic, fixed, latent: "normal", standardErrors: "hessian" } as const;
-const known = calibrate(pretest, options);
-const carried = calibrate(pretest, { ...options, fixedCovariance: bank.covariance ?? undefined });
+const options = { fixed, latent: "normal", standardErrors: "hessian" } as const;
+const known = calibrate(pretest, twoParameterLogistic, options);
+const carried = calibrate(pretest, twoParameterLogistic, { ...options, fixedCovariance: bank.covariance ?? undefined });
 known.items[10]?.standardErrors; // => { a: 0.145, b: 0.218 }: item 11, its fixed items taken as known
 carried.items[10]?.standardErrors; // => { a: 0.166, b: 0.265 }: with their error
 known.groups[0]?.standardErrors; // => { mean: 0.041, sd: 0.042 }; carried, { mean: 0.086, sd: 0.088 }
@@ -532,8 +530,7 @@ const matrix = buildResponseMatrix(
   ],
   { itemIds: ["p1q1", "p1q2", "p1q3", "p2q1", "p2q2", "p2q3"] },
 );
-const result = calibrate(matrix, {
-  model: twoParameterLogistic,
+const result = calibrate(matrix, twoParameterLogistic, {
   testlets: { passage1: ["p1q1", "p1q2", "p1q3"], passage2: ["p2q1", "p2q2", "p2q3"] },
 });
 const { testlets } = result;
@@ -579,10 +576,10 @@ const responses = simulateResponses(items, thetas, random);
 const personWeights = thetas.map((theta) => (theta > 0 ? 4 / 3 : 4));
 
 items[0]?.parameters; // => { a: 0.91, b: -0.24, c: 0, d: 1 }, the truth
-const weighted = calibrate(responses, { model: twoParameterLogistic, personWeights, standardErrors: "hessian" });
+const weighted = calibrate(responses, twoParameterLogistic, { personWeights, standardErrors: "hessian" });
 weighted.items[0]?.parameters; // => { a: 0.90, b: -0.17, c: 0, d: 1 }, on the population's scale
 weighted.items[0]?.standardErrors; // => { a: 0.069, b: 0.060 }
-const unweighted = calibrate(responses, { model: twoParameterLogistic });
+const unweighted = calibrate(responses, twoParameterLogistic);
 unweighted.items[0]?.parameters; // => { a: 0.82, b: -0.68, c: 0, d: 1 }, on the scale of the sample, whose mean is higher
 ```
 
@@ -633,8 +630,7 @@ const random = createRandom(2026);
 const items = simulateItems(twoParameterLogistic, 6, random);
 const responses = simulateResponses(items, simulateThetas(300, random), random);
 const fixed = Object.fromEntries(items.slice(0, 5).map((item, j) => [`item${j + 1}`, item.parameters]));
-calibrate(responses, {
-  model: twoParameterLogistic,
+calibrate(responses, twoParameterLogistic, {
   fixed,
   itemPriors: { item6: { b: normalPrior(0.4, 0.8) } },
 });
@@ -664,8 +660,7 @@ const items = simulateItems(threeParameterLogistic, 8, random).map((item) => ({
 }));
 const responses = simulateResponses(items, simulateThetas(2000, random), random);
 const fixedParameters = Object.fromEntries(responses.itemIds.map((id) => [id, { c: 0.25 }]));
-const { calibration, covariance } = calibrateWithCovariance(responses, {
-  model: threeParameterLogistic,
+const { calibration, covariance } = calibrateWithCovariance(responses, threeParameterLogistic, {
   fixedParameters,
   standardErrors: "hessian",
 });
@@ -712,7 +707,7 @@ import type { ResponseMatrix } from "@measurekit/psychometrics/data";
 import { calibrate, twoParameterLogistic } from "@measurekit/psychometrics/irt";
 
 self.onmessage = (event: MessageEvent<ResponseMatrix>) => {
-  const { items, logLikelihood, converged } = calibrate(event.data, { model: twoParameterLogistic });
+  const { items, logLikelihood, converged } = calibrate(event.data, twoParameterLogistic);
   // Models hold functions, which postMessage cannot copy: send the ids and parameters.
   self.postMessage({ items: items.map(({ id, parameters }) => ({ id, parameters })), logLikelihood, converged });
 };
@@ -1086,8 +1081,8 @@ const items = Array.from({ length: 12 }, (_, j) => ({
 }));
 const responses = simulateResponses(items, simulateThetas(1000, random), random);
 
-const restricted = calibrate(responses, { model: oneParameterLogistic });
-const general = calibrate(responses, { model: twoParameterLogistic });
+const restricted = calibrate(responses, oneParameterLogistic);
+const general = calibrate(responses, twoParameterLogistic);
 const parameters = (fit: { aic: number; logLikelihood: number }) => (fit.aic + 2 * fit.logLikelihood) / 2;
 const chiSquare = 2 * (general.logLikelihood - restricted.logLikelihood);
 const degreesOfFreedom = parameters(general) - parameters(restricted);
@@ -1132,13 +1127,13 @@ const items = Array.from({ length: 8 }, (_, j) => ({
   parameters: { a: 0.8 + 0.1 * j, b: -1.4 + 0.4 * j, c: 0, d: 1 },
 }));
 const matrix = simulateResponses(items, simulateThetas(1000, random), random);
-const fit = calibrate(matrix, { model: twoParameterLogistic, standardErrors: "hessian" });
+const fit = calibrate(matrix, twoParameterLogistic, { standardErrors: "hessian" });
 
 // 400 calibrations of persons drawn with replacement.
 const persons = matrix.responses.length;
 const replicates = Array.from({ length: 400 }, () => {
   const rows = Array.from({ length: persons }, () => matrix.responses[Math.floor(random.uniform() * persons)] ?? []);
-  return calibrate(buildResponseMatrix(rows, { itemIds: matrix.itemIds }), { model: twoParameterLogistic });
+  return calibrate(buildResponseMatrix(rows, { itemIds: matrix.itemIds }), twoParameterLogistic);
 });
 const standardDeviation = (values: readonly number[]) => {
   const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
@@ -1211,7 +1206,7 @@ const scores = rows.flatMap((row) => (row[6] === null || row[6] === undefined ? 
 const lowest = scores.reduce((least, score) => Math.min(least, score)); // => 1
 const highest = scores.reduce((most, score) => Math.max(most, score)); // => 9
 const collapsed = rows.map((row) => row.map((score, j) => (j === 6 && score !== null ? score - lowest : score)));
-const fit = calibrate(buildResponseMatrix(collapsed), { model: models });
+const fit = calibrate(buildResponseMatrix(collapsed), models);
 
 // Back over the points 0 to 10: a threshold 30 / a beyond the last node, 6, leaves an empty category a probability
 // below e^-30 at every node.
@@ -1306,7 +1301,7 @@ calibrate(
     [1, 1, 0],
     [0, 0, 1],
   ]),
-  { model: rasch },
+  rasch,
 );
 ```
 

@@ -60,7 +60,7 @@ function calibration(): Results["calibration"] {
   const items = simulateItems(twoParameterLogistic, ITEMS, random);
   const { responses } = simulateResponses(items, simulateThetas(PERSONS, random), random);
   const matrix = buildResponseMatrix(responses);
-  const fit = calibrate(matrix, { model: twoParameterLogistic, standardErrors: "hessian" });
+  const fit = calibrate(matrix, twoParameterLogistic, { standardErrors: "hessian" });
   return {
     converged: fit.converged,
     logLikelihood: round(fit.logLikelihood),

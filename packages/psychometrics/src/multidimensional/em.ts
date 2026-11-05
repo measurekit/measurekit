@@ -9,6 +9,7 @@ import { expectationStep } from "./expectation.js";
 import { defaultPoints, type Grid, productGrid } from "./grid.js";
 import { population } from "./groups.js";
 import { itemMaximization } from "./m-step.js";
+import type { MultidimensionalModel } from "./model.js";
 import type { GroupMoments, Settings, Solution } from "./solution.js";
 import { crossProductCovariance, type EmModel, type Fit, louisCovariance, parameterCount } from "./standard-errors.js";
 
@@ -109,6 +110,7 @@ function estimatesOf<TParameters>({ items, latents }: EmModel<TParameters>, out:
  */
 export function calibrateByEm<TParameters>(
   responses: CompressedResponses,
+  model: MultidimensionalModel<TParameters> | readonly MultidimensionalModel<TParameters>[],
   options: MultidimensionalCalibrationOptions<TParameters>,
   design: Design,
   settings: Settings,
@@ -118,7 +120,7 @@ export function calibrateByEm<TParameters>(
   const points = settings.points ?? defaultPoints(dimensions);
   checkIntegerFrom(points, "The option points", 2);
   const grid = productGrid(dimensions, points);
-  const items = setUp(responses, options, design, grid.count);
+  const items = setUp(responses, model, options, design, grid.count);
   const { labels, groupOf, latents } = population(options, responses, items, design, grid);
   const eStep = expectationStep(
     responses,

@@ -37,8 +37,7 @@ const matrix = simulateMultidimensionalResponses(items, thetas, random);
 
 // Confirmatory: the dimensions of each item by id.
 const loadings = Object.fromEntries(matrix.itemIds.map((id, i) => [id, [i < 4 ? "verbal" : "quantitative"]]));
-const fit = calibrateMultidimensional(matrix, {
-  model: multidimensionalTwoParameterLogistic,
+const fit = calibrateMultidimensional(matrix, multidimensionalTwoParameterLogistic, {
   loadings,
   standardErrors: "hessian",
 });
@@ -98,13 +97,13 @@ flowchart TD
 | Log-likelihood       | Exact on the grid                                    | Importance sampling                                                                 |
 | Time                 | Grows with the responses times `points ** D`         | Grows with the persons, responses and parameters; slower than EM below 4 dimensions |
 
-`calibrateMultidimensional(data, options)` takes a response matrix or response records, and a model, one for all items
-or one per item. Missing responses are skipped, which suits responses missing at random, and persons without responses change
-nothing. [A recipe](#recipe-responses-missing-not-at-random) models omissions that depend on the ability.
+`calibrateMultidimensional(data, model, options)` takes a response matrix or response records, and a model, one for all
+items or one per item in item order. Missing responses are skipped, which suits responses missing at random, and persons
+without responses change nothing. [A recipe](#recipe-responses-missing-not-at-random) models omissions that depend on
+the ability.
 
 | Option            | Default                                   | Meaning                                                                                                                                           |
 | ----------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `model`           | required                                  | One model, or one per item in item order                                                                                                          |
 | `method`          | `"em"` up to 3 dimensions, `"mhrm"` above | `"em"` or `"mhrm"`                                                                                                                                |
 | `dimensions`      | none; one of `dimensions` and `loadings`  | Exploratory: the number of dimensions, a positive integer, 3 at most for EM, 100 for MH-RM; every item loads on each                              |
 | `loadings`        | none; one of `dimensions` and `loadings`  | Confirmatory: the names of the dimensions of each item, by item id, of every item                                                                 |
@@ -217,12 +216,15 @@ const thetas = Array.from({ length: 1000 }, () => [random.normal(), random.norma
 const responses = simulateMultidimensionalResponses(items, thetas, random);
 const dimensionsOf = (i: number) =>
   i === shared ? ["verbal", "quantitative"] : [i < shared ? "verbal" : "quantitative"];
-const fit = calibrateMultidimensional(responses, {
-  model: items.map(({ model }) => model),
-  loadings: Object.fromEntries(responses.itemIds.map((id, i) => [id, dimensionsOf(i)])),
-  fixedParameters: { item4: { c: 0.25 } },
-  standardErrors: "hessian",
-});
+const fit = calibrateMultidimensional(
+  responses,
+  items.map(({ model }) => model),
+  {
+    loadings: Object.fromEntries(responses.itemIds.map((id, i) => [id, dimensionsOf(i)])),
+    fixedParameters: { item4: { c: 0.25 } },
+    standardErrors: "hessian",
+  },
+);
 fit.items[shared]?.parameters; // => { a: [1.16, 1.21], intercept: -1.02, c: 0.25, d: 1 }
 fit.items[shared]?.standardErrors; // => { a1: 0.28, a2: 0.32, intercept: 0.20 }, none for c
 ```
@@ -286,8 +288,7 @@ const thetas = Array.from({ length: 2000 }, (_, person) => {
 });
 const matrix = simulateMultidimensionalResponses(items, thetas, random);
 
-const fit = calibrateMultidimensional(matrix, {
-  model: multidimensionalTwoParameterLogistic,
+const fit = calibrateMultidimensional(matrix, multidimensionalTwoParameterLogistic, {
   loadings: Object.fromEntries(matrix.itemIds.map((id, i) => [id, [i < 10 ? "verbal" : "quantitative"]])),
   groups: thetas.map((_, person) => (person < 1000 ? "2025" : "2026")),
 });
@@ -497,11 +498,12 @@ eigendecompositions until none of their eigenvalues is negative, took more than 
 
 ## Bifactor and two-tier models
 
-`calibrateBifactor(data, options)` calibrates models in which every item loads on the primary dimensions, one for a
-bifactor model and two, correlated, for a two-tier model, and on at most one specific dimension, such as a passage or a
-method factor. The specific dimensions are uncorrelated with everything. It is `calibrateMultidimensional` with the
+`calibrateBifactor(data, specific, options)` calibrates models in which every item loads on the primary dimensions, one
+for a bifactor model and two, correlated, for a two-tier model, and on at most one specific dimension, such as a passage
+or a method factor. The specific dimensions are uncorrelated with everything. It is `calibrateMultidimensional` with the
 dimensions integrated one group of items at a time, so the cost follows the primary dimensions plus one, however many
-specific dimensions there are.
+specific dimensions there are. `specific` gives each item's specific dimension by item id, every item of the data: a
+name, or `null` for an item with none.
 
 ```mermaid
 flowchart LR
@@ -537,7 +539,7 @@ const matrix = simulateMultidimensionalResponses(items, thetas, random);
 
 // The specific dimension of each item by id; `null` for an item without one.
 const specific = Object.fromEntries(matrix.itemIds.map((id, i) => [id, `passage${1 + Math.floor(i / 4)}`]));
-const fit = calibrateBifactor(matrix, { specific, standardErrors: "hessian" });
+const fit = calibrateBifactor(matrix, specific, { standardErrors: "hessian" });
 fit.dimensions; // => ["general", "passage1", "passage2", "passage3"]
 fit.items[0]?.parameters; // => { a: [1.19, 1.07, 0, 0], intercept: -0.96, c: 0, d: 1 }
 fit.items[0]?.standardErrors; // => { a1: 0.11, a2: 0.17, intercept: 0.08 }
@@ -555,7 +557,6 @@ scores[0]?.estimate?.theta; // => [0.63, 0.14, 0.14, 0.22]
 
 | Option           | Default                                        | Meaning                                                                                                                                 |
 | ---------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `specific`       | required                                       | Each item's specific dimension by item id, every item of the data: a name, or `null` for an item with none                              |
 | `primary`        | one dimension, `"general"`, for every item     | Each item's primary dimensions by item id: one name for a bifactor model, up to two in all for a two-tier model                         |
 | `model`          | `multidimensionalTwoParameterLogistic`         | The model of every item: also the 3PL and the graded model                                                                              |
 | `priors`         | none                                           | Priors by parameter name, `"a"`, `"intercept"` and `"c"`: estimates are posterior modes, the usual way to estimate the 3PL's asymptotes |
@@ -647,7 +648,7 @@ const thetas = Array.from({ length: 1000 }, () => {
 });
 const matrix = simulateMultidimensionalResponses(items, thetas, random);
 
-const exploratory = calibrateMultidimensional(matrix, { model: multidimensionalTwoParameterLogistic, dimensions: 2 });
+const exploratory = calibrateMultidimensional(matrix, multidimensionalTwoParameterLogistic, { dimensions: 2 });
 const rotated = rotateLoadings(exploratory, { method: "oblimin" });
 rotated.loadings.slice(0, 2); // => [[0.61, -0.04], [0.51, 0.08]]
 rotated.correlations; // => [[1, 0.44], [0.44, 1]]
@@ -774,7 +775,7 @@ function withIndicators(data: ResponseMatrix) {
 }
 
 const { matrix: combined, loadings } = withIndicators(matrix);
-const fit = calibrateMultidimensional(combined, { model: multidimensionalTwoParameterLogistic, loadings });
+const fit = calibrateMultidimensional(combined, multidimensionalTwoParameterLogistic, { loadings });
 fit.correlations; // => [[1, 0.48], [0.48, 1]]: the truth is 0.5
 
 // The first person answered 4 of 8 items. Scored with the indicators and the correlation as the prior, the omissions count.

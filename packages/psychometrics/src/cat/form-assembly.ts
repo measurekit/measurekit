@@ -50,10 +50,6 @@ const INFORMATION_TARGET_FIELDS: FieldNames<InformationTarget> = { theta: true, 
 
 /** Options of {@link assembleForms}. */
 export interface FormAssemblyOptions {
-  /** The item pool. Items that share a `testlet` go on a form together. */
-  readonly pool: readonly PoolItem[];
-  /** The number of items of each form. */
-  readonly length: number;
   /**
    * Content constraints, on the pool items' `contentAreas`.
    *
@@ -93,8 +89,6 @@ export interface FormAssemblyOptions {
 }
 
 const FORM_ASSEMBLY_OPTIONS: FieldNames<FormAssemblyOptions> = {
-  pool: true,
-  length: true,
   content: true,
   target: true,
   enemies: true,
@@ -169,8 +163,10 @@ interface Assembly {
  * the counts and the information to check, and the method cannot prove that a blueprint is infeasible. Where a form
  * cannot be assembled as a solver would, check the counts against the bounds.
  *
- * @param options - The pool, the length, the content bounds and target, the enemy sets, the number of forms and the
- *   overlap; each option has its default.
+ * @param pool - The item pool. Items that share a `testlet` go on a form together.
+ * @param length - The number of items of each form.
+ * @param options - The content bounds and target, the enemy sets, the number of forms and the overlap; each option has
+ *   its default.
  * @returns The forms, in the order of the rotation's first round.
  * @throws `DataError` when an item's id or parameters are invalid, ids repeat, the length is not an integer from 1 to
  * the pool size, `forms` is not a positive integer or holds with the pool more than 2^26 counts, `overlap` is not an
@@ -180,13 +176,17 @@ interface Assembly {
  * or more distinct pool items, or `random` is not a random number generator.
  * @see {@link https://doi.org/10.1177/014662169301700205 | Swanson and Stocking (1993)}
  */
-export function assembleForms(options: FormAssemblyOptions): readonly AssembledForm[] {
+export function assembleForms(
+  pool: readonly PoolItem[],
+  length: number,
+  options: FormAssemblyOptions = {},
+): readonly AssembledForm[] {
   checkOptions(options, FORM_ASSEMBLY_OPTIONS);
-  const { pool, length, content = [], target = [], enemies = [], forms = 1, overlap = 0, random } = options;
+  const { content = [], target = [], enemies = [], forms = 1, overlap = 0, random } = options;
   const indices = indexItems(pool);
   if (!(Number.isSafeInteger(length) && length >= 1 && length <= pool.length)) {
     throw new DataError(
-      `The option length must be an integer from 1 to the pool size ${pool.length}, found ${describe(length)}.`,
+      `The length of a form must be an integer from 1 to the pool size ${pool.length}, found ${describe(length)}.`,
     );
   }
   checkArray(content, "The option content must be an array of content constraints");

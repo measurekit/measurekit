@@ -18,11 +18,11 @@ export interface ProfileSpace {
  * @throws `DataError` when they are not 1 to 20 distinct non-empty strings.
  */
 export function checkAttributes(attributes: readonly string[]): void {
-  checkArray(attributes, "The option attributes must be an array of attribute names");
+  checkArray(attributes, "The attributes must be an array of attribute names");
   const valid = attributes.length > 0 && attributes.length <= MAX_ATTRIBUTES && attributes.every(isNonEmptyString);
   if (!(valid && new Set(attributes).size === attributes.length)) {
     throw new DataError(
-      `The option attributes must list from 1 to ${MAX_ATTRIBUTES} distinct non-empty names, found ${formatList(attributes)}.`,
+      `The attributes must list from 1 to ${MAX_ATTRIBUTES} distinct non-empty names, found ${formatList(attributes)}.`,
     );
   }
 }

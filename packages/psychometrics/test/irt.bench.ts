@@ -56,24 +56,29 @@ const items: TestItem[] = fixture.items.a.map((a, i) => ({
 }));
 
 test("calibrates the one-parameter model of 2,000 persons and 40 items", async (context) => {
-  expect(calibrate(binary, { model: oneParameterLogistic }).converged).toBe(true);
-  await benchmark(context, "irt.calibrate1pl", () => calibrate(binary, { model: oneParameterLogistic }), SLOW_OPTIONS);
+  expect(calibrate(binary, oneParameterLogistic).converged).toBe(true);
+  await benchmark(context, "irt.calibrate1pl", () => calibrate(binary, oneParameterLogistic), SLOW_OPTIONS);
 });
 
 test("calibrates the two-parameter model of 2,000 persons and 40 items", async (context) => {
-  expect(calibrate(binary, { model: twoParameterLogistic }).converged).toBe(true);
-  await benchmark(context, "irt.calibrate2pl", () => calibrate(binary, { model: twoParameterLogistic }), SLOW_OPTIONS);
+  expect(calibrate(binary, twoParameterLogistic).converged).toBe(true);
+  await benchmark(context, "irt.calibrate2pl", () => calibrate(binary, twoParameterLogistic), SLOW_OPTIONS);
 });
 
 test("calibrates the three-parameter model of 2,000 persons and 40 items", async (context) => {
-  expect(calibrate(three, { model: threeParameterLogistic }).converged).toBe(true);
-  await benchmark(context, "irt.calibrate3pl", () => calibrate(three, { model: threeParameterLogistic }), SLOW_OPTIONS);
+  expect(calibrate(three, threeParameterLogistic).converged).toBe(true);
+  await benchmark(context, "irt.calibrate3pl", () => calibrate(three, threeParameterLogistic), SLOW_OPTIONS);
 });
 
 test("calibrates the two-parameter model with cross-product standard errors", async (context) => {
-  const options = { model: twoParameterLogistic, standardErrors: "cross-product" } as const;
-  expect(calibrate(binary, options).converged).toBe(true);
-  await benchmark(context, "irt.calibrate2plCrossProduct", () => calibrate(binary, options), SLOW_OPTIONS);
+  const options = { standardErrors: "cross-product" } as const;
+  expect(calibrate(binary, twoParameterLogistic, options).converged).toBe(true);
+  await benchmark(
+    context,
+    "irt.calibrate2plCrossProduct",
+    () => calibrate(binary, twoParameterLogistic, options),
+    SLOW_OPTIONS,
+  );
 });
 
 test("calibrates the two-parameter model of 500 persons and 20 items with standard errors from the Hessian", async (context) => {
@@ -81,41 +86,50 @@ test("calibrates the two-parameter model of 500 persons and 20 items with standa
     fixture.binary.responses.slice(0, PILOT_PERSONS).map((row) => row.slice(0, PILOT_ITEMS)),
     { itemIds: fixture.binary.itemIds.slice(0, PILOT_ITEMS) },
   );
-  const options = { model: twoParameterLogistic, standardErrors: "hessian" } as const;
-  expect(calibrate(pilot, options).converged).toBe(true);
-  await benchmark(context, "irt.calibrate2plHessian", () => calibrate(pilot, options), SLOW_OPTIONS);
-});
-
-test("calibrates the two-parameter model of 2,000 persons and 40 items with a latent regression", async (context) => {
-  const regression = buildResponseMatrix(regressionFixture.responses, { itemIds: regressionFixture.itemIds });
-  const options = { model: twoParameterLogistic, covariates: { x: regressionFixture.covariate } } as const;
-  expect(calibrate(regression, options).converged).toBe(true);
-  await benchmark(context, "irt.calibrate2plLatentRegression", () => calibrate(regression, options), SLOW_OPTIONS);
-});
-
-test("calibrates the graded response model of 1,500 persons and 20 items of 5 categories", async (context) => {
-  expect(calibrate(graded, { model: gradedResponse }).converged).toBe(true);
-  await benchmark(context, "irt.calibrateGraded", () => calibrate(graded, { model: gradedResponse }), SLOW_OPTIONS);
-});
-
-test("calibrates the generalized partial credit model of 1,500 persons and 20 items of 5 categories", async (context) => {
-  expect(calibrate(graded, { model: generalizedPartialCredit }).converged).toBe(true);
+  const options = { standardErrors: "hessian" } as const;
+  expect(calibrate(pilot, twoParameterLogistic, options).converged).toBe(true);
   await benchmark(
     context,
-    "irt.calibrateGpcm",
-    () => calibrate(graded, { model: generalizedPartialCredit }),
+    "irt.calibrate2plHessian",
+    () => calibrate(pilot, twoParameterLogistic, options),
     SLOW_OPTIONS,
   );
 });
 
+test("calibrates the two-parameter model of 2,000 persons and 40 items with a latent regression", async (context) => {
+  const regression = buildResponseMatrix(regressionFixture.responses, { itemIds: regressionFixture.itemIds });
+  const options = { covariates: { x: regressionFixture.covariate } } as const;
+  expect(calibrate(regression, twoParameterLogistic, options).converged).toBe(true);
+  await benchmark(
+    context,
+    "irt.calibrate2plLatentRegression",
+    () => calibrate(regression, twoParameterLogistic, options),
+    SLOW_OPTIONS,
+  );
+});
+
+test("calibrates the graded response model of 1,500 persons and 20 items of 5 categories", async (context) => {
+  expect(calibrate(graded, gradedResponse).converged).toBe(true);
+  await benchmark(context, "irt.calibrateGraded", () => calibrate(graded, gradedResponse), SLOW_OPTIONS);
+});
+
+test("calibrates the generalized partial credit model of 1,500 persons and 20 items of 5 categories", async (context) => {
+  expect(calibrate(graded, generalizedPartialCredit).converged).toBe(true);
+  await benchmark(context, "irt.calibrateGpcm", () => calibrate(graded, generalizedPartialCredit), SLOW_OPTIONS);
+});
+
 test("calibrates the testlet model of 1,000 persons and 6 testlets of 5 items", async (context) => {
   const options = {
-    model: twoParameterLogistic,
     testlets: fixture.testlet.testlets,
     quadrature: { points: fixture.testlet.points },
   };
-  expect(calibrate(testlets, options).converged).toBe(true);
-  await benchmark(context, "irt.calibrateTestlets", () => calibrate(testlets, options), SLOW_OPTIONS);
+  expect(calibrate(testlets, twoParameterLogistic, options).converged).toBe(true);
+  await benchmark(
+    context,
+    "irt.calibrateTestlets",
+    () => calibrate(testlets, twoParameterLogistic, options),
+    SLOW_OPTIONS,
+  );
 });
 
 test("estimates the ability of 2,000 persons on 40 items", async (context) => {

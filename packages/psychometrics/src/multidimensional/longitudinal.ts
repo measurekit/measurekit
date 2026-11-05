@@ -185,7 +185,7 @@ export function calibrateLongitudinal(
   const grid = productGrid(data.occasions.length, points);
   const rule = rectangular(points);
   const answered = Array.from(data.pooled.offsets.subarray(1), (end, row) => end > (data.pooled.offsets[row] ?? 0));
-  const setup = setUp(data.pooled, { model }, answered, rule);
+  const setup = setUp(data.pooled, model, {}, answered, rule);
   const latent = latentDistribution(grid, { correlations: true, variances: true, means: true, pinned: [0] });
   if (standardErrors !== "none") checkStandardErrorSize(setup.values.length + latent.size);
   const fit: LongitudinalFit<unknown> = {

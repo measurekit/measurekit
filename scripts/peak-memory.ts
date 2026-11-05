@@ -354,7 +354,7 @@ export const READERS: readonly ReaderCase[] = [
       pool: [{ id, model: psychometrics.twoParameterLogistic, parameters: { a, b, c: 0, d: 1 } }],
     }),
     read: ({ pool }: { pool: unknown[] }, { psychometrics }) =>
-      psychometrics.assembleForms({ pool, length: 1, forms: 8191, overlap: 1 }),
+      psychometrics.assembleForms(pool, 1, { forms: 8191, overlap: 1 }),
   },
   {
     name: "createDiagnosticAdaptiveTest: 128 items of 11 of 15 attributes, the most items × 2^K and latent groups",
@@ -369,7 +369,7 @@ export const READERS: readonly ReaderCase[] = [
       })),
     }),
     read: (options: { attributes: string[]; pool: unknown[] }, { psychometrics }) =>
-      psychometrics.createDiagnosticAdaptiveTest({ ...options, stopping: psychometrics.testLength(10) }),
+      psychometrics.createDiagnosticAdaptiveTest(options.pool, options.attributes, psychometrics.testLength(10)),
   },
 ];
 

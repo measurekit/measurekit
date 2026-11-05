@@ -18,10 +18,6 @@ import type { TestControlOptions } from "./test-controls.js";
 
 /** Options of {@link createMultidimensionalAdaptiveTest}. */
 export interface MultidimensionalAdaptiveTestOptions extends TestControlOptions {
-  /** The item pool: multidimensional items with ids, all on the same number of dimensions, such as a calibration's. */
-  readonly pool: readonly MultidimensionalPoolItem[];
-  /** The rule that ends the test. The test also ends when no item is left or the selection rule scores every eligible item `-Infinity`. */
-  readonly stopping: StoppingRule<MultidimensionalPoolItem, MultidimensionalEstimate>;
   /**
    * The rule that selects the next item.
    *
@@ -38,8 +34,6 @@ export interface MultidimensionalAdaptiveTestOptions extends TestControlOptions 
 }
 
 const MULTIDIMENSIONAL_ADAPTIVE_TEST_OPTIONS: FieldNames<MultidimensionalAdaptiveTestOptions> = {
-  pool: true,
-  stopping: true,
   selection: true,
   estimator: true,
   contentTargets: true,
@@ -59,8 +53,12 @@ const MULTIDIMENSIONAL_ADAPTIVE_TEST_OPTIONS: FieldNames<MultidimensionalAdaptiv
  * gives them the dimensions. The default estimate and rule use a prior of N(0, I); give the same prior to both when the
  * dimensions correlate, such as a calibration's `correlations`.
  *
- * @param options - The pool, the stopping and selection rules, the estimator, and the content balancing, enemy sets and
- *   testlet order; each option has its default.
+ * @param pool - The item pool: multidimensional items with ids, all on the same number of dimensions, such as a
+ *   calibration's.
+ * @param stopping - The rule that ends the test. The test also ends when no item is left or the selection rule scores
+ *   every eligible item `-Infinity`.
+ * @param options - The selection rule, the estimator, and the content balancing, enemy sets and testlet order; each
+ *   option has its default.
  * @returns The test: `start` gives the state before the first response, and `answer` the state after a response.
  * @throws `DataError` when `stopping`, `selection` or `estimator` is not a rule or function, the pool is not an array
  * of at least one valid item with a string id, ids repeat, the items differ in their number of dimensions or have more
@@ -80,7 +78,7 @@ const MULTIDIMENSIONAL_ADAPTIVE_TEST_OPTIONS: FieldNames<MultidimensionalAdaptiv
  *   parameters: { a, intercept, c: 0, d: 1 },
  * });
  * const pool = [item("q1", [1.2, 0], 0.3), item("q2", [0, 1.4], -0.2), item("q3", [0.8, 0.9], 0.1)];
- * const test = createMultidimensionalAdaptiveTest({ pool, stopping: testLength(2) });
+ * const test = createMultidimensionalAdaptiveTest(pool, testLength(2));
  * const random = createRandom(1);
  * let state = test.start(random);
  * state.next; // => "q2", the id of the first item
@@ -90,18 +88,12 @@ const MULTIDIMENSIONAL_ADAPTIVE_TEST_OPTIONS: FieldNames<MultidimensionalAdaptiv
  * ```
  */
 export function createMultidimensionalAdaptiveTest(
-  options: MultidimensionalAdaptiveTestOptions,
+  pool: readonly MultidimensionalPoolItem[],
+  stopping: StoppingRule<MultidimensionalPoolItem, MultidimensionalEstimate>,
+  options: MultidimensionalAdaptiveTestOptions = {},
 ): AdaptiveTest<MultidimensionalPoolItem, MultidimensionalEstimate> {
   checkOptions(options, MULTIDIMENSIONAL_ADAPTIVE_TEST_OPTIONS);
-  const {
-    pool,
-    stopping,
-    selection = maximumDeterminant(),
-    estimator,
-    contentTargets,
-    enemies,
-    withinTestlet,
-  } = options;
+  const { selection = maximumDeterminant(), estimator, contentTargets, enemies, withinTestlet } = options;
   checkRules(stopping, selection, "maximumDeterminant()");
   if (estimator !== undefined) {
     checkFunction(

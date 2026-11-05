@@ -37,7 +37,7 @@ const random = createRandom(20261029);
 const items = simulateItems(twoParameterLogistic, 20, random);
 const thetas = simulateThetas(2000, random);
 const matrix = simulateResponses(items, thetas, random, { missingProbability: 0.05 });
-calibrate(matrix, { model: twoParameterLogistic }).items; // estimates near items[j].parameters
+calibrate(matrix, twoParameterLogistic).items; // estimates near items[j].parameters
 ```
 
 ## Distributions

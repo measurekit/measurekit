@@ -97,11 +97,9 @@ const pool: TestItem[] = fixture.pool.a.map((a, i) => ({
 }));
 
 test("simulates adaptive tests of 30 items for 200 persons on a pool of 500 3PL items", async (context) => {
-  const test = createAdaptiveTest({
-    pool,
+  const test = createAdaptiveTest(pool, testLength(fixture.length), {
     selection: maximumInformation,
     estimator: posteriorMeanEstimate,
-    stopping: testLength(fixture.length),
   });
   expect(simulateAdaptiveTest(test, fixture.thetas, createRandom(SEED)).persons).toHaveLength(fixture.thetas.length);
   await benchmark(
@@ -113,12 +111,14 @@ test("simulates adaptive tests of 30 items for 200 persons on a pool of 500 3PL 
 });
 
 test("simulates adaptive tests of 30 items that select testlets, for 200 persons on a pool of 500 3PL items", async (context) => {
-  const test = createAdaptiveTest({
-    pool: pool.map((item, i) => ({ ...item, ...(fixture.testlets[i] !== null && { testlet: fixture.testlets[i] }) })),
-    selection: maximumInformation,
-    estimator: posteriorMeanEstimate,
-    stopping: testLength(fixture.length),
-  });
+  const test = createAdaptiveTest(
+    pool.map((item, i) => ({ ...item, ...(fixture.testlets[i] !== null && { testlet: fixture.testlets[i] }) })),
+    testLength(fixture.length),
+    {
+      selection: maximumInformation,
+      estimator: posteriorMeanEstimate,
+    },
+  );
   expect(simulateAdaptiveTest(test, fixture.thetas, createRandom(SEED)).persons).toHaveLength(fixture.thetas.length);
   await benchmark(
     context,
@@ -145,12 +145,14 @@ test("simulates diagnostic adaptive tests of 10 items for 200 persons on a pool 
   const profiles = attributeProfiles(matrix, calibration)
     .slice(0, fixture.diagnostic.persons)
     .map(({ map }) => [...map]);
-  const test = createDiagnosticAdaptiveTest({
-    pool: calibration.items,
-    attributes: calibration.attributes,
-    prior: calibration.profiles,
-    stopping: testLength(fixture.diagnostic.length),
-  });
+  const test = createDiagnosticAdaptiveTest(
+    calibration.items,
+    calibration.attributes,
+    testLength(fixture.diagnostic.length),
+    {
+      prior: calibration.profiles,
+    },
+  );
   expect(simulateDiagnosticTest(test, profiles, createRandom(SEED)).persons).toHaveLength(profiles.length);
   await benchmark(context, "cat.simulateDiagnostic", () => simulateDiagnosticTest(test, profiles, createRandom(SEED)));
 });
@@ -162,7 +164,7 @@ test("simulates multidimensional adaptive tests of 20 items for 100 persons on a
     model: multidimensionalTwoParameterLogistic,
     parameters: { a, intercept: defined(intercepts[i]), c: 0, d: 1 },
   }));
-  const test = createMultidimensionalAdaptiveTest({ pool, stopping: testLength(length) });
+  const test = createMultidimensionalAdaptiveTest(pool, testLength(length));
   expect(simulateMultidimensionalAdaptiveTest(test, thetas, createRandom(SEED)).persons).toHaveLength(thetas.length);
   await benchmark(
     context,
@@ -206,15 +208,13 @@ test("assembles 4 forms of 40 items from a pool of 1,000 3PL items in 5 content 
     contentAreas: [defined(areas[i])],
   }));
   const options = {
-    pool,
-    length,
     content: constraints,
     target,
     forms,
     enemies: enemies.map((pair) => pair.map((index) => `item${index + 1}`)),
   };
-  expect(assembleForms(options)).toHaveLength(forms);
-  await benchmark(context, "cat.assembleForms", () => assembleForms(options));
+  expect(assembleForms(pool, length, options)).toHaveLength(forms);
+  await benchmark(context, "cat.assembleForms", () => assembleForms(pool, length, options));
 });
 
 test("selects one item of a test of 30 after 15, by each rule, from a pool of 500 3PL items", async (context) => {
@@ -233,8 +233,8 @@ test("selects one item of a test of 30 after 15, by each rule, from a pool of 50
     ["cat.discriminationIndex", discriminationIndex],
     ["cat.posteriorDiscriminationIndex", posteriorDiscriminationIndex()],
     ["cat.closestDifficulty", closestDifficulty],
-    ["cat.progressive", progressive({ length: fixture.length })],
-    ["cat.proportional", proportional({ length: fixture.length })],
+    ["cat.progressive", progressive(fixture.length)],
+    ["cat.proportional", proportional(fixture.length)],
   ];
   for (const [name, rule] of rules) {
     const random = createRandom(SEED);
@@ -248,11 +248,9 @@ test("selects one item of a test of 30 after 15, by each rule, from a pool of 50
 
 test("simulates adaptive tests of at most 30 items for 200 persons that stop on a classification at a cut", async (context) => {
   const classifying = (stopping: StoppingRule) =>
-    createAdaptiveTest({
-      pool,
+    createAdaptiveTest(pool, anyOf(stopping, testLength(fixture.length)), {
       selection: maximumInformation,
       estimator: posteriorMeanEstimate,
-      stopping: anyOf(stopping, testLength(fixture.length)),
     });
   const interval = classifying(classificationThreshold([0]));
   const sprt = classifying(sequentialProbabilityRatio([{ lower: -0.3, upper: 0.3 }]));

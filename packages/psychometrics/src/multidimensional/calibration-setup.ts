@@ -72,6 +72,7 @@ function priorName(entry: string): string {
  */
 export function setUp<TParameters>(
   responses: CompressedResponses,
+  model: MultidimensionalModel<TParameters> | readonly MultidimensionalModel<TParameters>[],
   options: MultidimensionalCalibrationOptions<TParameters>,
   design: Design,
   nodeCount: number,
@@ -79,10 +80,10 @@ export function setUp<TParameters>(
   const { itemIds } = responses;
   const dimensions = design.dimensionNames.length;
   const tallies = categoryTallies(responses);
-  const models = modelsOf(options.model, itemIds.length, (each) =>
+  const models = modelsOf(model, itemIds.length, (each) =>
     checkMultidimensionalModel(
       each,
-      "The option model must be a multidimensional model such as multidimensionalTwoParameterLogistic",
+      "The model must be a multidimensional model such as multidimensionalTwoParameterLogistic",
     ),
   );
   const { priors = {}, fixed = {}, fixedParameters = {} } = options;

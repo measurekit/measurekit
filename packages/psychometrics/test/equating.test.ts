@@ -1922,8 +1922,7 @@ describe("irtEquatingStandardErrors", () => {
     const to = items.slice(6);
     const errorsFor = (persons: number): readonly number[] => {
       const thetas = simulateThetas(persons, random);
-      const { covariance } = calibrateWithCovariance(simulateResponses(items, thetas, random), {
-        model: twoParameterLogistic,
+      const { covariance } = calibrateWithCovariance(simulateResponses(items, thetas, random), twoParameterLogistic, {
         standardErrors: "hessian",
       });
       const result = irtEquatingStandardErrors(from, to, defined(covariance), { method: "observed-score" });
@@ -2084,8 +2083,7 @@ describe("linkCovariance and linkedEquatingErrors", () => {
       const ids = Array.from({ length: 20 }, (_, j) => `i${10 * f + j}`);
       const thetas = simulateThetas(1000, random).map((theta) => mean + sd * theta);
       const responses = simulateResponses(truth.slice(10 * f, 10 * f + 20), thetas, random);
-      const { calibration, covariance } = calibrateWithCovariance(responses, {
-        model: twoParameterLogistic,
+      const { calibration, covariance } = calibrateWithCovariance(responses, twoParameterLogistic, {
         standardErrors: "hessian",
       });
       const rename = (id: string): string => defined(ids[Number(id.slice(4)) - 1]);

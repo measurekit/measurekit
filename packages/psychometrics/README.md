@@ -71,8 +71,7 @@ import {
   weightedLikelihoodEstimate,
 } from "@measurekit/psychometrics";
 
-const irt = calibrate(test, {
-  model: threeParameterLogistic,
+const irt = calibrate(test, threeParameterLogistic, {
   priors: { a: logNormalPrior(0, 0.5), c: betaPrior(5, 17) },
   standardErrors: "hessian",
 });
@@ -87,10 +86,7 @@ The calibrated items then make an adaptive test, which selects each next item fr
 import { createRandom } from "@measurekit/psychometrics";
 import { allOf, anyOf, createAdaptiveTest, standardErrorThreshold, testLength } from "@measurekit/psychometrics/cat";
 
-const cat = createAdaptiveTest({
-  pool: irt.items,
-  stopping: anyOf(testLength(4), allOf(testLength(2), standardErrorThreshold(0.5))),
-});
+const cat = createAdaptiveTest(irt.items, anyOf(testLength(4), allOf(testLength(2), standardErrorThreshold(0.5))));
 const random = createRandom(1);
 let state = cat.start(random); // => { next: "q1", ... }: the first item
 state = cat.answer(state, 1, random); // => { items: ["q1"], responses: [1], next: "q2", ... }: next is null at the end

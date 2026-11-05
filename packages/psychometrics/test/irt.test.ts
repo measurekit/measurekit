@@ -895,9 +895,13 @@ interface IrtFixture {
 
 const FIXTURES: readonly IrtFixture[] = [lsat7, simulated1pl, simulated4pl, science, simulatedMixed];
 
+function fixtureModels(fixture: CalibrationFixture): IrtModel<unknown>[] {
+  return fixture.models.map(model);
+}
+
 function calibrationOptions(fixture: CalibrationFixture): CalibrationOptions<unknown> {
   return {
-    ...modelsAndQuadrature(fixture),
+    ...quadratureOf(fixture),
     ...(fixture.fixed && { fixed: fixture.fixed }),
     ...(fixture.priors && {
       priors: Object.fromEntries(Object.entries(fixture.priors).map(([name, value]) => [name, prior(value)])),
@@ -908,9 +912,9 @@ function calibrationOptions(fixture: CalibrationFixture): CalibrationOptions<unk
   };
 }
 
-function modelsAndQuadrature(fixture: CalibrationFixture): CalibrationOptions<unknown> {
+function quadratureOf(fixture: CalibrationFixture): CalibrationOptions<unknown> {
   const method = fixture.quadrature.method === "gauss-hermite" ? "gauss-hermite" : "rectangular";
-  return { model: fixture.models.map(model), quadrature: { method, points: fixture.quadrature.points } };
+  return { quadrature: { method, points: fixture.quadrature.points } };
 }
 
 function fixtureItems({ models, parameters }: FixturePool): IrtItem[] {
@@ -1264,9 +1268,7 @@ describe("thetaPosterior", () => {
 
   it("is the prior without responses, as a calibration's group distribution describes it", () => {
     const sample = simulate(20261029, 100, ITEMS_2PL);
-    const group: ThetaDistribution = defined(
-      calibrate(buildResponseMatrix(sample), { model: twoParameterLogistic }).groups[0],
-    );
+    const group: ThetaDistribution = defined(calibrate(buildResponseMatrix(sample), twoParameterLogistic).groups[0]);
     const none = thetaPosterior(ITEMS_2PL, [null, null, null, null]);
     group.nodes.forEach((node, q) => {
       expectClose(defined(none.nodes[q]), node, 1e-14);
@@ -1329,7 +1331,7 @@ describe("calibrate", () => {
     for (const reference of fixture.calibrations) {
       const flat = reference.models.some((name) => FLAT_MODELS.has(name));
       it(`matches ${reference.name} on ${fixture.source}`, () => {
-        const result = calibrate(matrix, calibrationOptions(reference));
+        const result = calibrate(matrix, fixtureModels(reference), calibrationOptions(reference));
         expect(result.converged).toBe(true);
         reference.items.forEach((expected, i) => {
           const actual = defined(result.items[i]);
@@ -1359,7 +1361,7 @@ describe("calibrate", () => {
         const fixed = Object.fromEntries(
           reference.items.map(({ parameters }, i) => [defined(fixture.itemIds[i]), parameters]),
         );
-        const result = calibrate(matrix, { ...modelsAndQuadrature(reference), fixed });
+        const result = calibrate(matrix, fixtureModels(reference), { ...quadratureOf(reference), fixed });
         expectClose(result.logLikelihood, reference.logLikelihood, FIXED_LOG_LIKELIHOOD_TOLERANCE, "log-likelihood");
       });
     }
@@ -1368,7 +1370,10 @@ describe("calibrate", () => {
   for (const reference of crossProduct.cases) {
     it(`matches the standard errors of ${reference.name}`, () => {
       const matrix = buildResponseMatrix(reference.responses, { itemIds: reference.itemIds });
-      const result = calibrate(matrix, { ...calibrationOptions(reference), standardErrors: "cross-product" });
+      const result = calibrate(matrix, fixtureModels(reference), {
+        ...calibrationOptions(reference),
+        standardErrors: "cross-product",
+      });
       const flat = reference.models.some((name) => FLAT_MODELS.has(name));
       reference.items.forEach((expected, i) => {
         const errors = defined(defined(result.items[i]).standardErrors);
@@ -1399,23 +1404,24 @@ describe("calibrate", () => {
     );
     for (const standardErrors of ["hessian", "cross-product"] as const) {
       const options = {
-        model: twoParameterLogistic,
         latent: "normal",
         fixed: { item1: defined(PARAMETERS_2PL[0]) },
         standardErrors,
       } as const;
-      expect(calibrate(records, options)).toEqual(calibrate(matrix, options));
+      expect(calibrate(records, twoParameterLogistic, options)).toEqual(
+        calibrate(matrix, twoParameterLogistic, options),
+      );
     }
   });
 
   it("reports non-convergence within the cycle limit", () => {
-    const result = calibrate(buildResponseMatrix(rows), { model: twoParameterLogistic, maxIterations: 2 });
+    const result = calibrate(buildResponseMatrix(rows), twoParameterLogistic, { maxIterations: 2 });
     expect(result).toMatchObject({ converged: false, iterations: 2 });
   });
 
   it("ignores persons without responses, also in the BIC", () => {
-    const base = calibrate(buildResponseMatrix(rows), { model: twoParameterLogistic });
-    const padded = calibrate(buildResponseMatrix([...rows, [null, null, null, null]]), { model: twoParameterLogistic });
+    const base = calibrate(buildResponseMatrix(rows), twoParameterLogistic);
+    const padded = calibrate(buildResponseMatrix([...rows, [null, null, null, null]]), twoParameterLogistic);
     expect(padded.items.map((item) => item.parameters)).toEqual(base.items.map((item) => item.parameters));
     expectClose(padded.logLikelihood, base.logLikelihood, 1e-9);
     expectClose(padded.bic, base.bic, 1e-9);
@@ -1424,7 +1430,7 @@ describe("calibrate", () => {
 
   it("evaluates the log-likelihood when every item is fixed", () => {
     const fixed = Object.fromEntries(PARAMETERS_2PL.map((item, i) => [`item${i + 1}`, item]));
-    const result = calibrate(buildResponseMatrix(rows), { model: twoParameterLogistic, fixed });
+    const result = calibrate(buildResponseMatrix(rows), twoParameterLogistic, { fixed });
     expect(result.items.map((item) => item.parameters)).toEqual(PARAMETERS_2PL);
     expect(result.items.every((item) => item.standardErrors === null)).toBe(true);
     expect(result.aic).toBe(-2 * result.logLikelihood);
@@ -1432,7 +1438,7 @@ describe("calibrate", () => {
 
   it("takes one model per item and shares a only among the 1PL items", () => {
     const models = [oneParameterLogistic, oneParameterLogistic, twoParameterLogistic, twoParameterLogistic];
-    const result = calibrate(buildResponseMatrix(rows), { model: models });
+    const result = calibrate(buildResponseMatrix(rows), models);
     const [first, second, third, fourth] = result.items.map((item) => item.parameters.a);
     expect(first).toBe(second);
     expect(third).not.toBe(fourth);
@@ -1448,8 +1454,7 @@ describe("calibrate", () => {
       generalizedPartialCredit,
     ];
     const pool = [...ITEMS_2PL.slice(0, 3), ...ITEMS_GPCM.slice(0, 2)];
-    const result = calibrate(buildResponseMatrix(simulate(20261029, 600, pool)), {
-      model: models,
+    const result = calibrate(buildResponseMatrix(simulate(20261029, 600, pool)), models, {
       priors: { c: betaPrior(5, 17) },
       standardErrors: "hessian",
     });
@@ -1466,10 +1471,10 @@ describe("calibrate", () => {
 
   it("shares a among PCM items, and a and the steps among RSM items", () => {
     const matrix = buildResponseMatrix(science.responses, { itemIds: science.itemIds });
-    const pcm = calibrate(matrix, { model: partialCredit, standardErrors: "cross-product" });
+    const pcm = calibrate(matrix, partialCredit, { standardErrors: "cross-product" });
     expect(new Set(pcm.items.map((item) => item.parameters.a)).size).toBe(1);
     expect(Object.keys(defined(pcm.items[0]?.standardErrors))).toEqual(["a", "b1", "b2", "b3"]);
-    const rsm = calibrate(matrix, { model: ratingScale, standardErrors: "cross-product" });
+    const rsm = calibrate(matrix, ratingScale, { standardErrors: "cross-product" });
     expect(new Set(rsm.items.map((item) => item.parameters.a)).size).toBe(1);
     expect(new Set(rsm.items.map((item) => item.parameters.steps.join())).size).toBe(1);
     expect(new Set(rsm.items.map((item) => item.parameters.b)).size).toBe(4);
@@ -1478,9 +1483,8 @@ describe("calibrate", () => {
   });
 
   it("applies priors to the parameters they name", () => {
-    const weak = calibrate(buildResponseMatrix(rows), { model: twoParameterLogistic });
-    const strong = calibrate(buildResponseMatrix(rows), {
-      model: twoParameterLogistic,
+    const weak = calibrate(buildResponseMatrix(rows), twoParameterLogistic);
+    const strong = calibrate(buildResponseMatrix(rows), twoParameterLogistic, {
       priors: { a: logNormalPrior(0, 0.05), b: normalPrior(0, 0.1) },
     });
     for (const [i, item] of strong.items.entries()) {
@@ -1493,16 +1497,15 @@ describe("calibrate", () => {
   it("gives the same estimates with any standard errors, and none by default", () => {
     const matrix = buildResponseMatrix(rows);
     const options = {
-      model: twoParameterLogistic,
       latent: { all: "normal" },
       groups: rows.map(() => "all"),
       fixed: { item1: defined(PARAMETERS_2PL[0]) },
     } as const;
-    const none = calibrate(matrix, options);
+    const none = calibrate(matrix, twoParameterLogistic, options);
     expect(none.items.every((item) => item.standardErrors === null)).toBe(true);
     expect(none.groups[0]?.standardErrors).toBeNull();
     for (const standardErrors of ["hessian", "cross-product"] as const) {
-      const result = calibrate(matrix, { ...options, standardErrors });
+      const result = calibrate(matrix, twoParameterLogistic, { ...options, standardErrors });
       expect(result.items.map((item) => item.parameters)).toEqual(none.items.map((item) => item.parameters));
       expect(result.groups[0]?.standardErrors).not.toBeNull();
       expect(result.items[1]?.standardErrors).not.toBeNull();
@@ -1510,7 +1513,7 @@ describe("calibrate", () => {
   });
 
   it("reports one standard normal group without groups", () => {
-    const [group] = calibrate(buildResponseMatrix(rows), { model: twoParameterLogistic }).groups;
+    const [group] = calibrate(buildResponseMatrix(rows), twoParameterLogistic).groups;
     expect(group).toMatchObject({ group: null, distribution: "standard-normal", mean: 0, sd: 1, standardErrors: null });
     expect(defined(group).nodes).toHaveLength(61);
     expectClose(
@@ -1521,13 +1524,14 @@ describe("calibrate", () => {
   });
 
   it("gives finite results for a single item and for two persons", () => {
-    const single = calibrate(buildResponseMatrix(rows.map((row) => row.slice(0, 1))), { model: twoParameterLogistic });
+    const single = calibrate(buildResponseMatrix(rows.map((row) => row.slice(0, 1))), twoParameterLogistic);
     const pair = calibrate(
       buildResponseMatrix([
         [1, 0],
         [0, 1],
       ]),
-      { model: twoParameterLogistic, standardErrors: "hessian" },
+      twoParameterLogistic,
+      { standardErrors: "hessian" },
     );
     for (const result of [single, pair]) expect(nonFinite(result)).toEqual([]);
     // Two persons with opposite responses say nothing about a: the information matrix is singular.
@@ -1543,11 +1547,11 @@ describe("calibrate", () => {
       [twoParameterLogistic, "hessian"],
       [oneParameterLogistic, "cross-product"],
     ] as const) {
-      expect(() => calibrate(matrix, { model, standardErrors })).toThrow(
+      expect(() => calibrate(matrix, model, { standardErrors })).toThrow(
         "Standard errors take at most 2000 estimated parameters, as their information holds every pair of them; found 2002.",
       );
     }
-    expect(calibrate(matrix, { model: twoParameterLogistic, maxIterations: 1 }).items).toHaveLength(1001);
+    expect(calibrate(matrix, twoParameterLogistic, { maxIterations: 1 }).items).toHaveLength(1001);
   });
 
   it("rejects RSM items with different numbers of categories", () => {
@@ -1557,7 +1561,7 @@ describe("calibrate", () => {
       [2, 2],
       [1, 3],
     ]);
-    expect(() => calibrate(matrix, { model: ratingScale })).toThrow(
+    expect(() => calibrate(matrix, ratingScale)).toThrow(
       'Items "item1" and "item2" of the RSM model share parameters, so they need the same number of categories; found 3 and 4.',
     );
   });
@@ -1568,63 +1572,65 @@ describe("calibrate", () => {
       [0, 1, 0],
       [0, null, 2],
     ]);
-    const options = { model: twoParameterLogistic };
-    expect(() => calibrate(matrix, options)).toThrow(
+    expect(() => calibrate(matrix, twoParameterLogistic)).toThrow(
       'Item "item1" has responses in fewer than two categories; calibration needs at least two.',
     );
-    expect(() => calibrate(matrix, { ...options, fixed: { item1: { a: 1, b: 0, c: 0, d: 1 } } })).toThrow(
+    expect(() => calibrate(matrix, twoParameterLogistic, { fixed: { item1: { a: 1, b: 0, c: 0, d: 1 } } })).toThrow(
       'Item "item3" has a response of 2, but the 2PL model allows responses from 0 to 1.',
     );
     const binary = buildResponseMatrix(rows);
     const binaryItem = defined(PARAMETERS_2PL[0]);
-    expect(() => calibrate(binary, { ...options, fixed: { q1: binaryItem } })).toThrow(
+    expect(() => calibrate(binary, twoParameterLogistic, { fixed: { q1: binaryItem } })).toThrow(
       'Fixed parameters are given for "q1", which is not an item id.',
     );
-    expect(() => calibrate(binary, { ...options, fixed: { item1: { a: 1, b: 0, c: 0.1, d: 1 } } })).toThrow(
+    expect(() => calibrate(binary, twoParameterLogistic, { fixed: { item1: { a: 1, b: 0, c: 0.1, d: 1 } } })).toThrow(
       'Fixed item "item1": A 2PL item has c = 0, found c = 0.1.',
     );
-    expect(() => calibrate(binary, { ...options, priors: { g: betaPrior(5, 17) } })).toThrow(
+    expect(() => calibrate(binary, twoParameterLogistic, { priors: { g: betaPrior(5, 17) } })).toThrow(
       'A prior is given for "g", which no estimated item has.',
     );
-    expect(() => calibrate(binary, { model: [twoParameterLogistic] })).toThrow("Found 1 models for 4 items.");
-    expect(() => calibrate(binary, { model: JSON.parse("null") })).toThrow(
-      "The option model must be an IRT model such as twoParameterLogistic, found null.",
+    expect(() => calibrate(binary, [twoParameterLogistic])).toThrow("Found 1 models for 4 items.");
+    expect(() => calibrate(binary, JSON.parse("null"))).toThrow(
+      "The model must be an IRT model such as twoParameterLogistic, found null.",
     );
-    expect(() => calibrate(binary, { ...options, standardErrors: JSON.parse('"full"') })).toThrow(
+    expect(() => calibrate(binary, twoParameterLogistic, { standardErrors: JSON.parse('"full"') })).toThrow(
       'The option standardErrors must be "none", "hessian" or "cross-product", found "full".',
     );
     const empty = buildResponseMatrix([[null, null]]);
-    expect(() => calibrate(empty, { ...options, fixed: { item1: binaryItem, item2: binaryItem } })).toThrow(
+    expect(() => calibrate(empty, twoParameterLogistic, { fixed: { item1: binaryItem, item2: binaryItem } })).toThrow(
       "Calibration needs at least one response.",
     );
-    expect(() => calibrate(binary, { ...options, tolerance: -1 })).toThrow(
+    expect(() => calibrate(binary, twoParameterLogistic, { tolerance: -1 })).toThrow(
       "The option tolerance must be a non-negative number, found -1.",
     );
-    expect(calibrate(binary, { ...options, tolerance: 0, maxIterations: 2 }).iterations).toBe(2);
-    expect(() => calibrate(binary, { ...options, maxIterations: 0.5 })).toThrow(DataError);
-    expect(() => calibrate(binary, { ...options, quadrature: JSON.parse('{ "method": "trapezoid" }') })).toThrow(
-      'The quadrature method must be "rectangular" or "gauss-hermite", found "trapezoid".',
-    );
+    expect(calibrate(binary, twoParameterLogistic, { tolerance: 0, maxIterations: 2 }).iterations).toBe(2);
+    expect(() => calibrate(binary, twoParameterLogistic, { maxIterations: 0.5 })).toThrow(DataError);
+    expect(() =>
+      calibrate(binary, twoParameterLogistic, { quadrature: JSON.parse('{ "method": "trapezoid" }') }),
+    ).toThrow('The quadrature method must be "rectangular" or "gauss-hermite", found "trapezoid".');
   });
 
   it("rejects options of other types from JavaScript", () => {
     const binary = buildResponseMatrix(rows);
-    const options = { model: twoParameterLogistic };
-    expect(() => calibrate(binary, JSON.parse("null"))).toThrow("The options must be an object, found null.");
-    expect(() => calibrate(binary, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
-    expect(() => calibrate(binary, { model: JSON.parse('{ "name": "2PL" }') })).toThrow(
-      "The option model must be an IRT model such as twoParameterLogistic, found an object.",
+    expect(() => calibrate(binary, twoParameterLogistic, JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
     );
-    expect(() => calibrate(binary, { ...options, fixed: JSON.parse("null") })).toThrow(
+    expect(() => calibrate(binary, twoParameterLogistic, JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
+    );
+    expect(() => calibrate(binary, JSON.parse('{ "name": "2PL" }'))).toThrow(
+      "The model must be an IRT model such as twoParameterLogistic, found an object.",
+    );
+    expect(() => calibrate(binary, twoParameterLogistic, { fixed: JSON.parse("null") })).toThrow(
       "The option fixed must be an object of item parameters by item id, found null.",
     );
-    expect(() => calibrate(binary, { ...options, priors: JSON.parse('{ "a": null }') })).toThrow(
+    expect(() => calibrate(binary, twoParameterLogistic, { priors: JSON.parse('{ "a": null }') })).toThrow(
       'The prior of "a" must be a prior such as normalPrior(0, 1), found null.',
     );
-    expect(() => calibrate(binary, { ...options, testlets: JSON.parse("null") })).toThrow(
+    expect(() => calibrate(binary, twoParameterLogistic, { testlets: JSON.parse("null") })).toThrow(
       "The option testlets must be an object of item id lists by testlet id, found null.",
     );
-    expect(() => calibrate(binary, { ...options, maxIterations: JSON.parse('"10"') })).toThrow(
+    expect(() => calibrate(binary, twoParameterLogistic, { maxIterations: JSON.parse('"10"') })).toThrow(
       'The option maxIterations must be a positive integer, found "10".',
     );
   });
@@ -1636,7 +1642,7 @@ describe("calibrate", () => {
         itemIds: ["__proto__", "constructor", "toString", "valueOf"],
       },
     );
-    const result = calibrate(named, { model: twoParameterLogistic });
+    const result = calibrate(named, twoParameterLogistic);
     expect(result.items.map(({ id }) => id)).toEqual(["__proto__", "constructor", "toString", "valueOf"]);
     expect(result.items.every(({ parameters }) => Number.isFinite(parameters.a) && parameters.a > 0)).toBe(true);
   });
@@ -1647,14 +1653,14 @@ describe("calibrate", () => {
       [1, null],
       [null, null],
     ]);
-    expect(() => calibrate(matrix, { model: fourParameterLogistic })).toThrow(
+    expect(() => calibrate(matrix, fourParameterLogistic)).toThrow(
       'Item "item1" has no response in category 0; calibration needs responses in every category up to the highest.',
     );
     const fixed = { item1: defined(PARAMETERS_2PL[0]) };
-    expect(() => calibrate(matrix, { model: fourParameterLogistic, fixed })).toThrow(
+    expect(() => calibrate(matrix, fourParameterLogistic, { fixed })).toThrow(
       'Item "item2" has responses in fewer than two categories; calibration needs at least two.',
     );
-    expect(() => calibrate(matrix, { model: gradedResponse, fixed: { item1: { a: 1, b: [0] } } })).toThrow(
+    expect(() => calibrate(matrix, gradedResponse, { fixed: { item1: { a: 1, b: [0] } } })).toThrow(
       'Item "item2" has responses in fewer than two categories; calibration needs at least two.',
     );
   });
@@ -1663,11 +1669,11 @@ describe("calibrate", () => {
     const highest = 2 ** 31 - 1;
     const matrix = buildResponseMatrix([[0], [1], [highest], [1]]);
     for (const model of [gradedResponse, generalizedPartialCredit]) {
-      expect(() => calibrate(matrix, { model })).toThrow(
+      expect(() => calibrate(matrix, model)).toThrow(
         'Item "item1" has no response in category 2; calibration needs responses in every category up to the highest.',
       );
     }
-    expect(() => calibrate(matrix, { model: twoParameterLogistic })).toThrow(
+    expect(() => calibrate(matrix, twoParameterLogistic)).toThrow(
       `Item "item1" has a response of ${highest}, but the 2PL model allows responses from 0 to 1.`,
     );
   }, 5_000);
@@ -1675,14 +1681,13 @@ describe("calibrate", () => {
 
 describe("calibrateWithCovariance", () => {
   const sample = simulate(20261029, 300, ITEMS_2PL);
-  const options = { model: twoParameterLogistic, standardErrors: "hessian" } as const;
+  const options = { standardErrors: "hessian" } as const;
 
   for (const reference of covariance.cases) {
     const source = reference.data === "irt-lsat7" ? lsat7 : science;
     it(`matches the covariance matrix of ${reference.name}`, () => {
       const matrix = buildResponseMatrix(source.responses, { itemIds: source.itemIds });
-      const result = calibrateWithCovariance(matrix, {
-        model: reference.models.map(model),
+      const result = calibrateWithCovariance(matrix, reference.models.map(model), {
         quadrature: { method: "rectangular", points: reference.quadrature.points },
         ...(reference.priors && {
           priors: Object.fromEntries(
@@ -1711,13 +1716,18 @@ describe("calibrateWithCovariance", () => {
 
   it("calibrates as calibrate does", () => {
     const matrix = buildResponseMatrix(sample);
-    expect(calibrateWithCovariance(matrix, options).calibration).toEqual(calibrate(matrix, options));
+    expect(calibrateWithCovariance(matrix, twoParameterLogistic, options).calibration).toEqual(
+      calibrate(matrix, twoParameterLogistic, options),
+    );
   });
 
   it("has the squares of the standard errors on its diagonal, with either method", () => {
     const matrix = buildResponseMatrix(sample);
     for (const standardErrors of ["hessian", "cross-product"] as const) {
-      const { calibration, covariance: result } = calibrateWithCovariance(matrix, { ...options, standardErrors });
+      const { calibration, covariance: result } = calibrateWithCovariance(matrix, twoParameterLogistic, {
+        ...options,
+        standardErrors,
+      });
       const { parameters, matrix: entries } = defined(result);
       parameters.forEach(({ item, name }, k) => {
         const errors = defined(defined(calibration.items.find(({ id }) => id === item)).standardErrors);
@@ -1728,7 +1738,10 @@ describe("calibrateWithCovariance", () => {
 
   it("is symmetric and covers the estimated items in item order, leaving out the fixed ones", () => {
     const fixed = { item1: defined(PARAMETERS_2PL[0]), item3: defined(PARAMETERS_2PL[2]) };
-    const { covariance: result } = calibrateWithCovariance(buildResponseMatrix(sample), { ...options, fixed });
+    const { covariance: result } = calibrateWithCovariance(buildResponseMatrix(sample), twoParameterLogistic, {
+      ...options,
+      fixed,
+    });
     const { parameters, matrix } = defined(result);
     expect(parameters).toEqual([
       { item: "item2", name: "a" },
@@ -1747,8 +1760,8 @@ describe("calibrateWithCovariance", () => {
   it("lists a parameter that items share once for each item, with correlation 1", () => {
     const { covariance: result } = calibrateWithCovariance(
       buildResponseMatrix(science.responses, { itemIds: science.itemIds }),
+      ratingScale,
       {
-        model: ratingScale,
         standardErrors: "hessian",
       },
     );
@@ -1761,44 +1774,48 @@ describe("calibrateWithCovariance", () => {
 
   it("is null without standard errors, with every item fixed, and where the information matrix is singular", () => {
     const matrix = buildResponseMatrix(sample);
-    expect(calibrateWithCovariance(matrix, { model: twoParameterLogistic }).covariance).toBeNull();
+    expect(calibrateWithCovariance(matrix, twoParameterLogistic).covariance).toBeNull();
     const fixed = Object.fromEntries(ITEMS_2PL.map((item, i) => [`item${i + 1}`, item.parameters]));
-    const normal = calibrateWithCovariance(matrix, { ...options, fixed, latent: "normal" });
+    const normal = calibrateWithCovariance(matrix, twoParameterLogistic, { ...options, fixed, latent: "normal" });
     expect(normal.covariance).toBeNull();
     expect(normal.calibration.groups[0]?.standardErrors).not.toBeNull();
     const pair = buildResponseMatrix([
       [1, 0],
       [0, 1],
     ]);
-    expect(calibrateWithCovariance(pair, options).covariance).toBeNull();
+    expect(calibrateWithCovariance(pair, twoParameterLogistic, options).covariance).toBeNull();
   });
 
   it("is plain data that JSON serializes", () => {
-    const { covariance: result } = calibrateWithCovariance(buildResponseMatrix(sample), options);
+    const { covariance: result } = calibrateWithCovariance(buildResponseMatrix(sample), twoParameterLogistic, options);
     expect(JSON.parse(JSON.stringify(result))).toEqual(result);
   });
 
   it("rejects options of other types from JavaScript", () => {
     const matrix = buildResponseMatrix(sample);
-    expect(() => calibrateWithCovariance(matrix, JSON.parse("null"))).toThrow(
+    expect(() => calibrateWithCovariance(matrix, twoParameterLogistic, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
-    expect(() => calibrateWithCovariance(matrix, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
-    expect(() => calibrateWithCovariance(matrix, { ...options, standardErrors: JSON.parse('"full"') })).toThrow(
-      'The option standardErrors must be "none", "hessian" or "cross-product", found "full".',
+    expect(() => calibrateWithCovariance(matrix, twoParameterLogistic, JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
     );
+    expect(() =>
+      calibrateWithCovariance(matrix, twoParameterLogistic, { ...options, standardErrors: JSON.parse('"full"') }),
+    ).toThrow('The option standardErrors must be "none", "hessian" or "cross-product", found "full".');
   });
 });
 
 describe("item priors", () => {
   const sample = simulate(20261029, 300, ITEMS_2PL);
   const matrix = buildResponseMatrix(sample);
-  const options = { model: twoParameterLogistic } as const;
 
   it("replace the priors of the option for the parameter they name, and only for that item", () => {
     const priors = { a: logNormalPrior(0.3, 0.5), b: normalPrior(0, 0.5) };
-    const general = calibrate(matrix, { ...options, priors });
-    const replaced = calibrate(matrix, { ...options, priors, itemPriors: { item2: { b: normalPrior(1, 0.01) } } });
+    const general = calibrate(matrix, twoParameterLogistic, { priors });
+    const replaced = calibrate(matrix, twoParameterLogistic, {
+      priors,
+      itemPriors: { item2: { b: normalPrior(1, 0.01) } },
+    });
     expect(Math.abs(defined(replaced.items[1]).parameters.b - 1)).toBeLessThan(0.05);
     expect(defined(general.items[1]).parameters.b).toBeLessThan(0.5);
   });
@@ -1806,20 +1823,25 @@ describe("item priors", () => {
   it("give the result of the option priors when every item has the same prior", () => {
     const prior = logNormalPrior(0.2, 0.4);
     const itemPriors = Object.fromEntries(ITEMS_2PL.map((_, i) => [`item${i + 1}`, { a: prior }]));
-    const byItem = calibrate(matrix, { ...options, itemPriors, standardErrors: "hessian" });
-    expect(byItem).toEqual(calibrate(matrix, { ...options, priors: { a: prior }, standardErrors: "hessian" }));
+    const byItem = calibrate(matrix, twoParameterLogistic, { itemPriors, standardErrors: "hessian" });
+    expect(byItem).toEqual(
+      calibrate(matrix, twoParameterLogistic, { priors: { a: prior }, standardErrors: "hessian" }),
+    );
   });
 
   it("change nothing when empty", () => {
-    expect(calibrate(matrix, { ...options, itemPriors: {} })).toEqual(calibrate(matrix, options));
-    expect(calibrate(matrix, { ...options, itemPriors: { item1: {} } })).toEqual(calibrate(matrix, options));
+    expect(calibrate(matrix, twoParameterLogistic, { itemPriors: {} })).toEqual(
+      calibrate(matrix, twoParameterLogistic),
+    );
+    expect(calibrate(matrix, twoParameterLogistic, { itemPriors: { item1: {} } })).toEqual(
+      calibrate(matrix, twoParameterLogistic),
+    );
   });
 
   it("apply to the parameters of models that do not share them", () => {
     const grades = buildResponseMatrix(science.responses, { itemIds: science.itemIds });
-    const free = calibrate(grades, { model: generalizedPartialCredit });
-    const tight = calibrate(grades, {
-      model: generalizedPartialCredit,
+    const free = calibrate(grades, generalizedPartialCredit);
+    const tight = calibrate(grades, generalizedPartialCredit, {
       itemPriors: { [defined(science.itemIds[0])]: { a: logNormalPrior(0, 0.05) } },
     });
     expect(Math.abs(Math.log(defined(tight.items[0]).parameters.a))).toBeLessThan(
@@ -1829,25 +1851,24 @@ describe("item priors", () => {
 
   it("reject items that are unknown or fixed, parameters the model lacks or shares, and priors of other types", () => {
     const fixed = { item1: defined(PARAMETERS_2PL[0]) };
-    expect(() => calibrate(matrix, { ...options, itemPriors: { q1: { a: normalPrior(1, 1) } } })).toThrow(
+    expect(() => calibrate(matrix, twoParameterLogistic, { itemPriors: { q1: { a: normalPrior(1, 1) } } })).toThrow(
       'Priors are given for "q1", which is not an item id.',
     );
-    expect(() => calibrate(matrix, { ...options, fixed, itemPriors: { item1: { a: normalPrior(1, 1) } } })).toThrow(
-      'Priors are given for item "item1", which is fixed.',
-    );
-    expect(() => calibrate(matrix, { ...options, itemPriors: { item2: { c: betaPrior(5, 17) } } })).toThrow(
+    expect(() =>
+      calibrate(matrix, twoParameterLogistic, { fixed, itemPriors: { item1: { a: normalPrior(1, 1) } } }),
+    ).toThrow('Priors are given for item "item1", which is fixed.');
+    expect(() => calibrate(matrix, twoParameterLogistic, { itemPriors: { item2: { c: betaPrior(5, 17) } } })).toThrow(
       'A prior is given for "c" of item "item2", whose model has no such parameter.',
     );
     const grades = buildResponseMatrix(science.responses, { itemIds: science.itemIds });
     expect(() =>
-      calibrate(grades, {
-        model: ratingScale,
+      calibrate(grades, ratingScale, {
         itemPriors: { [defined(science.itemIds[1])]: { a: normalPrior(1, 1) } },
       }),
     ).toThrow(`A prior is given for "a" of item "${science.itemIds[1]}", whose model shares it among items`);
     const rejected = (value: string): DataError | undefined => {
       try {
-        calibrate(matrix, { ...options, itemPriors: JSON.parse(value) });
+        calibrate(matrix, twoParameterLogistic, { itemPriors: JSON.parse(value) });
       } catch (error) {
         return error instanceof DataError ? error : undefined;
       }
@@ -1865,7 +1886,7 @@ describe("item priors", () => {
   });
 
   it("treat an item id such as constructor as an id", () => {
-    expect(() => calibrate(matrix, { ...options, itemPriors: JSON.parse('{ "constructor": {} }') })).toThrow(
+    expect(() => calibrate(matrix, twoParameterLogistic, { itemPriors: JSON.parse('{ "constructor": {} }') })).toThrow(
       'Priors are given for "constructor", which is not an item id.',
     );
   });
@@ -1873,7 +1894,6 @@ describe("item priors", () => {
 
 describe("the sampling error of fixed items", () => {
   const options = (reference: IrtFixedErrorCase) => ({
-    model: twoParameterLogistic,
     fixed: reference.fixed,
     ...(reference.latent === "normal" && { latent: "normal" as const }),
     standardErrors: "hessian" as const,
@@ -1886,8 +1906,8 @@ describe("the sampling error of fixed items", () => {
 
   for (const reference of fixedError.cases) {
     it(`matches base R's V + J S J' with ${reference.name}`, () => {
-      const known = calibrateWithCovariance(matrixOf(reference), options(reference));
-      const { calibration, covariance } = calibrateWithCovariance(matrixOf(reference), {
+      const known = calibrateWithCovariance(matrixOf(reference), twoParameterLogistic, options(reference));
+      const { calibration, covariance } = calibrateWithCovariance(matrixOf(reference), twoParameterLogistic, {
         ...options(reference),
         fixedCovariance: reference.fixedCovariance,
       });
@@ -1933,13 +1953,16 @@ describe("the sampling error of fixed items", () => {
 
   it("leaves the estimates as they are and adds as much to the variances as the covariance has", () => {
     const reference = defined(independent);
-    const without = calibrateWithCovariance(matrixOf(reference), options(reference));
+    const without = calibrateWithCovariance(matrixOf(reference), twoParameterLogistic, options(reference));
     const scaled = (factor: number): ParameterCovariance => ({
       parameters: reference.fixedCovariance.parameters,
       matrix: reference.fixedCovariance.matrix.map((row) => row.map((value) => value * factor)),
     });
     const run = (factor: number) =>
-      calibrateWithCovariance(matrixOf(reference), { ...options(reference), fixedCovariance: scaled(factor) });
+      calibrateWithCovariance(matrixOf(reference), twoParameterLogistic, {
+        ...options(reference),
+        fixedCovariance: scaled(factor),
+      });
     const zero = run(0);
     const once = run(1);
     const four = run(4);
@@ -1962,8 +1985,11 @@ describe("the sampling error of fixed items", () => {
   it("carries the fixed items' error with the cross-product standard errors too", () => {
     const reference = defined(independent);
     const crossProduct = { ...options(reference), standardErrors: "cross-product" as const };
-    const without = calibrate(matrixOf(reference), crossProduct);
-    const withError = calibrate(matrixOf(reference), { ...crossProduct, fixedCovariance: reference.fixedCovariance });
+    const without = calibrate(matrixOf(reference), twoParameterLogistic, crossProduct);
+    const withError = calibrate(matrixOf(reference), twoParameterLogistic, {
+      ...crossProduct,
+      fixedCovariance: reference.fixedCovariance,
+    });
     without.items.forEach((item, i) => {
       if (item.standardErrors === null) return;
       expect(defined(withError.items[i]?.standardErrors?.b)).toBeGreaterThan(defined(item.standardErrors.b));
@@ -1979,8 +2005,11 @@ describe("the sampling error of fixed items", () => {
         [...reference.fixedCovariance.matrix.map(() => 0), 0.01],
       ],
     };
-    const listed = calibrateWithCovariance(matrixOf(reference), { ...options(reference), fixedCovariance: pool });
-    const exact = calibrateWithCovariance(matrixOf(reference), {
+    const listed = calibrateWithCovariance(matrixOf(reference), twoParameterLogistic, {
+      ...options(reference),
+      fixedCovariance: pool,
+    });
+    const exact = calibrateWithCovariance(matrixOf(reference), twoParameterLogistic, {
       ...options(reference),
       fixedCovariance: reference.fixedCovariance,
     });
@@ -2016,18 +2045,18 @@ describe("the sampling error of fixed items", () => {
         : simulateResponses(items.slice(0, operational), persons(250, 0, 1), random).responses;
       const calibration = calibrateWithCovariance(
         buildResponseMatrix(first, { itemIds: itemIds.slice(0, operational) }),
-        { model: twoParameterLogistic, standardErrors: "hessian" },
+        twoParameterLogistic,
+        { standardErrors: "hessian" },
       );
       const base = {
-        model: twoParameterLogistic,
         fixed: Object.fromEntries(calibration.calibration.items.map((item) => [item.id, item.parameters])),
         ...(design.samePersons ? {} : { latent: "normal" as const }),
         standardErrors: "hessian" as const,
       };
       const matrix = buildResponseMatrix(rows, { itemIds });
       const fits = {
-        known: calibrate(matrix, base),
-        carried: calibrate(matrix, { ...base, fixedCovariance: defined(calibration.covariance) }),
+        known: calibrate(matrix, twoParameterLogistic, base),
+        carried: calibrate(matrix, twoParameterLogistic, { ...base, fixedCovariance: defined(calibration.covariance) }),
       };
       for (const [name, fit] of Object.entries(fits) as [keyof typeof fits, Calibration<LogisticItem>][]) {
         items.slice(operational).forEach((truth, k) => {
@@ -2080,12 +2109,18 @@ describe("the sampling error of fixed items", () => {
       matrix: [[variance]],
     });
     expect(() =>
-      calibrate(matrix, { ...options(reference), standardErrors: "none", fixedCovariance: covariance("q01", "a") }),
+      calibrate(matrix, twoParameterLogistic, {
+        ...options(reference),
+        standardErrors: "none",
+        fixedCovariance: covariance("q01", "a"),
+      }),
     ).toThrow('The option fixedCovariance needs the standard errors "hessian" or "cross-product".');
-    expect(() => calibrate(matrix, { ...options(reference), fixedCovariance: covariance("q09", "a") })).toThrow(
-      'The option fixedCovariance has the parameter "a" of item "q09", which is estimated here, not fixed.',
-    );
-    expect(() => calibrate(matrix, { ...options(reference), fixedCovariance: covariance("q01", "slope") })).toThrow(
+    expect(() =>
+      calibrate(matrix, twoParameterLogistic, { ...options(reference), fixedCovariance: covariance("q09", "a") }),
+    ).toThrow('The option fixedCovariance has the parameter "a" of item "q09", which is estimated here, not fixed.');
+    expect(() =>
+      calibrate(matrix, twoParameterLogistic, { ...options(reference), fixedCovariance: covariance("q01", "slope") }),
+    ).toThrow(
       'The option fixedCovariance has the parameter "slope" of item "q01", which its 2PL model does not estimate; it estimates a, b.',
     );
     const twice: ParameterCovariance = {
@@ -2098,20 +2133,28 @@ describe("the sampling error of fixed items", () => {
         [0, 0.01],
       ],
     };
-    expect(() => calibrate(matrix, { ...options(reference), fixedCovariance: twice })).toThrow(
+    expect(() => calibrate(matrix, twoParameterLogistic, { ...options(reference), fixedCovariance: twice })).toThrow(
       'The option fixedCovariance lists the parameter "a" of item "q01" twice.',
     );
-    expect(() => calibrate(matrix, { ...options(reference), fixedCovariance: covariance("q01", "a", -0.01) })).toThrow(
+    expect(() =>
+      calibrate(matrix, twoParameterLogistic, {
+        ...options(reference),
+        fixedCovariance: covariance("q01", "a", -0.01),
+      }),
+    ).toThrow(
       "The option fixedCovariance is not positive semidefinite: the variance it adds to an estimate is negative",
     );
-    const guessing = { ...options(reference), model: threeParameterLogistic, fixed: { ...reference.fixed } };
+    const guessing = { ...options(reference), fixed: { ...reference.fixed } };
     const pretest = reference.itemIds.filter((id) => !(id in reference.fixed));
     expect(() =>
-      calibrate(matrix, {
-        ...guessing,
-        model: reference.itemIds.map((id) => (pretest.includes(id) ? twoParameterLogistic : threeParameterLogistic)),
-        fixedCovariance: covariance("q01", "c"),
-      }),
+      calibrate(
+        matrix,
+        reference.itemIds.map((id) => (pretest.includes(id) ? twoParameterLogistic : threeParameterLogistic)),
+        {
+          ...guessing,
+          fixedCovariance: covariance("q01", "c"),
+        },
+      ),
     ).toThrow(
       'The parameter "c" of item "q01" is 0, on a bound of its range; the standard error needs it inside the range.',
     );
@@ -2120,11 +2163,11 @@ describe("the sampling error of fixed items", () => {
   it("rejects a covariance of another type from JavaScript", () => {
     const reference = defined(independent);
     const matrix = matrixOf(reference);
-    expect(() => calibrate(matrix, { ...options(reference), fixedCovariance: JSON.parse("null") })).toThrow(
-      "The option fixedCovariance must be an object { parameters, matrix }, found null.",
-    );
     expect(() =>
-      calibrate(matrix, {
+      calibrate(matrix, twoParameterLogistic, { ...options(reference), fixedCovariance: JSON.parse("null") }),
+    ).toThrow("The option fixedCovariance must be an object { parameters, matrix }, found null.");
+    expect(() =>
+      calibrate(matrix, twoParameterLogistic, {
         ...options(reference),
         fixedCovariance: JSON.parse('{"parameters":[{"item":"q01","name":"a"}],"matrix":[["1"]]}'),
       }),
@@ -2134,8 +2177,8 @@ describe("the sampling error of fixed items", () => {
 
 describe("fixed parameters", () => {
   const matrix = buildResponseMatrix(fixedParameters.responses, { itemIds: fixedParameters.itemIds });
+  const optionsModel = fixedParameters.models.map(model);
   const options = {
-    model: fixedParameters.models.map(model),
     fixedParameters: fixedParameters.fixedParameters,
     tolerance: EM_TOLERANCE,
     maxIterations: 10_000,
@@ -2144,7 +2187,7 @@ describe("fixed parameters", () => {
   for (const reference of fixedParameters.calibrations) {
     const standardErrors = reference.standardErrors === "cross-product" ? "cross-product" : "hessian";
     it(`match mirt with est = FALSE on the held parameters, with ${standardErrors} standard errors`, () => {
-      const result = calibrate(matrix, { ...options, standardErrors });
+      const result = calibrate(matrix, optionsModel, { ...options, standardErrors });
       expect(result.converged).toBe(true);
       reference.items.forEach((expected, i) => {
         const actual = defined(result.items[i]);
@@ -2162,7 +2205,7 @@ describe("fixed parameters", () => {
   }
 
   it("keep each held value exactly, and leave it out of the standard errors and the covariance", () => {
-    const { calibration, covariance: result } = calibrateWithCovariance(matrix, {
+    const { calibration, covariance: result } = calibrateWithCovariance(matrix, optionsModel, {
       ...options,
       standardErrors: "hessian",
     });
@@ -2184,10 +2227,9 @@ describe("fixed parameters", () => {
 
   it("give the free calibration when a parameter is held at its estimate", () => {
     const grades = buildResponseMatrix(science.responses, { itemIds: science.itemIds });
-    const free = calibrate(grades, { model: generalizedPartialCredit, tolerance: EM_TOLERANCE, maxIterations: 10_000 });
+    const free = calibrate(grades, generalizedPartialCredit, { tolerance: EM_TOLERANCE, maxIterations: 10_000 });
     const second = defined(free.items[1]);
-    const held = calibrate(grades, {
-      model: generalizedPartialCredit,
+    const held = calibrate(grades, generalizedPartialCredit, {
       fixedParameters: { [second.id]: { b2: defined(second.parameters.b[1]) } },
       tolerance: EM_TOLERANCE,
       maxIterations: 10_000,
@@ -2233,7 +2275,7 @@ describe("fixed parameters", () => {
 
   it("give the free calibration when a threshold of a graded item is held at its estimate, whatever the starts", () => {
     const grades = buildResponseMatrix(science.responses, { itemIds: science.itemIds });
-    const free = calibrate(grades, { model: gradedResponse, tolerance: EM_TOLERANCE, maxIterations: 10_000 });
+    const free = calibrate(grades, gradedResponse, { tolerance: EM_TOLERANCE, maxIterations: 10_000 });
     const second = defined(free.items[1]);
     const b = second.parameters.b;
     for (const fixedParameters of [
@@ -2241,8 +2283,7 @@ describe("fixed parameters", () => {
       { [second.id]: { b1: defined(b[0]), b3: defined(b[2]) } },
       { [second.id]: { b3: defined(b[2]) } },
     ]) {
-      const held = calibrate(grades, {
-        model: gradedResponse,
+      const held = calibrate(grades, gradedResponse, {
         fixedParameters,
         tolerance: EM_TOLERANCE,
         maxIterations: 10_000,
@@ -2262,12 +2303,11 @@ describe("fixed parameters", () => {
         "c" in held ? [[id, { c: betaPrior(1 + 10_000 * held.c, 1 + 10_000 * (1 - held.c)) }]] : [],
       ),
     );
-    const prior = calibrate(matrix, {
-      model: fixedParameters.models.map(model),
+    const prior = calibrate(matrix, fixedParameters.models.map(model), {
       itemPriors,
       fixedParameters: { item12: { a: 1 } },
     });
-    const held = calibrate(matrix, { ...options, tolerance: 1e-4, maxIterations: 500 });
+    const held = calibrate(matrix, optionsModel, { ...options, tolerance: 1e-4, maxIterations: 500 });
     held.items.forEach((item, i) => {
       expectParameters(defined(prior.items[i]).parameters, item.parameters, 0.02, item.id);
     });
@@ -2275,19 +2315,22 @@ describe("fixed parameters", () => {
 
   it("change nothing when empty", () => {
     const sample = buildResponseMatrix(simulate(20261029, 300, ITEMS_2PL));
-    const plain = calibrate(sample, { model: twoParameterLogistic });
-    expect(calibrate(sample, { model: twoParameterLogistic, fixedParameters: {} })).toEqual(plain);
-    expect(calibrate(sample, { model: twoParameterLogistic, fixedParameters: { item1: {} } })).toEqual(plain);
+    const plain = calibrate(sample, twoParameterLogistic);
+    expect(calibrate(sample, twoParameterLogistic, { fixedParameters: {} })).toEqual(plain);
+    expect(calibrate(sample, twoParameterLogistic, { fixedParameters: { item1: {} } })).toEqual(plain);
   });
 
   it("reject unknown and fixed items, parameters the model lacks or shares, every parameter, priors and values", () => {
     const sample = buildResponseMatrix(simulate(20261029, 300, ITEMS_2PL));
-    const two = { model: twoParameterLogistic } as const;
     const fixed = { item1: defined(PARAMETERS_2PL[0]) };
-    const rejected = (value: object | string, extra: object = {}): string | undefined => {
+    const rejected = (
+      value: object | string,
+      extra: object = {},
+      model: IrtModel<LogisticItem> = twoParameterLogistic,
+    ): string | undefined => {
       try {
         const held = typeof value === "string" ? JSON.parse(value) : value;
-        calibrate(sample, { ...two, ...extra, fixedParameters: held });
+        calibrate(sample, model, { ...extra, fixedParameters: held });
       } catch (error) {
         return error instanceof DataError ? error.message : undefined;
       }
@@ -2312,17 +2355,16 @@ describe("fixed parameters", () => {
     expect(rejected(allSlopes, { priors: { a: logNormalPrior(0, 0.5) } })).toBe(
       'A prior is given for "a", which no estimated item has.',
     );
-    expect(rejected({ item2: { a: 1 } }, { model: oneParameterLogistic })).toBe(
+    expect(rejected({ item2: { a: 1 } }, {}, oneParameterLogistic)).toBe(
       'The option fixedParameters holds "a" of item "item2", whose 1PL model shares it among items.',
     );
     const thresholds = buildResponseMatrix(science.responses, { itemIds: science.itemIds });
     expect(() =>
-      calibrate(thresholds, {
-        model: gradedResponse,
+      calibrate(thresholds, gradedResponse, {
         fixedParameters: { [defined(science.itemIds[0])]: { b1: 1, b2: 0 } },
       }),
     ).toThrow(/with its held parameters: A GRM item .* thresholds b strictly increasing/);
-    expect(rejected({ item2: { c: 1 } }, { model: threeParameterLogistic })).toMatch(
+    expect(rejected({ item2: { c: 1 } }, {}, threeParameterLogistic)).toMatch(
       /^Item "item2" with its held parameters: Logistic item parameters need finite a and b and 0 ≤ c < d ≤ 1, found .* c = 1, d = 1\.$/,
     );
     expect(rejected("null")).toBe(
@@ -2823,14 +2865,17 @@ describe("distributions of theta", () => {
       const distributions: Readonly<Record<string, LatentDistribution>> = Object.fromEntries(
         Object.entries(reference.distributions).map(([group, name]) => [group, latentDistribution(name)]),
       );
-      const result = calibrate(buildResponseMatrix(reference.responses, { itemIds: reference.itemIds }), {
-        model: twoParameterLogistic,
-        fixed: definedEntries(reference.fixed),
-        ...(groups === undefined ? { latent: defined(distributions.all) } : { groups, latent: distributions }),
-        tolerance: EM_TOLERANCE,
-        maxIterations: 10_000,
-        standardErrors: "hessian",
-      });
+      const result = calibrate(
+        buildResponseMatrix(reference.responses, { itemIds: reference.itemIds }),
+        twoParameterLogistic,
+        {
+          fixed: definedEntries(reference.fixed),
+          ...(groups === undefined ? { latent: defined(distributions.all) } : { groups, latent: distributions }),
+          tolerance: EM_TOLERANCE,
+          maxIterations: 10_000,
+          standardErrors: "hessian",
+        },
+      );
       expect(result.converged).toBe(true);
       reference.items.forEach((expected, i) => {
         const actual = defined(result.items[i]);
@@ -2867,13 +2912,16 @@ describe("distributions of theta", () => {
 
   it(`matches ${latent.histogram.name}`, () => {
     const { histogram } = latent;
-    const result = calibrate(buildResponseMatrix(histogram.responses, { itemIds: histogram.itemIds }), {
-      model: twoParameterLogistic,
-      fixed: histogram.fixed,
-      latent: "empirical-histogram",
-      tolerance: histogram.tolerance,
-      maxIterations: 10_000,
-    });
+    const result = calibrate(
+      buildResponseMatrix(histogram.responses, { itemIds: histogram.itemIds }),
+      twoParameterLogistic,
+      {
+        fixed: histogram.fixed,
+        latent: "empirical-histogram",
+        tolerance: histogram.tolerance,
+        maxIterations: 10_000,
+      },
+    );
     expect(result).toMatchObject({ converged: true, iterations: histogram.iterations });
     const group = defined(result.groups[0]);
     group.weights.forEach((weight, q) => {
@@ -2890,11 +2938,7 @@ describe("distributions of theta", () => {
     const pool = simulateItems(twoParameterLogistic, 60, random).map((item, i) => ({ ...item, id: `op${i + 1}` }));
     const pretest = simulateItems(twoParameterLogistic, 4, random);
     const thetas = simulateThetas(3000, random).map((theta) => 0.4 + 1.2 * theta);
-    const sessions = simulateAdaptiveTest(
-      createAdaptiveTest({ pool, stopping: testLength(12) }),
-      thetas,
-      random,
-    ).persons;
+    const sessions = simulateAdaptiveTest(createAdaptiveTest(pool, testLength(12)), thetas, random).persons;
     const seeded = simulateResponses(pretest, thetas, random).responses;
     const itemIds = [...pool.map((item) => item.id), "pre1", "pre2", "pre3", "pre4"];
     // Each session answers its adaptive items and two of the four pretest items.
@@ -2909,8 +2953,7 @@ describe("distributions of theta", () => {
     const matrix = buildResponseMatrix(rows, { itemIds });
     const fixed = Object.fromEntries(pool.map((item) => [item.id, item.parameters]));
     for (const distribution of ["normal", "empirical-histogram"] as const) {
-      const result = calibrate(matrix, {
-        model: twoParameterLogistic,
+      const result = calibrate(matrix, twoParameterLogistic, {
         fixed,
         latent: distribution,
         standardErrors: "cross-product",
@@ -2931,8 +2974,8 @@ describe("distributions of theta", () => {
   it("gives the estimates of one group to groups that all keep the standard normal", () => {
     const rows = simulate(7, 400, ITEMS_2PL);
     const groups = rows.map((_, person) => (person % 2 === 0 ? "even" : "odd"));
-    const one = calibrate(buildResponseMatrix(rows), { model: twoParameterLogistic });
-    const two = calibrate(buildResponseMatrix(rows), { model: twoParameterLogistic, groups });
+    const one = calibrate(buildResponseMatrix(rows), twoParameterLogistic);
+    const two = calibrate(buildResponseMatrix(rows), twoParameterLogistic, { groups });
     two.items.forEach((item, i) => {
       expectParameters(item.parameters, defined(one.items[i]).parameters, 1e-12, item.id);
     });
@@ -2943,8 +2986,7 @@ describe("distributions of theta", () => {
   it("estimates the distribution of a group on fixed items alone", () => {
     const rows = simulate(11, 500, ITEMS_2PL);
     const fixed = Object.fromEntries(PARAMETERS_2PL.map((item, i) => [`item${i + 1}`, item]));
-    const result = calibrate(buildResponseMatrix(rows), {
-      model: twoParameterLogistic,
+    const result = calibrate(buildResponseMatrix(rows), twoParameterLogistic, {
       fixed,
       latent: "normal",
       standardErrors: "hessian",
@@ -2968,14 +3010,14 @@ describe("distributions of theta", () => {
       item2: { a: 0.99, b: 0.82, c: 0, d: 1 },
       item3: { a: 1.21, b: -0.22, c: 0, d: 1 },
     };
-    const result = calibrate(matrix, { model: twoParameterLogistic, fixed, latent: "normal", maxIterations: 2000 });
+    const result = calibrate(matrix, twoParameterLogistic, { fixed, latent: "normal", maxIterations: 2000 });
     const group = defined(result.groups[0]);
     expect(Number.isFinite(group.mean)).toBe(true);
     expect(group.sd).toBeGreaterThan(0);
     expect(group.sd).toBeLessThan(0.2);
     // The SD is below the spacing of the nodes, 0.2: the likelihood has no maximum there.
     expect(result.converged).toBe(false);
-    const first = calibrate(matrix, { model: twoParameterLogistic, fixed, latent: "normal", maxIterations: 1 });
+    const first = calibrate(matrix, twoParameterLogistic, { fixed, latent: "normal", maxIterations: 1 });
     expect(result.logLikelihood).toBeGreaterThan(first.logLikelihood);
   });
 
@@ -2983,8 +3025,7 @@ describe("distributions of theta", () => {
     // Three of the focal group's four persons answer the item in its top category: its mean runs to +∞.
     const responses = [[2], [2], [1], [0], [1], [2], [1], [2], [1]];
     const groups = responses.map((_, person) => (person % 2 === 1 ? "focal" : "reference"));
-    const result = calibrate(buildResponseMatrix(responses), {
-      model: generalizedPartialCredit,
+    const result = calibrate(buildResponseMatrix(responses), generalizedPartialCredit, {
       groups,
       latent: { focal: "normal" },
       standardErrors: "hessian",
@@ -3001,8 +3042,7 @@ describe("distributions of theta", () => {
   it("takes groups named as the properties of every object as groups without a distribution of their own", () => {
     const rows = simulate(9, 200, ITEMS_2PL);
     const groups = rows.map((_, person) => ["constructor", "toString", "reference"][person % 3] ?? "reference");
-    const result = calibrate(buildResponseMatrix(rows), {
-      model: twoParameterLogistic,
+    const result = calibrate(buildResponseMatrix(rows), twoParameterLogistic, {
       groups,
       latent: { reference: "normal" },
       fixed: { item1: defined(PARAMETERS_2PL[0]) },
@@ -3018,8 +3058,8 @@ describe("distributions of theta", () => {
     // 100,000 persons in 50,000 groups: comparing each person with every group would take 5 billion steps, twice.
     const rows = simulate(12, 100_000, ITEMS_2PL.slice(0, 2));
     const groups = rows.map((_, person) => `g${person >> 1}`);
-    const options = { model: twoParameterLogistic, groups, quadrature: { points: 5 }, maxIterations: 1 };
-    const result = calibrate(buildResponseMatrix(rows), options);
+    const options = { groups, quadrature: { points: 5 }, maxIterations: 1 };
+    const result = calibrate(buildResponseMatrix(rows), twoParameterLogistic, options);
     expect(result.groups).toHaveLength(50_000);
     expect(result.groups[49_999]?.group).toBe("g49999");
   }, 3_000);
@@ -3027,35 +3067,42 @@ describe("distributions of theta", () => {
   it("rejects groups and distributions that do not fit the data or leave the scale free", () => {
     const rows = simulate(3, 50, ITEMS_2PL);
     const matrix = buildResponseMatrix(rows);
-    const options = { model: twoParameterLogistic };
     const labels = rows.map((_, person) => (person < 25 ? "a" : "b"));
-    expect(() => calibrate(matrix, { ...options, groups: ["a"] })).toThrow("Found 1 groups for 50 persons.");
+    expect(() => calibrate(matrix, twoParameterLogistic, { groups: ["a"] })).toThrow("Found 1 groups for 50 persons.");
     expect(() =>
-      calibrate(matrix, { ...options, groups: JSON.parse(JSON.stringify(labels.map((_, i) => (i === 3 ? 3 : "a")))) }),
+      calibrate(matrix, twoParameterLogistic, {
+        groups: JSON.parse(JSON.stringify(labels.map((_, i) => (i === 3 ? 3 : "a")))),
+      }),
     ).toThrow("The group of person 4 must be a string, found 3.");
     const sparse = [...labels];
     delete sparse[7];
-    expect(() => calibrate(matrix, { ...options, groups: sparse })).toThrow(
+    expect(() => calibrate(matrix, twoParameterLogistic, { groups: sparse })).toThrow(
       "The group of person 8 must be a string, found undefined.",
     );
-    expect(() => calibrate(matrix, { ...options, latent: "normal" })).toThrow(
+    expect(() => calibrate(matrix, twoParameterLogistic, { latent: "normal" })).toThrow(
       "Estimating every group's distribution of theta needs fixed items or a standard normal group to fix the scale.",
     );
-    expect(() => calibrate(matrix, { ...options, latent: { a: "normal" } })).toThrow(
+    expect(() => calibrate(matrix, twoParameterLogistic, { latent: { a: "normal" } })).toThrow(
       "Distributions of theta by group need the groups option.",
     );
-    expect(() => calibrate(matrix, { ...options, groups: labels, latent: { c: "normal" } })).toThrow(
+    expect(() => calibrate(matrix, twoParameterLogistic, { groups: labels, latent: { c: "normal" } })).toThrow(
       'A distribution of theta is given for group "c", which no person is in.',
     );
-    expect(() => calibrate(matrix, { ...options, groups: labels, latent: JSON.parse('{ "b": "uniform" }') })).toThrow(
+    expect(() =>
+      calibrate(matrix, twoParameterLogistic, { groups: labels, latent: JSON.parse('{ "b": "uniform" }') }),
+    ).toThrow(
       'The distribution of theta of group "b" must be "standard-normal", "normal" or "empirical-histogram", found "uniform".',
     );
     const fixed = { item1: defined(PARAMETERS_2PL[0]) };
     expect(() =>
-      calibrate(matrix, { ...options, fixed, latent: "normal", quadrature: { method: "gauss-hermite", points: 21 } }),
+      calibrate(matrix, twoParameterLogistic, {
+        fixed,
+        latent: "normal",
+        quadrature: { method: "gauss-hermite", points: 21 },
+      }),
     ).toThrow("Estimating a distribution of theta needs the rectangular quadrature rule.");
     const silent = buildResponseMatrix([...rows, [null, null, null, null]]);
-    expect(() => calibrate(silent, { ...options, groups: [...labels, "c"] })).toThrow(
+    expect(() => calibrate(silent, twoParameterLogistic, { groups: [...labels, "c"] })).toThrow(
       'Group "c" has no person with a response.',
     );
   });
@@ -3065,14 +3112,17 @@ describe("latent regression", () => {
   type Reference = (typeof latentRegression.cases)[number];
   const covariatesOf = (reference: Reference) => definedEntries(reference.covariates);
   const calibrateReference = (reference: Reference, standardErrors: StandardErrorMethod = "none") =>
-    calibrate(buildResponseMatrix(reference.responses, { itemIds: reference.itemIds }), {
-      model: reference.model === "1pl" ? oneParameterLogistic : twoParameterLogistic,
-      fixed: definedEntries(reference.fixed),
-      covariates: covariatesOf(reference),
-      tolerance: 1e-8,
-      maxIterations: 5000,
-      standardErrors,
-    });
+    calibrate(
+      buildResponseMatrix(reference.responses, { itemIds: reference.itemIds }),
+      reference.model === "1pl" ? oneParameterLogistic : twoParameterLogistic,
+      {
+        fixed: definedEntries(reference.fixed),
+        covariates: covariatesOf(reference),
+        tolerance: 1e-8,
+        maxIterations: 5000,
+        standardErrors,
+      },
+    );
 
   for (const reference of latentRegression.cases.filter(({ model }) => model === "2pl")) {
     it(`matches mirt's items, coefficients and residual variance of ${reference.name}`, () => {
@@ -3099,12 +3149,15 @@ describe("latent regression", () => {
 
   it("matches mirt's slopes, thresholds and coefficient of the generalized partial credit model", () => {
     const reference = latentRegression.polytomous;
-    const result = calibrate(buildResponseMatrix(reference.responses, { itemIds: reference.itemIds }), {
-      model: generalizedPartialCredit,
-      covariates: reference.covariates,
-      tolerance: 1e-8,
-      maxIterations: 5000,
-    });
+    const result = calibrate(
+      buildResponseMatrix(reference.responses, { itemIds: reference.itemIds }),
+      generalizedPartialCredit,
+      {
+        covariates: reference.covariates,
+        tolerance: 1e-8,
+        maxIterations: 5000,
+      },
+    );
     expect(result.converged).toBe(true);
     reference.mirt.items.forEach((expected, i) => {
       const actual = defined(result.items[i]).parameters as ThresholdItem;
@@ -3155,13 +3208,11 @@ describe("latent regression", () => {
       x.map((value, person) => 0.6 * value + (noise[person] ?? 0)),
       random,
     );
-    const free = defined(calibrate(responses, { model: twoParameterLogistic, covariates: { x } }).regression);
+    const free = defined(calibrate(responses, twoParameterLogistic, { covariates: { x } }).regression);
     expect(free.residualSd).toBe(1);
     expectClose(defined(free.coefficients.x), 0.6 / 0.8, 0.07);
     const fixed = Object.fromEntries(items.slice(0, 8).map((item, j) => [`item${j + 1}`, item.parameters]));
-    const anchored = defined(
-      calibrate(responses, { model: twoParameterLogistic, covariates: { x }, fixed }).regression,
-    );
+    const anchored = defined(calibrate(responses, twoParameterLogistic, { covariates: { x }, fixed }).regression);
     expectClose(defined(anchored.coefficients.x), 0.6, 0.06);
     expectClose(anchored.residualSd, 0.8, 0.06);
   });
@@ -3172,14 +3223,15 @@ describe("latent regression", () => {
     const result = calibrateReference(reference, "hessian");
     expect(Object.keys(defined(result.regression?.standardErrors))).toEqual(Object.keys(reference.covariates));
     const matrix = buildResponseMatrix(reference.responses, { itemIds: reference.itemIds });
-    expect(calibrate(matrix, { model: twoParameterLogistic }).regression).toBeUndefined();
+    expect(calibrate(matrix, twoParameterLogistic).regression).toBeUndefined();
   });
 
   it("counts the coefficients, and the residual SD when estimated, among the parameters", () => {
     const [free, anchored] = [defined(latentRegression.cases[0]), defined(latentRegression.cases.at(-1))];
-    const withoutCovariates = calibrate(buildResponseMatrix(free.responses, { itemIds: free.itemIds }), {
-      model: twoParameterLogistic,
-    });
+    const withoutCovariates = calibrate(
+      buildResponseMatrix(free.responses, { itemIds: free.itemIds }),
+      twoParameterLogistic,
+    );
     const withCovariates = calibrateReference(free);
     const parameters = (aic: number, logLikelihood: number) => (aic + 2 * logLikelihood) / 2;
     const base = parameters(withoutCovariates.aic, withoutCovariates.logLikelihood);
@@ -3193,16 +3245,21 @@ describe("latent regression", () => {
     const reference = defined(latentRegression.cases[0]);
     const order = reference.responses.map((_, person) => (person * 7 + 3) % reference.responses.length);
     expect(new Set(order).size).toBe(order.length);
-    const options = { model: twoParameterLogistic, tolerance: 1e-9, maxIterations: 5000 } as const;
-    const original = calibrate(buildResponseMatrix(reference.responses, { itemIds: reference.itemIds }), {
-      ...options,
-      covariates: covariatesOf(reference),
-    });
+    const options = { tolerance: 1e-9, maxIterations: 5000 } as const;
+    const original = calibrate(
+      buildResponseMatrix(reference.responses, { itemIds: reference.itemIds }),
+      twoParameterLogistic,
+      {
+        ...options,
+        covariates: covariatesOf(reference),
+      },
+    );
     const permuted = calibrate(
       buildResponseMatrix(
         order.map((person) => defined(reference.responses[person])),
         { itemIds: reference.itemIds },
       ),
+      twoParameterLogistic,
       {
         ...options,
         covariates: Object.fromEntries(
@@ -3215,7 +3272,7 @@ describe("latent regression", () => {
     );
     expectClose(defined(permuted.regression?.coefficients.x), defined(original.regression?.coefficients.x), 1e-7);
     const silent = [...reference.responses, reference.itemIds.map(() => null)];
-    const withSilent = calibrate(buildResponseMatrix(silent, { itemIds: reference.itemIds }), {
+    const withSilent = calibrate(buildResponseMatrix(silent, { itemIds: reference.itemIds }), twoParameterLogistic, {
       ...options,
       covariates: Object.fromEntries(
         Object.entries(covariatesOf(reference)).map(([name, values]) => [name, [...values, 1e6]]),
@@ -3230,53 +3287,55 @@ describe("latent regression", () => {
     const covariates = covariatesOf(reference);
     const x = defined(covariates.x);
     const persons = reference.responses.length;
-    const options = { model: twoParameterLogistic, covariates } as const;
-    expect(() => calibrate(matrix, { ...options, groups: reference.responses.map(() => "a") })).toThrow(
-      "Covariates need one group: a group is a covariate in a latent regression.",
-    );
-    expect(() => calibrate(matrix, { ...options, latent: "normal" })).toThrow(
+    const options = { covariates } as const;
+    expect(() =>
+      calibrate(matrix, twoParameterLogistic, { ...options, groups: reference.responses.map(() => "a") }),
+    ).toThrow("Covariates need one group: a group is a covariate in a latent regression.");
+    expect(() => calibrate(matrix, twoParameterLogistic, { ...options, latent: "normal" })).toThrow(
       "Covariates replace the distribution of theta: the option latent must be absent or standard-normal.",
     );
-    expect(() => calibrate(matrix, { ...options, quadrature: { method: "gauss-hermite" } })).toThrow(
-      "A latent regression needs the rectangular quadrature rule.",
-    );
-    expect(() => calibrate(matrix, { ...options, standardErrors: "cross-product" })).toThrow(
+    expect(() =>
+      calibrate(matrix, twoParameterLogistic, { ...options, quadrature: { method: "gauss-hermite" } }),
+    ).toThrow("A latent regression needs the rectangular quadrature rule.");
+    expect(() => calibrate(matrix, twoParameterLogistic, { ...options, standardErrors: "cross-product" })).toThrow(
       'Covariates need the standard errors "none" or "hessian".',
     );
-    expect(() => calibrate(matrix, { ...options, testlets: { t1: [defined(reference.itemIds[0])] } })).toThrow(
-      "Covariates cannot be used with testlets.",
-    );
-    expect(() => calibrate(matrix, { ...options, covariates: {} })).toThrow(
+    expect(() =>
+      calibrate(matrix, twoParameterLogistic, { ...options, testlets: { t1: [defined(reference.itemIds[0])] } }),
+    ).toThrow("Covariates cannot be used with testlets.");
+    expect(() => calibrate(matrix, twoParameterLogistic, { ...options, covariates: {} })).toThrow(
       "The option covariates needs at least one covariate.",
     );
-    expect(() => calibrate(matrix, { ...options, covariates: { x: x.slice(1) } })).toThrow(
+    expect(() => calibrate(matrix, twoParameterLogistic, { ...options, covariates: { x: x.slice(1) } })).toThrow(
       `Covariate "x" has ${persons - 1} values for ${persons} persons.`,
     );
     expect(() =>
-      calibrate(matrix, { ...options, covariates: { x: x.map((v, i) => (i === 4 ? Number.NaN : v)) } }),
+      calibrate(matrix, twoParameterLogistic, {
+        ...options,
+        covariates: { x: x.map((v, i) => (i === 4 ? Number.NaN : v)) },
+      }),
     ).toThrow('Covariate "x" of person 5 must be a finite number, found NaN.');
-    expect(() => calibrate(matrix, { ...options, covariates: { x: x.map(() => 1), y: x.map(() => 1) } })).toThrow(
-      "The covariates of the persons who answered are collinear: leave one of them out.",
-    );
+    expect(() =>
+      calibrate(matrix, twoParameterLogistic, { ...options, covariates: { x: x.map(() => 1), y: x.map(() => 1) } }),
+    ).toThrow("The covariates of the persons who answered are collinear: leave one of them out.");
   });
 
   it("rejects covariates of other types, as JavaScript or JSON pass them", () => {
     const reference = defined(latentRegression.cases[0]);
     const matrix = buildResponseMatrix(reference.responses, { itemIds: reference.itemIds });
-    const options = { model: twoParameterLogistic } as const;
-    expect(() => calibrate(matrix, { ...options, covariates: JSON.parse("null") })).toThrow(
+    expect(() => calibrate(matrix, twoParameterLogistic, { covariates: JSON.parse("null") })).toThrow(
       "The option covariates must be an object of values by covariate name, found null.",
     );
-    expect(() => calibrate(matrix, { ...options, covariates: JSON.parse('{ "x": "high" }') })).toThrow(
+    expect(() => calibrate(matrix, twoParameterLogistic, { covariates: JSON.parse('{ "x": "high" }') })).toThrow(
       'Covariate "x" must be an array with a value for each person, found "high".',
     );
-    expect(() => calibrate(matrix, { ...options, covariates: JSON.parse('{ "x": { "0": 1 } }') })).toThrow(
+    expect(() => calibrate(matrix, twoParameterLogistic, { covariates: JSON.parse('{ "x": { "0": 1 } }') })).toThrow(
       'Covariate "x" must be an array with a value for each person, found an object.',
     );
     const column = reference.responses.map((_, person) => (person === 2 ? "2" : person % 5));
-    expect(() => calibrate(matrix, { ...options, covariates: JSON.parse(JSON.stringify({ x: column })) })).toThrow(
-      'Covariate "x" of person 3 must be a finite number, found "2".',
-    );
+    expect(() =>
+      calibrate(matrix, twoParameterLogistic, { covariates: JSON.parse(JSON.stringify({ x: column })) }),
+    ).toThrow('Covariate "x" of person 3 must be a finite number, found "2".');
   });
 });
 
@@ -3633,8 +3692,7 @@ describe("person weights", () => {
       ["cross-product", twoPl.crossProductErrors],
     ] as const;
     for (const [standardErrors, expectedErrors] of methods) {
-      const result = calibrate(matrixOf(twoPl), {
-        model: twoParameterLogistic,
+      const result = calibrate(matrixOf(twoPl), twoParameterLogistic, {
         personWeights: twoPl.weights,
         standardErrors,
         ...tight,
@@ -3656,7 +3714,7 @@ describe("person weights", () => {
   });
 
   it("matches mirt's survey weights for the graded response model", () => {
-    const result = calibrate(matrixOf(graded), { model: gradedResponse, personWeights: graded.weights, ...tight });
+    const result = calibrate(matrixOf(graded), gradedResponse, { personWeights: graded.weights, ...tight });
     expect(result.converged).toBe(true);
     graded.items.forEach((expected, i) => {
       expectParameters(defined(result.items[i]).parameters, expected, WEIGHTED_TOLERANCE, `item ${i + 1}`);
@@ -3665,8 +3723,7 @@ describe("person weights", () => {
   });
 
   it("matches base R's maximum of the weighted likelihood in two groups, which mirt's survey weights stop short of", () => {
-    const result = calibrate(matrixOf(groups), {
-      model: twoParameterLogistic,
+    const result = calibrate(matrixOf(groups), twoParameterLogistic, {
       personWeights: groups.weights,
       groups: groups.groups,
       latent: { focal: "normal" },
@@ -3686,8 +3743,7 @@ describe("person weights", () => {
   });
 
   it("matches TAM's pweights for the Rasch model with a latent regression, on the Rasch scale", () => {
-    const result = calibrate(matrixOf(rasch), {
-      model: oneParameterLogistic,
+    const result = calibrate(matrixOf(rasch), oneParameterLogistic, {
       personWeights: rasch.weights,
       covariates: rasch.covariates,
       ...tight,
@@ -3702,8 +3758,7 @@ describe("person weights", () => {
   });
 
   it("weights the latent regression as the repeated persons do, where mirt's survey weights leave it out", () => {
-    const result = calibrate(matrixOf(regression), {
-      model: twoParameterLogistic,
+    const result = calibrate(matrixOf(regression), twoParameterLogistic, {
       personWeights: regression.weights,
       covariates: regression.covariates,
       ...tight,
@@ -3731,60 +3786,66 @@ describe("person weights", () => {
       readonly name: string;
       readonly rows: readonly (readonly (number | null)[])[];
       readonly itemIds?: readonly string[];
-      readonly options: CalibrationOptions<unknown>;
+      readonly model: IrtModel<unknown>;
+      readonly options?: CalibrationOptions<unknown>;
       readonly byPerson?: (weights: readonly number[]) => Partial<CalibrationOptions<unknown>>;
     }[] = [
       {
         name: "the 2PL with errors from the Hessian",
         rows,
-        options: { model: twoParameterLogistic, standardErrors: "hessian" },
+        model: twoParameterLogistic,
+        options: { standardErrors: "hessian" },
       },
       {
         name: "the 2PL with cross-product errors",
         rows,
-        options: { model: twoParameterLogistic, standardErrors: "cross-product" },
+        model: twoParameterLogistic,
+        options: { standardErrors: "cross-product" },
       },
-      { name: "the GPCM", rows: simulate(32, 240, ITEMS_GPCM), options: { model: generalizedPartialCredit } },
+      { name: "the GPCM", rows: simulate(32, 240, ITEMS_GPCM), model: generalizedPartialCredit },
       {
         name: "two groups, the focal group's normal estimated",
         rows,
-        options: { model: twoParameterLogistic, latent: { focal: "normal" }, standardErrors: "hessian" },
+        model: twoParameterLogistic,
+        options: { latent: { focal: "normal" }, standardErrors: "hessian" },
         byPerson: (each) => ({ groups: repeated(labels, each) }),
       },
       {
         name: "a histogram of theta on a fixed item's scale",
         rows,
-        options: { model: twoParameterLogistic, fixed: anchor, latent: "empirical-histogram", maxIterations: 5000 },
+        model: twoParameterLogistic,
+        options: { fixed: anchor, latent: "empirical-histogram", maxIterations: 5000 },
       },
       {
         name: "a latent regression on a fixed item's scale",
         rows,
-        options: { model: twoParameterLogistic, fixed: anchor, standardErrors: "hessian" },
+        model: twoParameterLogistic,
+        options: { fixed: anchor, standardErrors: "hessian" },
         byPerson: (each) => ({ covariates: { x: repeated(x, each) } }),
       },
       {
         name: "testlets",
         rows: testletRows,
         itemIds: testletCase.itemIds,
+        model: twoParameterLogistic,
         options: {
-          model: twoParameterLogistic,
           testlets: definedEntries(testletCase.testlets),
           standardErrors: "hessian",
         },
       },
     ];
 
-    for (const { name, rows: data, itemIds, options, byPerson } of cases) {
+    for (const { name, rows: data, itemIds, model, options, byPerson } of cases) {
       it(`with ${name}`, () => {
         const each = data.map((_, person) => 1 + (person % 3));
         const ones = data.map(() => 1);
         const ids = itemIds === undefined ? {} : { itemIds };
-        const fit = calibrate(buildResponseMatrix(data, ids), {
+        const fit = calibrate(buildResponseMatrix(data, ids), model, {
           ...options,
           ...byPerson?.(ones),
           personWeights: each,
         });
-        const expanded = calibrate(buildResponseMatrix(repeated(data, each), ids), {
+        const expanded = calibrate(buildResponseMatrix(repeated(data, each), ids), model, {
           ...options,
           ...byPerson?.(each),
         });
@@ -3831,18 +3892,23 @@ describe("person weights", () => {
 
     it("gives the unweighted calibration, to the last digit, when every weight is equal", () => {
       const matrix = buildResponseMatrix(rows);
-      const options = { model: twoParameterLogistic, standardErrors: "cross-product" } as const;
-      expect(calibrate(matrix, { ...options, personWeights: rows.map(() => 2.5) })).toEqual(calibrate(matrix, options));
+      const options = { standardErrors: "cross-product" } as const;
+      expect(calibrate(matrix, twoParameterLogistic, { ...options, personWeights: rows.map(() => 2.5) })).toEqual(
+        calibrate(matrix, twoParameterLogistic, options),
+      );
     });
 
     it("ignores the weight of a person without responses and rescales weights of any size", () => {
       const matrix = buildResponseMatrix(rows);
-      const options = { model: twoParameterLogistic, ...tight } as const;
-      const base = calibrate(matrix, { ...options, personWeights: weights });
+      const options = { ...tight } as const;
+      const base = calibrate(matrix, twoParameterLogistic, { ...options, personWeights: weights });
       const heavy = weights.map((weight, person) => (person === 5 ? 1e300 : weight));
-      expect(calibrate(matrix, { ...options, personWeights: heavy })).toEqual(base);
+      expect(calibrate(matrix, twoParameterLogistic, { ...options, personWeights: heavy })).toEqual(base);
       for (const scale of [1e306, 1e-310]) {
-        const result = calibrate(matrix, { ...options, personWeights: weights.map((weight) => weight * scale) });
+        const result = calibrate(matrix, twoParameterLogistic, {
+          ...options,
+          personWeights: weights.map((weight) => weight * scale),
+        });
         expect(nonFinite(result)).toEqual([]);
         result.items.forEach((item, i) => {
           expectParameters(item.parameters, defined(base.items[i]).parameters, EXPANSION_TOLERANCE, `item ${i + 1}`);
@@ -3865,14 +3931,14 @@ describe("person weights", () => {
         .reverse(),
       { personIds: matrix.personIds, itemIds: matrix.itemIds },
     );
-    const options = { model: twoParameterLogistic, personWeights: twoPl.weights } as const;
-    expect(calibrate(records, options)).toEqual(calibrate(matrix, options));
+    const options = { personWeights: twoPl.weights } as const;
+    expect(calibrate(records, twoParameterLogistic, options)).toEqual(calibrate(matrix, twoParameterLogistic, options));
   });
 
   it("rejects weights that are not a positive number for each person, from JavaScript or JSON", () => {
     const matrix = buildResponseMatrix(simulate(33, 20, ITEMS_2PL));
     const fit = (personWeights: unknown) =>
-      calibrate(matrix, { model: twoParameterLogistic, ...JSON.parse(JSON.stringify({ personWeights })) });
+      calibrate(matrix, twoParameterLogistic, { ...JSON.parse(JSON.stringify({ personWeights })) });
     const at = (value: unknown) => Array.from({ length: 20 }, (_, person) => (person === 2 ? value : 1));
     const third = (value: unknown) =>
       new DataError(`The weight of person 3 must be a positive number, found ${value}.`);
@@ -3883,7 +3949,7 @@ describe("person weights", () => {
     expect(() => fit(at(null))).toThrow(third(null));
     for (const value of [Number.NaN, Number.POSITIVE_INFINITY]) {
       const personWeights = Array.from({ length: 20 }, (_, person) => (person === 2 ? value : 1));
-      expect(() => calibrate(matrix, { model: twoParameterLogistic, personWeights })).toThrow(third(value));
+      expect(() => calibrate(matrix, twoParameterLogistic, { personWeights })).toThrow(third(value));
     }
     const notAnArray = "The option personWeights must be an array with a weight for each person, found";
     expect(() => fit(null)).toThrow(new DataError(`${notAnArray} null.`));
@@ -4089,8 +4155,7 @@ describe("testlets", () => {
   for (const reference of testlet.cases) {
     it(`matches ${reference.name}`, () => {
       const matrix = buildResponseMatrix(reference.responses, { itemIds: reference.itemIds });
-      const result = calibrate(matrix, {
-        model: twoParameterLogistic,
+      const result = calibrate(matrix, twoParameterLogistic, {
         testlets: definedEntries(reference.testlets),
         quadrature: { points: testlet.points },
         tolerance: 1e-8,
@@ -4137,8 +4202,7 @@ describe("testlets", () => {
   for (const reference of testletGroups.cases) {
     it(`matches ${reference.name}`, () => {
       const matrix = buildResponseMatrix(reference.responses, { itemIds: reference.itemIds });
-      const result = calibrate(matrix, {
-        model: twoParameterLogistic,
+      const result = calibrate(matrix, twoParameterLogistic, {
         groups: reference.groups,
         latent: Object.fromEntries(
           Object.entries(reference.latent).map(([group, name]) => [group, latentDistribution(name)]),
@@ -4198,16 +4262,19 @@ describe("testlets", () => {
 
   it(`matches ${testletGroups.histogram.name}`, () => {
     const { histogram } = testletGroups;
-    const result = calibrate(buildResponseMatrix(histogram.responses, { itemIds: histogram.itemIds }), {
-      model: twoParameterLogistic,
-      groups: histogram.groups,
-      latent: { b: "empirical-histogram" },
-      fixed: definedEntries(histogram.fixed),
-      testlets: definedEntries(histogram.testlets),
-      quadrature: { points: testletGroups.points },
-      tolerance: histogram.tolerance,
-      maxIterations: 100_000,
-    });
+    const result = calibrate(
+      buildResponseMatrix(histogram.responses, { itemIds: histogram.itemIds }),
+      twoParameterLogistic,
+      {
+        groups: histogram.groups,
+        latent: { b: "empirical-histogram" },
+        fixed: definedEntries(histogram.fixed),
+        testlets: definedEntries(histogram.testlets),
+        quadrature: { points: testletGroups.points },
+        tolerance: histogram.tolerance,
+        maxIterations: 100_000,
+      },
+    );
     expect(result).toMatchObject({ converged: true, iterations: histogram.iterations });
     histogram.weights.forEach((weight, q) => {
       expectClose(defined(result.groups[1]?.weights[q]), weight, HISTOGRAM_TOLERANCE, `weight ${q}`);
@@ -4221,7 +4288,6 @@ describe("testlets", () => {
   it("estimates the same with the groups renamed and the persons in another order", () => {
     const reference = defined(testletGroups.cases[0]);
     const options = {
-      model: twoParameterLogistic,
       latent: { second: latentDistribution("normal") },
       testlets: definedEntries(reference.testlets),
       quadrature: { points: testletGroups.points },
@@ -4230,15 +4296,20 @@ describe("testlets", () => {
     };
     const persons = reference.responses.length;
     const order = Array.from({ length: persons }, (_, p) => (p * 7 + 3) % persons);
-    const first = calibrate(buildResponseMatrix(reference.responses, { itemIds: reference.itemIds }), {
-      ...options,
-      groups: reference.groups.map((group) => (group === "a" ? "first" : "second")),
-    });
+    const first = calibrate(
+      buildResponseMatrix(reference.responses, { itemIds: reference.itemIds }),
+      twoParameterLogistic,
+      {
+        ...options,
+        groups: reference.groups.map((group) => (group === "a" ? "first" : "second")),
+      },
+    );
     const shuffled = calibrate(
       buildResponseMatrix(
         order.map((p) => defined(reference.responses[p])),
         { itemIds: reference.itemIds },
       ),
+      twoParameterLogistic,
       { ...options, groups: order.map((p) => (defined(reference.groups[p]) === "a" ? "first" : "second")) },
     );
     first.items.forEach((item, i) => {
@@ -4259,8 +4330,7 @@ describe("testlets", () => {
         ? row.map((value, j) => (skipped.has(defined(reference.itemIds[j])) ? null : value))
         : row,
     );
-    const result = calibrate(buildResponseMatrix(rows, { itemIds: reference.itemIds }), {
-      model: twoParameterLogistic,
+    const result = calibrate(buildResponseMatrix(rows, { itemIds: reference.itemIds }), twoParameterLogistic, {
       groups: reference.groups,
       latent: { b: "normal" },
       testlets: definedEntries(reference.testlets),
@@ -4279,7 +4349,7 @@ describe("testlets", () => {
     const rows = simulate(5, 100, ITEMS_2PL).map((row) => [...row, null, null]);
     const fixed = { item5: { a: 1, b: 0, c: 0, d: 1 }, item6: { a: 1.2, b: 0.5, c: 0, d: 1 } };
     expect(() =>
-      calibrate(buildResponseMatrix(rows), { model: twoParameterLogistic, fixed, testlets: { t: ["item5", "item6"] } }),
+      calibrate(buildResponseMatrix(rows), twoParameterLogistic, { fixed, testlets: { t: ["item5", "item6"] } }),
     ).toThrow('Testlet "t" has no response, so the SD of its effect has nothing to be estimated from.');
   });
 
@@ -4292,8 +4362,7 @@ describe("testlets", () => {
       [1, 0, 1, 1, 1, 1],
       [0, 0, 0, 1, 0, 0],
     ]);
-    const result = calibrate(matrix, {
-      model: twoParameterLogistic,
+    const result = calibrate(matrix, twoParameterLogistic, {
       testlets: { first: ["item1", "item2", "item3"], second: ["item4", "item5", "item6"] },
       standardErrors: "hessian",
     });
@@ -4314,27 +4383,34 @@ describe("testlets", () => {
   it("reports no testlets without them, and rejects testlets that do not fit the items or the options", () => {
     const rows = simulate(5, 200, ITEMS_2PL);
     const matrix = buildResponseMatrix(rows);
-    expect(calibrate(matrix, { model: twoParameterLogistic }).testlets).toEqual([]);
-    const options = { model: twoParameterLogistic, maxIterations: 3 };
-    expect(() => calibrate(matrix, { ...options, testlets: { a: ["item1"] } })).toThrow(
+    expect(calibrate(matrix, twoParameterLogistic).testlets).toEqual([]);
+    const options = { maxIterations: 3 };
+    expect(() => calibrate(matrix, twoParameterLogistic, { ...options, testlets: { a: ["item1"] } })).toThrow(
       'Testlet "a" needs at least two items.',
     );
-    expect(() => calibrate(matrix, { ...options, testlets: { a: ["item1", "q9"] } })).toThrow(
+    expect(() => calibrate(matrix, twoParameterLogistic, { ...options, testlets: { a: ["item1", "q9"] } })).toThrow(
       'Testlet "a" names "q9", which is not an item id.',
     );
-    expect(() => calibrate(matrix, { ...options, testlets: { a: ["item1", "item2"], b: ["item2", "item3"] } })).toThrow(
-      'Item "item2" is in more than one testlet.',
-    );
+    expect(() =>
+      calibrate(matrix, twoParameterLogistic, {
+        ...options,
+        testlets: { a: ["item1", "item2"], b: ["item2", "item3"] },
+      }),
+    ).toThrow('Item "item2" is in more than one testlet.');
     const testlets = { a: ["item1", "item2"] };
     expect(() =>
-      calibrate(matrix, { ...options, testlets, quadrature: { method: "gauss-hermite", points: 21 } }),
+      calibrate(matrix, twoParameterLogistic, {
+        ...options,
+        testlets,
+        quadrature: { method: "gauss-hermite", points: 21 },
+      }),
     ).toThrow("Testlets need the rectangular quadrature rule.");
     const groups = rows.map((_, p) => (p < 100 ? "a" : "b"));
-    expect(() => calibrate(matrix, { ...options, testlets, groups, latent: "normal" })).toThrow(
+    expect(() => calibrate(matrix, twoParameterLogistic, { ...options, testlets, groups, latent: "normal" })).toThrow(
       "Estimating every group's distribution of theta needs fixed items or a standard normal group to fix the scale.",
     );
     expect(() =>
-      calibrate(matrix, {
+      calibrate(matrix, twoParameterLogistic, {
         ...options,
         testlets,
         groups,
@@ -4342,9 +4418,9 @@ describe("testlets", () => {
         quadrature: { method: "gauss-hermite" },
       }),
     ).toThrow("Testlets need the rectangular quadrature rule.");
-    expect(() => calibrate(matrix, { ...options, testlets, standardErrors: "cross-product" })).toThrow(
-      'Testlets need the standard errors "none" or "hessian".',
-    );
+    expect(() =>
+      calibrate(matrix, twoParameterLogistic, { ...options, testlets, standardErrors: "cross-product" }),
+    ).toThrow('Testlets need the standard errors "none" or "hessian".');
     const twice = [
       { items: ["item1", "item2"], sd: 1 },
       { items: ["item2", "item3"], sd: 1 },
@@ -4605,7 +4681,7 @@ describe("calibrateUnfolding", () => {
 
   it("calibrates by calibrate from starts by proportions alone, which place every location on one side", () => {
     const matrix = unfoldingMatrix(defined(unfolding.cases.mixed).responses);
-    const result = calibrate(matrix, { model: generalizedGradedUnfolding, maxIterations: 50 });
+    const result = calibrate(matrix, generalizedGradedUnfolding, { maxIterations: 50 });
     expect(nonFinite(result)).toEqual([]);
     expect(result.items.every((item) => item.parameters.a > 0)).toBe(true);
   });
@@ -4680,10 +4756,7 @@ describe("the recipe for the nested-model chi-square", () => {
   it("equals mirt's anova of the 1PL against the 2PL", () => {
     const { slopes } = nestedModels;
     const matrix = buildResponseMatrix(slopes.responses, { itemIds: [...slopes.itemIds] });
-    const result = likelihoodRatio(
-      calibrate(matrix, { model: oneParameterLogistic }),
-      calibrate(matrix, { model: twoParameterLogistic }),
-    );
+    const result = likelihoodRatio(calibrate(matrix, oneParameterLogistic), calibrate(matrix, twoParameterLogistic));
     expectClose(result.chiSquare, slopes.chiSquare, NESTED_TOLERANCE, "chi-square");
     expect(result.degreesOfFreedom).toBe(slopes.degreesOfFreedom);
     expectClose(result.pValue, slopes.pValue, NESTED_TOLERANCE, "p-value");
@@ -4692,10 +4765,7 @@ describe("the recipe for the nested-model chi-square", () => {
   it("equals mirt's anova of the partial credit model against the generalized partial credit model", () => {
     const { credit } = nestedModels;
     const matrix = buildResponseMatrix(credit.responses, { itemIds: [...credit.itemIds] });
-    const result = likelihoodRatio(
-      calibrate(matrix, { model: partialCredit }),
-      calibrate(matrix, { model: generalizedPartialCredit }),
-    );
+    const result = likelihoodRatio(calibrate(matrix, partialCredit), calibrate(matrix, generalizedPartialCredit));
     expectClose(result.chiSquare, credit.chiSquare, NESTED_TOLERANCE, "chi-square");
     expect(result.degreesOfFreedom).toBe(credit.degreesOfFreedom);
     expectClose(result.pValue, credit.pValue, NESTED_TOLERANCE, "p-value");
@@ -4709,7 +4779,7 @@ describe("the recipe for the nested-model chi-square", () => {
 
   it("gives a statistic of 0 for a model against itself, which has no degrees of freedom", () => {
     const matrix = buildResponseMatrix(nestedModels.slopes.responses, { itemIds: [...nestedModels.slopes.itemIds] });
-    const fit = calibrate(matrix, { model: twoParameterLogistic });
+    const fit = calibrate(matrix, twoParameterLogistic);
     expect(likelihoodRatio(fit, fit)).toMatchObject({ chiSquare: 0, degreesOfFreedom: 0 });
   });
 });
@@ -4727,7 +4797,7 @@ describe("the recipe for bootstrap standard errors", () => {
       parameters: { a: 0.8 + 0.1 * j, b: -1.4 + 0.4 * j, c: 0, d: 1 },
     }));
     const matrix = simulateResponses(items, simulateThetas(1000, random), random);
-    const fit = calibrate(matrix, { model: twoParameterLogistic, standardErrors: "hessian" });
+    const fit = calibrate(matrix, twoParameterLogistic, { standardErrors: "hessian" });
 
     // The recipe of irt.md: calibrations of persons drawn with replacement.
     const persons = matrix.responses.length;
@@ -4736,7 +4806,7 @@ describe("the recipe for bootstrap standard errors", () => {
         { length: persons },
         () => matrix.responses[Math.floor(random.uniform() * persons)] ?? [],
       );
-      return calibrate(buildResponseMatrix(rows, { itemIds: matrix.itemIds }), { model: twoParameterLogistic });
+      return calibrate(buildResponseMatrix(rows, { itemIds: matrix.itemIds }), twoParameterLogistic);
     });
     const standardDeviation = (values: readonly number[]) => {
       const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
@@ -4774,15 +4844,13 @@ describe("the recipe for an item with an empty category", () => {
       ...items.slice(0, 6).map(() => twoParameterLogistic),
       generalizedPartialCredit,
     ];
-    expect(() => calibrate(buildResponseMatrix(rows), { model: models })).toThrow(
-      'Item "item7" has no response in category 0',
-    );
+    expect(() => calibrate(buildResponseMatrix(rows), models)).toThrow('Item "item7" has no response in category 0');
     const scores = rows.flatMap((row) => (row[6] === null || row[6] === undefined ? [] : [row[6]]));
     const lowest = scores.reduce((least, score) => Math.min(least, score));
     const highest = scores.reduce((most, score) => Math.max(most, score));
     expect([lowest, highest]).toEqual([1, 9]);
     const collapsed = rows.map((row) => row.map((score, j) => (j === 6 && score !== null ? score - lowest : score)));
-    const fit = calibrate(buildResponseMatrix(collapsed), { model: models });
+    const fit = calibrate(buildResponseMatrix(collapsed), models);
     const { a, b } = defined(fit.items[6]).parameters as ThresholdItem;
     const reach = 6 + 30 / a;
     const thresholds = Array.from({ length: 10 }, (_, k) =>
@@ -5042,7 +5110,7 @@ describe("properties", () => {
     fc.assert(
       fc.property(rows, models, (data, m) => {
         try {
-          expect(nonFinite(calibrate(buildResponseMatrix(data), { model: m, maxIterations: 100 }))).toEqual([]);
+          expect(nonFinite(calibrate(buildResponseMatrix(data), m, { maxIterations: 100 }))).toEqual([]);
         } catch (error) {
           if (!(error instanceof DataError)) throw error;
         }
@@ -5066,7 +5134,7 @@ describe("properties", () => {
           const matrix = buildResponseMatrix(simulate(seed, 150, defined(pools[pool])));
           const [first = 0, second = 0, ...later] = Array.from(
             { length: 12 },
-            (_, i) => calibrate(matrix, { model: m, maxIterations: i + 1, tolerance: 1e-12 }).logLikelihood,
+            (_, i) => calibrate(matrix, m, { maxIterations: i + 1, tolerance: 1e-12 }).logLikelihood,
           );
           expect(second).toBeGreaterThanOrEqual(first - 1e-9);
           // The extrapolation of the third iteration may fall below the second iteration, as it may rise far above it.
@@ -5088,7 +5156,7 @@ describe("properties", () => {
         const run = (): unknown => {
           const matrix = buildResponseMatrix(simulate(seed, 300, pool));
           return [
-            calibrate(matrix, { model: models, priors: { c: betaPrior(5, 17) }, maxIterations: 50 }),
+            calibrate(matrix, models, { priors: { c: betaPrior(5, 17) }, maxIterations: 50 }),
             jointMaximumLikelihood(matrix),
           ];
         };
@@ -5105,9 +5173,11 @@ describe("properties", () => {
         fc.double({ min: 1e-3, max: 1e3, noNaN: true }),
         (seed, weight) => {
           const matrix = buildResponseMatrix(simulate(seed, 100, ITEMS_2PL));
-          const options = { model: twoParameterLogistic, standardErrors: "cross-product" } as const;
+          const options = { standardErrors: "cross-product" } as const;
           const personWeights = matrix.personIds.map(() => weight);
-          expect(calibrate(matrix, { ...options, personWeights })).toEqual(calibrate(matrix, options));
+          expect(calibrate(matrix, twoParameterLogistic, { ...options, personWeights })).toEqual(
+            calibrate(matrix, twoParameterLogistic, options),
+          );
         },
       ),
       { numRuns: 20 },
@@ -5124,8 +5194,7 @@ describe("properties", () => {
         (seed, weights, scale, power) => {
           const matrix = buildResponseMatrix(simulate(seed, 100, ITEMS_2PL));
           const fit = (factor: number) =>
-            calibrate(matrix, {
-              model: twoParameterLogistic,
+            calibrate(matrix, twoParameterLogistic, {
               standardErrors: "cross-product",
               personWeights: weights.map((weight) => weight * factor),
             });

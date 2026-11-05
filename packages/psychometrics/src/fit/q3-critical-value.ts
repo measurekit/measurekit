@@ -176,7 +176,7 @@ const DEFAULT_SLOPE_LIMIT = 4;
  * const passage = simulateResponses(items.slice(0, 2), thetas.map((theta) => theta + 1.5 * random.normal()), random);
  * const others = simulateResponses(items.slice(2), thetas, random);
  * const matrix = buildResponseMatrix(others.responses.map((row, person) => [...(passage.responses[person] ?? []), ...row]));
- * const fit = calibrate(matrix, { model: twoParameterLogistic });
+ * const fit = calibrate(matrix, twoParameterLogistic);
  * const q3 = yenQ3CriticalValue(matrix, fit.items, createRandom(1), { replications: 20 });
  * q3.flagged.map((pair) => pair.items); // => [["item1", "item2"]]
  * ```
@@ -288,7 +288,7 @@ function runBootstrap<TParameters>(
   let redrawn = 0;
   let notConverged = 0;
   const excessesOf = (simulated: ResponseMatrix): PairExcesses | null => {
-    const fit = calibrate(simulated, { model: models, ...calibration });
+    const fit = calibrate(simulated, models, calibration);
     if (!fit.converged) notConverged += 1;
     return pairExcesses(simulated, fit.items, tested, estimator);
   };

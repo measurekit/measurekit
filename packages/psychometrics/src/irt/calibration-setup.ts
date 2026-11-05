@@ -63,11 +63,13 @@ export interface FreeParameter {
  * Checks the options against the data and builds the items, the groups and the free parameters with their starting
  * values. Each item starts from its shares of the responses in each category, weighted by the persons' weights.
  *
+ * @param model - The model of every item, or one model per item, in item order.
  * @param answered - Whether each person answered an item.
  * @param starts - The starting parameters of each item, in item order; without them, its model's starting values.
  */
 export function setUp<TParameters>(
   responses: CompressedResponses,
+  model: IrtModel<TParameters> | readonly IrtModel<TParameters>[],
   options: CalibrationOptions<TParameters>,
   answered: readonly boolean[],
   rule: Quadrature,
@@ -76,8 +78,8 @@ export function setUp<TParameters>(
   const { itemIds } = responses;
   const weights = rescaledWeights(options.personWeights, answered);
   const tallies = categoryTallies(responses, weights);
-  const models = modelsOf(options.model, itemIds.length, (each) =>
-    checkModel(each, "The option model must be an IRT model such as twoParameterLogistic"),
+  const models = modelsOf(model, itemIds.length, (each) =>
+    checkModel(each, "The model must be an IRT model such as twoParameterLogistic"),
   );
   const { fixed = {}, priors = {}, itemPriors = {}, fixedParameters = {} } = options;
   checkRecordById(fixed, "The option fixed must be an object of item parameters by item id");

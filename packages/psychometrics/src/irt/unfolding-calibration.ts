@@ -131,13 +131,12 @@ export function calibrateUnfolding(
     errors: StandardErrorMethod,
   ): Calibration<UnfoldingParameters> => {
     const stageOptions: CalibrationOptions<UnfoldingParameters> = {
-      model,
       ...(quadrature !== undefined && { quadrature }),
       standardErrors: errors,
       tolerance,
       maxIterations,
     };
-    return calibrateResponses(responses, stageOptions, starts).calibration;
+    return calibrateResponses(responses, model, stageOptions, starts).calibration;
   };
   const shared = new Map<number, IrtModel<UnfoldingParameters>>();
   const sharedModels = proportions.map(({ length }) => {

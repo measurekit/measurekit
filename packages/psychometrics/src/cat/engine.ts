@@ -82,7 +82,7 @@ type AdaptiveEngine<TEstimate> = Omit<AdaptiveTest<PoolControls, TEstimate>, "po
  * @throws `DataError` when `stopping` is not a stopping rule or `selection` is not a selection rule.
  */
 export function checkRules(stopping: unknown, selection: unknown, selectionExample: string): void {
-  checkMethod(stopping, "stops", "The option stopping must be a stopping rule, such as testLength(20)");
+  checkMethod(stopping, "stops", "The stopping rule must be a rule such as testLength(20)");
   checkMethod(selection, "scores", `The option selection must be a selection rule, such as ${selectionExample}`);
 }
 

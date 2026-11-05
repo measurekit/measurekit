@@ -21,11 +21,6 @@ import type { LoadingPattern, MultidimensionalModel } from "./model.js";
  */
 export interface BifactorOptions<TParameters = MultidimensionalLogisticParameters> {
   /**
-   * Each item's specific dimension, by item id, every item of the data included: a name, or `null` for an item with
-   * none. A specific dimension has at least two items, and an item loads on at most one. Required.
-   */
-  readonly specific: Readonly<Record<string, string | null>>;
-  /**
    * The primary dimensions each item loads on, by item id, every item of the data included: one dimension name for a
    * bifactor model, and up to two in all for a two-tier model, whose primary dimensions are correlated.
    *
@@ -76,7 +71,6 @@ export interface BifactorOptions<TParameters = MultidimensionalLogisticParameter
 }
 
 const BIFACTOR_OPTIONS: FieldNames<BifactorOptions<unknown>> = {
-  specific: true,
   primary: true,
   model: true,
   priors: true,
@@ -112,8 +106,10 @@ const DEFAULT_POINTS = [31, 21] as const;
  * responses are skipped; persons without responses change nothing.
  *
  * @param data - The responses of the persons, as a matrix or as records.
- * @param options - The specific and primary dimensions of each item, the priors, the quadrature, the standard errors
- *   and the stopping rules; each option has its default.
+ * @param specific - Each item's specific dimension, by item id, every item of the data included: a name, or `null` for
+ *   an item with none. A specific dimension has at least two items, and an item loads on at most one.
+ * @param options - The primary dimensions of each item, the model, the priors, the quadrature, the standard errors and
+ *   the stopping rules; each option has its default.
  * @returns The items with their parameters, the correlations of the primary dimensions, the standardized loadings and
  *   communalities, the log-likelihood, AIC and BIC, whether the EM converged and the iterations run.
  * @see {@link https://doi.org/10.1177/014662169201600302 | Gibbons and Hedeker (1992)}
@@ -128,28 +124,31 @@ const DEFAULT_POINTS = [31, 21] as const;
  */
 export function calibrateBifactor(
   data: ResponseMatrix | ResponseRecords,
-  options: BifactorOptions & { readonly model?: undefined },
+  specific: Readonly<Record<string, string | null>>,
+  options?: BifactorOptions & { readonly model?: undefined },
 ): MultidimensionalCalibration<MultidimensionalLogisticParameters>;
 export function calibrateBifactor<TParameters>(
   data: ResponseMatrix | ResponseRecords,
+  specific: Readonly<Record<string, string | null>>,
   options: BifactorOptions<TParameters> & { readonly model: MultidimensionalModel<TParameters> },
 ): MultidimensionalCalibration<TParameters>;
 export function calibrateBifactor(
   data: ResponseMatrix | ResponseRecords,
-  options: BifactorOptions<unknown>,
+  specific: Readonly<Record<string, string | null>>,
+  options: BifactorOptions<unknown> = {},
 ): MultidimensionalCalibration<unknown> {
   checkOptions(options, BIFACTOR_OPTIONS);
   const responses = compressResponses(data);
   const { standardErrors = "none", model = multidimensionalTwoParameterLogistic, priors } = options;
   checkChoice(standardErrors, "The option standardErrors", STANDARD_ERROR_METHODS);
   const { respondents } = respondentsOf(responses);
-  const structure = structureOf(options, responses.itemIds);
+  const structure = structureOf(specific, responses.itemIds, options.primary);
   const { points = DEFAULT_POINTS[structure.primaryCount - 1] ?? 21 } = options;
   checkIntegerFrom(points, "The option points", 2);
   const { tolerance = DEFAULT_TOLERANCE, maxIterations = DEFAULT_MAX_ITERATIONS } = options;
   checkStopping(tolerance, maxIterations);
   if (structure.design.correlated) checkCorrelatedGroups([null], [respondents], structure.primaryCount);
-  const fit = bifactorFit(responses, { model, priors }, structure, points, standardErrors === "hessian");
+  const fit = bifactorFit(responses, model, { priors }, structure, points, standardErrors === "hessian");
   const solution = solveBifactor(fit, structure.design.dimensionNames.length, {
     tolerance,
     maxIterations,

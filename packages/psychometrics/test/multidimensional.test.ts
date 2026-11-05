@@ -719,14 +719,17 @@ function calibrateFixture(
   standardErrors: "none" | "hessian" | "cross-product",
   extra: { readonly priors?: Readonly<Record<string, ParameterPrior>>; readonly tolerance: number },
 ): MultidimensionalCalibration<Parameters> {
-  return calibrateMultidimensional(buildResponseMatrix(fixture.responses, { itemIds: [...fixture.itemIds] }), {
-    model: modelOf(fixture.model),
-    loadings: fixture.loadings,
-    points: fixture.points,
-    standardErrors,
-    maxIterations: 2000,
-    ...extra,
-  });
+  return calibrateMultidimensional(
+    buildResponseMatrix(fixture.responses, { itemIds: [...fixture.itemIds] }),
+    modelOf(fixture.model),
+    {
+      loadings: fixture.loadings,
+      points: fixture.points,
+      standardErrors,
+      maxIterations: 2000,
+      ...extra,
+    },
+  );
 }
 
 describe("models", () => {
@@ -1104,13 +1107,16 @@ describe("calibration", () => {
 
     for (const [name, fixture] of Object.entries(exploratory)) {
       it(`reaches the maximum of the likelihood that mirt's EM stops short of: ${name}`, () => {
-        const fit = calibrateMultidimensional(buildResponseMatrix(fixture.responses, { itemIds: fixture.itemIds }), {
-          model: multidimensionalTwoParameterLogistic,
-          dimensions: 2,
-          points: fixture.points,
-          tolerance: 1e-8,
-          maxIterations: 20000,
-        });
+        const fit = calibrateMultidimensional(
+          buildResponseMatrix(fixture.responses, { itemIds: fixture.itemIds }),
+          multidimensionalTwoParameterLogistic,
+          {
+            dimensions: 2,
+            points: fixture.points,
+            tolerance: 1e-8,
+            maxIterations: 20000,
+          },
+        );
         const { baseMaximum } = fixture;
         expect(fit.converged).toBe(true);
         // The likelihood is not lower than mirt's, and equals the maximum found in base R.
@@ -1152,8 +1158,8 @@ describe("calibration", () => {
     loadings[defined(m2pl.itemIds[5])] = ["F1", "F2"];
     const fit = calibrateMultidimensional(
       buildResponseMatrix(m2pl.responses.slice(0, 400), { itemIds: [...m2pl.itemIds] }),
+      multidimensionalTwoParameterLogistic,
       {
-        model: multidimensionalTwoParameterLogistic,
         loadings,
         points: 15,
         tolerance: 1e-6,
@@ -1186,13 +1192,16 @@ describe("calibration", () => {
 
   it("fixes the correlations at 0 when they are not estimated", () => {
     const free = calibrateFixture(m2pl, "none", { tolerance: 1e-6 });
-    const fit = calibrateMultidimensional(buildResponseMatrix(m2pl.responses, { itemIds: [...m2pl.itemIds] }), {
-      model: multidimensionalTwoParameterLogistic,
-      loadings: m2pl.loadings,
-      correlated: false,
-      points: 31,
-      tolerance: 1e-6,
-    });
+    const fit = calibrateMultidimensional(
+      buildResponseMatrix(m2pl.responses, { itemIds: [...m2pl.itemIds] }),
+      multidimensionalTwoParameterLogistic,
+      {
+        loadings: m2pl.loadings,
+        correlated: false,
+        points: 31,
+        tolerance: 1e-6,
+      },
+    );
     expect(fit.correlations).toEqual([
       [1, 0],
       [0, 1],
@@ -1208,13 +1217,12 @@ describe("calibration", () => {
       m2pl.responses.map((row) => row.slice(0, 6)),
       { itemIds: [...columns] },
     );
-    const one = calibrateMultidimensional(data, {
-      model: multidimensionalTwoParameterLogistic,
+    const one = calibrateMultidimensional(data, multidimensionalTwoParameterLogistic, {
       dimensions: 1,
       standardErrors: "hessian",
       tolerance: 1e-10,
     });
-    const reference = calibrate(data, { model: twoParameterLogistic, standardErrors: "hessian", tolerance: 1e-10 });
+    const reference = calibrate(data, twoParameterLogistic, { standardErrors: "hessian", tolerance: 1e-10 });
     expect(one.dimensions).toEqual(["F1"]);
     expect(one.correlations).toEqual([[1]]);
     expectClose(one.logLikelihood, reference.logLikelihood, 1e-8, "log-likelihood");
@@ -1244,18 +1252,20 @@ describe("calibration", () => {
         response === null ? [] : [{ person: `p${person}`, item: defined(missing.itemIds[item]), response }],
       ),
     );
-    const sparse = calibrateMultidimensional(buildResponseRecords(records), {
-      model: multidimensionalTwoParameterLogistic,
+    const sparse = calibrateMultidimensional(buildResponseRecords(records), multidimensionalTwoParameterLogistic, {
       loadings: missing.loadings,
       points: 15,
       tolerance: 1e-8,
     });
-    const dense = calibrateMultidimensional(buildResponseMatrix(missing.responses, { itemIds: [...missing.itemIds] }), {
-      model: multidimensionalTwoParameterLogistic,
-      loadings: missing.loadings,
-      points: 15,
-      tolerance: 1e-8,
-    });
+    const dense = calibrateMultidimensional(
+      buildResponseMatrix(missing.responses, { itemIds: [...missing.itemIds] }),
+      multidimensionalTwoParameterLogistic,
+      {
+        loadings: missing.loadings,
+        points: 15,
+        tolerance: 1e-8,
+      },
+    );
     expectClose(sparse.logLikelihood, dense.logLikelihood, 1e-8);
     dense.items.forEach((item, i) => {
       expectClose(defined(sparse.items[i]?.parameters.a[0]), defined(item.parameters.a[0]), 1e-8);
@@ -1264,15 +1274,19 @@ describe("calibration", () => {
 
   it("ignores persons without responses", () => {
     const rows = [...missing.responses.slice(0, 300)];
-    const base = calibrateMultidimensional(buildResponseMatrix(rows, { itemIds: [...missing.itemIds] }), {
-      model: multidimensionalTwoParameterLogistic,
-      loadings: missing.loadings,
-      points: 15,
-      tolerance: 1e-9,
-    });
+    const base = calibrateMultidimensional(
+      buildResponseMatrix(rows, { itemIds: [...missing.itemIds] }),
+      multidimensionalTwoParameterLogistic,
+      {
+        loadings: missing.loadings,
+        points: 15,
+        tolerance: 1e-9,
+      },
+    );
     const padded = calibrateMultidimensional(
       buildResponseMatrix([...rows, new Array<number | null>(12).fill(null)], { itemIds: [...missing.itemIds] }),
-      { model: multidimensionalTwoParameterLogistic, loadings: missing.loadings, points: 15, tolerance: 1e-9 },
+      multidimensionalTwoParameterLogistic,
+      { loadings: missing.loadings, points: 15, tolerance: 1e-9 },
     );
     expect(padded.logLikelihood).toBe(base.logLikelihood);
     expect(padded.bic).toBe(base.bic);
@@ -1282,13 +1296,12 @@ describe("calibration", () => {
     const columns = [...m2pl.itemIds];
     const data = buildResponseMatrix(m2pl.responses.slice(0, 200), { itemIds: columns });
     const options = {
-      model: multidimensionalTwoParameterLogistic,
       loadings: m2pl.loadings,
       points: 15,
       tolerance: 1e-8,
     };
-    const plain = calibrateMultidimensional(data, options);
-    const prior = calibrateMultidimensional(data, {
+    const plain = calibrateMultidimensional(data, multidimensionalTwoParameterLogistic, options);
+    const prior = calibrateMultidimensional(data, multidimensionalTwoParameterLogistic, {
       ...options,
       priors: { a: normalPrior(0.5, 0.2), intercept: normalPrior(0, 0.3) },
     });
@@ -1301,15 +1314,18 @@ describe("calibration", () => {
       ) / 12;
     expect(slope(prior)).toBeLessThan(slope(plain));
     expect(intercept(prior)).toBeLessThan(intercept(plain));
-    const lognormal = calibrateMultidimensional(data, { ...options, priors: { a: logNormalPrior(0, 0.3) } });
+    const lognormal = calibrateMultidimensional(data, multidimensionalTwoParameterLogistic, {
+      ...options,
+      priors: { a: logNormalPrior(0, 0.3) },
+    });
     expect(lognormal.items.every(({ parameters }) => (parameters.a[0] ?? 0) >= 0)).toBe(true);
   });
 
   it("starts exploratory models from the principal components and uses the dimensions of each item once", () => {
     const fit = calibrateMultidimensional(
       buildResponseMatrix(m2pl.responses.slice(0, 300), { itemIds: [...m2pl.itemIds] }),
+      multidimensionalTwoParameterLogistic,
       {
-        model: multidimensionalTwoParameterLogistic,
         dimensions: 2,
         points: 11,
         maxIterations: 1,
@@ -1346,8 +1362,7 @@ describe("calibration", () => {
       loadings[id] = i < 6 ? ["verbal"] : ["quantitative"];
     });
     loadings[defined(m2pl.itemIds[5])] = ["verbal", "quantitative"];
-    const fit = calibrateMultidimensional(data, {
-      model: multidimensionalTwoParameterLogistic,
+    const fit = calibrateMultidimensional(data, multidimensionalTwoParameterLogistic, {
       loadings,
       points: 11,
       tolerance: 1e-4,
@@ -1364,8 +1379,8 @@ describe("calibration", () => {
     expect(Object.keys(defined(fit.items[6]?.standardErrors)).sort()).toEqual(["a2", "intercept"]);
     const gradedFit = calibrateMultidimensional(
       buildResponseMatrix(graded.responses.slice(0, 300), { itemIds: [...graded.itemIds] }),
+      multidimensionalGradedResponse,
       {
-        model: multidimensionalGradedResponse,
         loadings: graded.loadings,
         points: 11,
         standardErrors: "cross-product",
@@ -1385,8 +1400,8 @@ describe("calibration", () => {
   it("stops at the largest number of iterations and says so", () => {
     const short = calibrateMultidimensional(
       buildResponseMatrix(m2pl.responses.slice(0, 200), { itemIds: [...m2pl.itemIds] }),
+      multidimensionalTwoParameterLogistic,
       {
-        model: multidimensionalTwoParameterLogistic,
         loadings: m2pl.loadings,
         points: 11,
         maxIterations: 3,
@@ -1399,15 +1414,15 @@ describe("calibration", () => {
 
 describe("fixed parameters", () => {
   const matrix = buildResponseMatrix(held.responses, { itemIds: held.itemIds });
+  const optionsModel = held.models.map(modelOf);
   const options = {
-    model: held.models.map(modelOf),
     loadings: held.loadings,
     fixedParameters: held.fixedParameters,
     points: held.points,
     tolerance: 1e-9,
     maxIterations: 5000,
   };
-  const hessian = calibrateMultidimensional(matrix, { ...options, standardErrors: "hessian" });
+  const hessian = calibrateMultidimensional(matrix, optionsModel, { ...options, standardErrors: "hessian" });
 
   it("match mirt with est = FALSE on a shared 3PL item's asymptote and a 2PL item's slope", () => {
     expectCalibration(hessian, held, { parameters: 1e-5, errors: 1e-5, likelihood: 1e-8 }, "held");
@@ -1416,7 +1431,7 @@ describe("fixed parameters", () => {
   });
 
   it("match mirt's cross-product standard errors", () => {
-    const fit = calibrateMultidimensional(matrix, { ...options, standardErrors: "cross-product" });
+    const fit = calibrateMultidimensional(matrix, optionsModel, { ...options, standardErrors: "cross-product" });
     held.crossProduct.standardErrors.forEach((errors, i) => {
       const found = defined(fit.items[i]?.standardErrors);
       expect(Object.keys(found)).toEqual(Object.keys(errors));
@@ -1451,16 +1466,15 @@ describe("fixed parameters", () => {
   it("give the free calibration when a graded item's intercept is held at its estimate", () => {
     const data = buildResponseMatrix(graded.responses.slice(0, 300), { itemIds: [...graded.itemIds] });
     const base = {
-      model: multidimensionalGradedResponse,
       loadings: graded.loadings,
       points: 11,
       tolerance: 1e-7,
       maxIterations: 2000,
     };
-    const free = calibrateMultidimensional(data, base);
+    const free = calibrateMultidimensional(data, multidimensionalGradedResponse, base);
     const [first, second] = free.items;
     const intercept = (defined(second).parameters as MultidimensionalGradedParameters).intercepts[1];
-    const fit = calibrateMultidimensional(data, {
+    const fit = calibrateMultidimensional(data, multidimensionalGradedResponse, {
       ...base,
       fixedParameters: { [defined(second).id]: { intercept2: defined(intercept) } },
     });
@@ -1474,7 +1488,7 @@ describe("fixed parameters", () => {
     expectClose(fit.logLikelihood, free.logLikelihood, 1e-6, "log-likelihood");
     expectClose(fit.aic, free.aic - 2, 1e-5, "AIC");
     expect(() =>
-      calibrateMultidimensional(data, {
+      calibrateMultidimensional(data, multidimensionalGradedResponse, {
         ...base,
         fixedParameters: { [defined(second).id]: { intercept1: 0, intercept2: 1 } },
       }),
@@ -1487,7 +1501,7 @@ describe("fixed parameters", () => {
       [hessian.items[2], hessian.items[8]].map((item) => [defined(item).id, defined(item).parameters]),
     );
     const groups = held.responses.map((_, p) => (p % 2 === 0 ? "reference" : "focal"));
-    const fit = calibrateMultidimensional(matrix, {
+    const fit = calibrateMultidimensional(matrix, optionsModel, {
       ...options,
       tolerance: 1e-5,
       fixed: anchors,
@@ -1502,8 +1516,7 @@ describe("fixed parameters", () => {
   });
 
   it("hold with MH-RM, near the solution of EM within its Monte Carlo error", () => {
-    const fit = calibrateMultidimensional(matrix, {
-      model: options.model,
+    const fit = calibrateMultidimensional(matrix, optionsModel, {
       loadings: options.loadings,
       fixedParameters: options.fixedParameters,
       method: "mhrm",
@@ -1527,22 +1540,32 @@ describe("fixed parameters", () => {
   it("change nothing when empty", () => {
     const small = buildResponseMatrix(m2pl.responses.slice(0, 200), { itemIds: [...m2pl.itemIds] });
     const plain = {
-      model: multidimensionalTwoParameterLogistic,
       loadings: m2pl.loadings,
       points: 11,
     };
-    const fit = calibrateMultidimensional(small, plain);
-    expect(calibrateMultidimensional(small, { ...plain, fixedParameters: {} })).toEqual(fit);
-    expect(calibrateMultidimensional(small, { ...plain, fixedParameters: { q01: {} } })).toEqual(fit);
+    const fit = calibrateMultidimensional(small, multidimensionalTwoParameterLogistic, plain);
+    expect(
+      calibrateMultidimensional(small, multidimensionalTwoParameterLogistic, { ...plain, fixedParameters: {} }),
+    ).toEqual(fit);
+    expect(
+      calibrateMultidimensional(small, multidimensionalTwoParameterLogistic, {
+        ...plain,
+        fixedParameters: { q01: {} },
+      }),
+    ).toEqual(fit);
   });
 
   it("reject unknown and fixed items, parameters the item lacks, every parameter, and invalid values", () => {
     const small = buildResponseMatrix(held.responses.slice(0, 40), { itemIds: held.itemIds });
-    const base = { model: options.model, loadings: held.loadings, points: 5, maxIterations: 1 };
-    const rejected = (value: object | string, extra: object = {}): string | undefined => {
+    const base = { loadings: held.loadings, points: 5, maxIterations: 1 };
+    const rejected = (
+      value: object | string,
+      extra: object = {},
+      model: MultidimensionalModel<Parameters> | readonly MultidimensionalModel<Parameters>[] = optionsModel,
+    ): string | undefined => {
       try {
         const fixedParameters = typeof value === "string" ? JSON.parse(value) : value;
-        calibrateMultidimensional(small, { ...base, ...extra, fixedParameters });
+        calibrateMultidimensional(small, model, { ...base, ...extra, fixedParameters });
       } catch (error) {
         return error instanceof DataError ? error.message : undefined;
       }
@@ -1568,10 +1591,7 @@ describe("fixed parameters", () => {
       'The option fixedParameters holds "a2" of item "q01", a slope that the pattern of loadings fixes at 0.',
     );
     expect(
-      rejected(
-        { q01: { a2: 1 } },
-        { loadings: undefined, dimensions: 2, model: multidimensionalThreeParameterLogistic },
-      ),
+      rejected({ q01: { a2: 1 } }, { loadings: undefined, dimensions: 2 }, multidimensionalThreeParameterLogistic),
     ).toBe('The option fixedParameters holds "a2" of item "q01", a slope that the pattern of loadings fixes at 0.');
     expect(rejected({ q03: { a1: 1, intercept: 0 } })).toBe(
       'The option fixedParameters holds every parameter of item "q03"; give its parameters in the option fixed.',
@@ -1610,12 +1630,15 @@ describe("MH-RM", () => {
       readonly standardErrors?: "none" | "hessian";
     },
   ): MultidimensionalCalibration<Parameters> {
-    return calibrateMultidimensional(buildResponseMatrix(fixture.responses, { itemIds: [...fixture.itemIds] }), {
-      model: modelOf(fixture.model),
-      loadings: fixture.loadings,
-      method: "mhrm",
-      ...extra,
-    });
+    return calibrateMultidimensional(
+      buildResponseMatrix(fixture.responses, { itemIds: [...fixture.itemIds] }),
+      modelOf(fixture.model),
+      {
+        loadings: fixture.loadings,
+        method: "mhrm",
+        ...extra,
+      },
+    );
   }
 
   /** Returns the largest absolute difference of the slopes and intercepts from those of the fixture. */
@@ -1731,37 +1754,60 @@ describe("MH-RM", () => {
   describe("small data", () => {
     const rows = m2pl.responses.slice(0, 250);
     const data = buildResponseMatrix(rows, { itemIds: [...m2pl.itemIds] });
-    const options = { model: multidimensionalTwoParameterLogistic, loadings: m2pl.loadings, method: "mhrm" } as const;
+    const options = { loadings: m2pl.loadings, method: "mhrm" } as const;
 
     it("gives the same calibration for the same seed and another for another seed", () => {
       // 50 persons and 10 cycles of the last stage: the seed fixes the draws of every stage and of the standard errors.
       const few = buildResponseMatrix(rows.slice(0, 50), { itemIds: [...m2pl.itemIds] });
       const short = { ...options, maxIterations: 10 };
-      const first = calibrateMultidimensional(few, { ...short, seed: 5, standardErrors: "hessian" });
+      const first = calibrateMultidimensional(few, multidimensionalTwoParameterLogistic, {
+        ...short,
+        seed: 5,
+        standardErrors: "hessian",
+      });
       expect(first.items[0]?.standardErrors).not.toBeNull();
-      expect(calibrateMultidimensional(few, { ...short, seed: 5, standardErrors: "hessian" })).toEqual(first);
-      const other = calibrateMultidimensional(few, { ...short, seed: 6 });
+      expect(
+        calibrateMultidimensional(few, multidimensionalTwoParameterLogistic, {
+          ...short,
+          seed: 5,
+          standardErrors: "hessian",
+        }),
+      ).toEqual(first);
+      const other = calibrateMultidimensional(few, multidimensionalTwoParameterLogistic, { ...short, seed: 6 });
       expect(other.items[0]?.parameters).not.toEqual(first.items[0]?.parameters);
     });
 
     it("reports the cycles of its last stage and whether the tolerance was met", () => {
-      const short = calibrateMultidimensional(data, { ...options, maxIterations: 3 });
+      const short = calibrateMultidimensional(data, multidimensionalTwoParameterLogistic, {
+        ...options,
+        maxIterations: 3,
+      });
       expect(short.converged).toBe(false);
       expect(short.iterations).toBe(3);
-      const long = calibrateMultidimensional(data, { ...options, tolerance: 0.05 });
+      const long = calibrateMultidimensional(data, multidimensionalTwoParameterLogistic, {
+        ...options,
+        tolerance: 0.05,
+      });
       expect(long.converged).toBe(true);
       expect(long.iterations).toBeGreaterThanOrEqual(3);
       expect(long.iterations).toBeLessThan(2000);
     });
 
     it("reports AIC and BIC from the same number of parameters as EM", () => {
-      const fit = calibrateMultidimensional(data, { ...options, maxIterations: 5 });
+      const fit = calibrateMultidimensional(data, multidimensionalTwoParameterLogistic, {
+        ...options,
+        maxIterations: 5,
+      });
       expectClose(fit.aic, -2 * fit.logLikelihood + 2 * 25, 1e-9);
       expectClose(fit.bic, -2 * fit.logLikelihood + 25 * Math.log(250), 1e-9);
     });
 
     it("fixes the correlations at 0 when they are not estimated and has none in one dimension", () => {
-      const uncorrelated = calibrateMultidimensional(data, { ...options, correlated: false, maxIterations: 5 });
+      const uncorrelated = calibrateMultidimensional(data, multidimensionalTwoParameterLogistic, {
+        ...options,
+        correlated: false,
+        maxIterations: 5,
+      });
       expect(uncorrelated.correlations).toEqual([
         [1, 0],
         [0, 1],
@@ -1772,15 +1818,15 @@ describe("MH-RM", () => {
           rows.map((row) => row.slice(0, 6)),
           { itemIds: m2pl.itemIds.slice(0, 6) },
         ),
-        { model: multidimensionalTwoParameterLogistic, dimensions: 1, method: "mhrm", standardErrors: "hessian" },
+        multidimensionalTwoParameterLogistic,
+        { dimensions: 1, method: "mhrm", standardErrors: "hessian" },
       );
       expect(one.correlations).toEqual([[1]]);
       expect(one.items.every(({ standardErrors }) => standardErrors !== null)).toBe(true);
     });
 
     it("estimates exploratory models with the first items' later slopes fixed at 0", () => {
-      const fit = calibrateMultidimensional(data, {
-        model: multidimensionalTwoParameterLogistic,
+      const fit = calibrateMultidimensional(data, multidimensionalTwoParameterLogistic, {
         dimensions: 2,
         method: "mhrm",
         maxIterations: 10,
@@ -1794,8 +1840,8 @@ describe("MH-RM", () => {
     });
 
     it("applies priors", () => {
-      const plain = calibrateMultidimensional(data, { ...options, seed: 2 });
-      const shrunk = calibrateMultidimensional(data, {
+      const plain = calibrateMultidimensional(data, multidimensionalTwoParameterLogistic, { ...options, seed: 2 });
+      const shrunk = calibrateMultidimensional(data, multidimensionalTwoParameterLogistic, {
         ...options,
         seed: 2,
         priors: { intercept: normalPrior(0, 0.3) },
@@ -1814,7 +1860,10 @@ describe("MH-RM", () => {
           response === null ? [] : [{ person: `p${person}`, item: defined(m2pl.itemIds[item]), response }],
         ),
       );
-      const fit = calibrateMultidimensional(buildResponseRecords(records), { ...options, maxIterations: 5 });
+      const fit = calibrateMultidimensional(buildResponseRecords(records), multidimensionalTwoParameterLogistic, {
+        ...options,
+        maxIterations: 5,
+      });
       expect(fit.items).toHaveLength(12);
       expect(fit.logLikelihood).toBeLessThan(0);
     });
@@ -1822,8 +1871,7 @@ describe("MH-RM", () => {
     it("chooses EM up to three dimensions and MH-RM above", () => {
       // Only EM has a grid: the option points is accepted by the default method up to three dimensions and rejected above.
       expect(() =>
-        calibrateMultidimensional(data, {
-          model: multidimensionalTwoParameterLogistic,
+        calibrateMultidimensional(data, multidimensionalTwoParameterLogistic, {
           loadings: m2pl.loadings,
           points: 5,
           maxIterations: 1,
@@ -1831,10 +1879,9 @@ describe("MH-RM", () => {
       ).not.toThrow();
       const four = Object.fromEntries(m2pl.itemIds.map((id, i) => [id, [`D${(i % 4) + 1}`]]));
       expect(() =>
-        calibrateMultidimensional(data, { model: multidimensionalTwoParameterLogistic, loadings: four, points: 5 }),
+        calibrateMultidimensional(data, multidimensionalTwoParameterLogistic, { loadings: four, points: 5 }),
       ).toThrow('The option points is for EM, which the method "mhrm" does not use.');
-      const fit = calibrateMultidimensional(data, {
-        model: multidimensionalTwoParameterLogistic,
+      const fit = calibrateMultidimensional(data, multidimensionalTwoParameterLogistic, {
         loadings: four,
         maxIterations: 3,
       });
@@ -1851,13 +1898,14 @@ describe("MH-RM", () => {
     fc.assert(
       fc.property(fc.integer({ min: 0, max: 2 ** 31 }), (seed) => {
         const options = {
-          model: multidimensionalTwoParameterLogistic,
           dimensions: 1,
           method: "mhrm",
           seed,
           maxIterations: 2,
         } as const;
-        expect(calibrateMultidimensional(data, options)).toEqual(calibrateMultidimensional(data, options));
+        expect(calibrateMultidimensional(data, multidimensionalTwoParameterLogistic, options)).toEqual(
+          calibrateMultidimensional(data, multidimensionalTwoParameterLogistic, options),
+        );
       }),
       { numRuns: 4 },
     );
@@ -1870,7 +1918,7 @@ describe("MH-RM internals", () => {
 
   it("computes the complete-data score and information of mirt's Deriv", () => {
     const design = designOf({ loadings: mirtMhrm.loadings }, items5);
-    const states = setUp(responses, { model: multidimensionalGradedResponse, loadings: mirtMhrm.loadings }, design, 0);
+    const states = setUp(responses, multidimensionalGradedResponse, {}, design, 0);
     const theta = Float64Array.from(mirtMhrm.thetas.flat());
     const data = responsesByItem(responses);
     const scratch = createScratch(states, 5);
@@ -1953,12 +2001,7 @@ describe("MH-RM internals", () => {
         { itemIds },
       ),
     );
-    const states = setUp(
-      calibrated,
-      { model: multidimensionalTwoParameterLogistic, loadings },
-      designOf({ loadings }, itemIds),
-      0,
-    );
+    const states = setUp(calibrated, multidimensionalTwoParameterLogistic, {}, designOf({ loadings }, itemIds), 0);
     const parameters = [
       { a: [1.2, 0], intercept: 0.3 },
       { a: [0.9, 0], intercept: -0.4 },
@@ -2121,20 +2164,25 @@ describe("multiple groups", () => {
     extra: Partial<MultidimensionalCalibrationOptions<Parameters>> = {},
   ): MultidimensionalCalibration<Parameters> {
     const { fixed, correlated } = fixture;
-    return calibrateMultidimensional(buildResponseMatrix(fixture.responses, { itemIds: [...fixture.itemIds] }), {
-      model: modelOf(fixture.model),
-      loadings: fixture.loadings,
-      points: fixture.points,
-      groups: [...fixture.personGroups],
-      ...(fixed === undefined
-        ? {}
-        : { fixed: Object.fromEntries(Object.entries(fixed).map(([id, p]) => [id, parametersOf(fixture.model, p)])) }),
-      ...(correlated === undefined ? {} : { correlated }),
-      standardErrors,
-      tolerance: 1e-9,
-      maxIterations: 2000,
-      ...extra,
-    });
+    return calibrateMultidimensional(
+      buildResponseMatrix(fixture.responses, { itemIds: [...fixture.itemIds] }),
+      modelOf(fixture.model),
+      {
+        loadings: fixture.loadings,
+        points: fixture.points,
+        groups: [...fixture.personGroups],
+        ...(fixed === undefined
+          ? {}
+          : {
+              fixed: Object.fromEntries(Object.entries(fixed).map(([id, p]) => [id, parametersOf(fixture.model, p)])),
+            }),
+        ...(correlated === undefined ? {} : { correlated }),
+        standardErrors,
+        tolerance: 1e-9,
+        maxIterations: 2000,
+        ...extra,
+      },
+    );
   }
 
   /** Compares the means and covariance of each group with mirt's. */
@@ -2229,8 +2277,7 @@ describe("multiple groups", () => {
 
   it("reports no groups without the options groups and fixed", () => {
     const { itemIds, responses, loadings, points, model } = twoGroups;
-    const fit = calibrateMultidimensional(buildResponseMatrix(responses, { itemIds: [...itemIds] }), {
-      model: modelOf(model),
+    const fit = calibrateMultidimensional(buildResponseMatrix(responses, { itemIds: [...itemIds] }), modelOf(model), {
       loadings,
       points,
     });
@@ -2239,8 +2286,7 @@ describe("multiple groups", () => {
 
   it("names the group of all persons when fixed items come without groups", () => {
     const { itemIds, responses, loadings, points, model, fixed } = anchored;
-    const fit = calibrateMultidimensional(buildResponseMatrix(responses, { itemIds: [...itemIds] }), {
-      model: modelOf(model),
+    const fit = calibrateMultidimensional(buildResponseMatrix(responses, { itemIds: [...itemIds] }), modelOf(model), {
       loadings,
       points,
       fixed: Object.fromEntries(Object.entries(defined(fixed)).map(([id, p]) => [id, parametersOf(model, p)])),
@@ -2280,14 +2326,14 @@ describe("multiple groups", () => {
       ),
       { personIds: [...matrix.personIds], itemIds: [...matrix.itemIds] },
     );
+    const optionsModel = modelOf(small.model);
     const options = {
-      model: modelOf(small.model),
       loadings: small.loadings,
       points: 15,
       groups: [...small.personGroups],
     };
-    const fromMatrix = calibrateMultidimensional(matrix, options);
-    const fromRecords = calibrateMultidimensional(records, options);
+    const fromMatrix = calibrateMultidimensional(matrix, optionsModel, options);
+    const fromRecords = calibrateMultidimensional(records, optionsModel, options);
     expect(fromRecords.groups).toEqual(fromMatrix.groups);
     expect(fromRecords.logLikelihood).toBeCloseTo(fromMatrix.logLikelihood, 8);
   }, 120_000);
@@ -2393,8 +2439,7 @@ describe("multiple groups", () => {
       "recovers the means and covariances of three groups on three dimensions from 40 items per dimension",
       () => {
         const { matrix, labels } = simulate(20261031);
-        const fit = calibrateMultidimensional(matrix, {
-          model: multidimensionalTwoParameterLogistic,
+        const fit = calibrateMultidimensional(matrix, multidimensionalTwoParameterLogistic, {
           loadings: Object.fromEntries(matrix.itemIds.map((id, i) => [id, [`D${Math.floor(i / perDimension) + 1}`]])),
           groups: labels,
           points: 21,
@@ -2693,29 +2738,30 @@ describe("multiple groups errors", () => {
   const matrix = (rows: readonly (readonly (number | null)[])[] = keep.map((k) => defined(responses[k]))) =>
     buildResponseMatrix(rows, { itemIds: [...itemIds] });
   const labels = keep.map((k) => defined(personGroups[k]));
-  const base = { model: modelOf(model), loadings, points: 7 };
+  const baseModel = modelOf(model);
+  const base = { loadings, points: 7 };
 
   it("needs one string label for each person", () => {
-    expect(() => calibrateMultidimensional(matrix(), { ...base, groups: ["A", "B"] })).toThrow(
+    expect(() => calibrateMultidimensional(matrix(), baseModel, { ...base, groups: ["A", "B"] })).toThrow(
       "Found 2 groups for 80 persons.",
     );
-    expect(() => calibrateMultidimensional(matrix(), { ...base, groups: JSON.parse('"A"') })).toThrow(
+    expect(() => calibrateMultidimensional(matrix(), baseModel, { ...base, groups: JSON.parse('"A"') })).toThrow(
       "Found no groups for 80 persons.",
     );
     expect(() =>
-      calibrateMultidimensional(matrix(), {
+      calibrateMultidimensional(matrix(), baseModel, {
         ...base,
         groups: JSON.parse(JSON.stringify([1, ...labels.slice(1)])),
       }),
     ).toThrow("The group of person 1 must be a string, found 1.");
-    expect(() => calibrateMultidimensional(matrix(), { ...base, groups: JSON.parse("null") })).toThrow(
+    expect(() => calibrateMultidimensional(matrix(), baseModel, { ...base, groups: JSON.parse("null") })).toThrow(
       "Found no groups for 80 persons.",
     );
   });
 
   it("needs a person with a response in each group", () => {
     const rows = keep.map((k, p) => (p < 40 ? defined(responses[k]) : defined(responses[k]).map(() => null)));
-    expect(() => calibrateMultidimensional(matrix(rows), { ...base, groups: labels })).toThrow(
+    expect(() => calibrateMultidimensional(matrix(rows), baseModel, { ...base, groups: labels })).toThrow(
       'Group "B" has no person with a response.',
     );
   });
@@ -2724,21 +2770,21 @@ describe("multiple groups errors", () => {
     const one = keep.map((k, p) =>
       p === 0 || p >= 40 ? defined(responses[k]) : defined(responses[k]).map(() => null),
     );
-    expect(() => calibrateMultidimensional(matrix(one), { ...base, groups: labels })).toThrow(
+    expect(() => calibrateMultidimensional(matrix(one), baseModel, { ...base, groups: labels })).toThrow(
       'Group "A" has 1 person with a response, no more than its 2 correlated dimensions, whose correlations then run to ±1: estimate the correlations from more persons, or set correlated to false.',
     );
-    expect(calibrateMultidimensional(matrix(one), { ...base, groups: labels, correlated: false }).groups).toHaveLength(
-      2,
-    );
+    expect(
+      calibrateMultidimensional(matrix(one), baseModel, { ...base, groups: labels, correlated: false }).groups,
+    ).toHaveLength(2);
     const three = keep.map((k, p) =>
       p < 3 || p >= 40 ? defined(responses[k]) : defined(responses[k]).map(() => null),
     );
-    expect(calibrateMultidimensional(matrix(three), { ...base, groups: labels }).groups).toHaveLength(2);
+    expect(calibrateMultidimensional(matrix(three), baseModel, { ...base, groups: labels }).groups).toHaveLength(2);
     // Two persons of opposite responses, so that every item has both categories.
     const first = defined(responses[0]).map((response) => response ?? 0);
     const two = buildResponseMatrix([first, first.map((response) => 1 - response)], { itemIds: [...itemIds] });
     for (const method of ["em", "mhrm"] as const) {
-      expect(() => calibrateMultidimensional(two, { model: base.model, loadings, method })).toThrow(
+      expect(() => calibrateMultidimensional(two, baseModel, { loadings, method })).toThrow(
         "The calibration has 2 persons with a response, no more than its 2 correlated dimensions",
       );
     }
@@ -2748,7 +2794,7 @@ describe("multiple groups errors", () => {
     const rows = keep.map((k, p) =>
       defined(responses[k]).map((response, i) => (p < 40 ? (i < 6 ? response : null) : i < 6 ? null : response)),
     );
-    expect(() => calibrateMultidimensional(matrix(rows), { ...base, groups: labels })).toThrow(
+    expect(() => calibrateMultidimensional(matrix(rows), baseModel, { ...base, groups: labels })).toThrow(
       'The group "B" shares no item with the group "A", directly or through other groups',
     );
   });
@@ -2758,16 +2804,16 @@ describe("multiple groups errors", () => {
     const rows = keep.map((k, p) =>
       defined(responses[k]).map((response, i) => (p >= 70 ? (i >= 3 && i < 9 ? response : null) : response)),
     );
-    const fit = calibrateMultidimensional(matrix(rows), { ...base, groups: three });
+    const fit = calibrateMultidimensional(matrix(rows), baseModel, { ...base, groups: three });
     expect(fit.groups?.map(({ group }) => group)).toEqual(["A", "B", "C"]);
   });
 
   it("needs fixed items that set the scale of every dimension", () => {
     const fixed = { [defined(itemIds[0])]: { a: [1, 0], intercept: 0.2, c: 0, d: 1 } };
-    expect(() => calibrateMultidimensional(matrix(), { ...base, groups: labels, fixed })).toThrow(
+    expect(() => calibrateMultidimensional(matrix(), baseModel, { ...base, groups: labels, fixed })).toThrow(
       'No fixed item with a slope on dimension "F2" was answered by the group "A" or the groups linked to it',
     );
-    expect(() => calibrateMultidimensional(matrix(), { ...base, fixed })).toThrow(
+    expect(() => calibrateMultidimensional(matrix(), baseModel, { ...base, fixed })).toThrow(
       'No fixed item with a slope on dimension "F2" was answered by the persons',
     );
   });
@@ -2775,27 +2821,27 @@ describe("multiple groups errors", () => {
   it("checks the fixed items", () => {
     const parameters = { a: [1, 0], intercept: 0.2, c: 0, d: 1 };
     const both = { [defined(itemIds[0])]: parameters, [defined(itemIds[6])]: { a: [0, 1], intercept: 0, c: 0, d: 1 } };
-    expect(() => calibrateMultidimensional(matrix(), { ...base, fixed: { nobody: parameters } })).toThrow(
+    expect(() => calibrateMultidimensional(matrix(), baseModel, { ...base, fixed: { nobody: parameters } })).toThrow(
       'Fixed parameters are given for "nobody", which is not an item id.',
     );
     expect(() =>
-      calibrateMultidimensional(matrix(), {
+      calibrateMultidimensional(matrix(), baseModel, {
         ...base,
         fixed: { ...both, [defined(itemIds[1])]: { ...parameters, a: [1] } },
       }),
     ).toThrow('Fixed item "q02" has 1 dimensions, but the calibration has 2.');
     expect(() =>
-      calibrateMultidimensional(matrix(), {
+      calibrateMultidimensional(matrix(), baseModel, {
         ...base,
         fixed: { ...both, [defined(itemIds[1])]: { ...parameters, c: 2 } },
       }),
     ).toThrow('Fixed item "q02"');
-    expect(() => calibrateMultidimensional(matrix(), { ...base, fixed: JSON.parse("null") })).toThrow(
+    expect(() => calibrateMultidimensional(matrix(), baseModel, { ...base, fixed: JSON.parse("null") })).toThrow(
       "The option fixed must be an object of item parameters by item id, found null.",
     );
-    expect(() => calibrateMultidimensional(matrix(), { ...base, fixed: { ...both, q02: JSON.parse("null") } })).toThrow(
-      'Fixed item "q02"',
-    );
+    expect(() =>
+      calibrateMultidimensional(matrix(), baseModel, { ...base, fixed: { ...both, q02: JSON.parse("null") } }),
+    ).toThrow('Fixed item "q02"');
     const graded = buildResponseMatrix(
       [
         [0, 1],
@@ -2805,8 +2851,7 @@ describe("multiple groups errors", () => {
       { itemIds: ["g1", "g2"] },
     );
     expect(() =>
-      calibrateMultidimensional(graded, {
-        model: multidimensionalGradedResponse,
+      calibrateMultidimensional(graded, multidimensionalGradedResponse, {
         loadings: { g1: ["D"], g2: ["D"] },
         fixed: { g1: { a: [1], intercepts: [0.5] } },
       }),
@@ -2815,10 +2860,10 @@ describe("multiple groups errors", () => {
 
   it("is for EM and not for MH-RM", () => {
     expect(() =>
-      calibrateMultidimensional(matrix(), { ...base, points: undefined, method: "mhrm", groups: labels }),
+      calibrateMultidimensional(matrix(), baseModel, { ...base, points: undefined, method: "mhrm", groups: labels }),
     ).toThrow('The option groups is for EM, which the method "mhrm" does not use.');
     expect(() =>
-      calibrateMultidimensional(matrix(), {
+      calibrateMultidimensional(matrix(), baseModel, {
         ...base,
         points: undefined,
         method: "mhrm",
@@ -4250,8 +4295,7 @@ describe("the recipe for responses missing not at random", () => {
     expect(omitted.responses.flat().filter((response) => response === null).length).toBeGreaterThan(1000);
   });
 
-  const fit = calibrateMultidimensional(recipe.matrix, {
-    model: multidimensionalTwoParameterLogistic,
+  const fit = calibrateMultidimensional(recipe.matrix, multidimensionalTwoParameterLogistic, {
     loadings: recipe.loadings,
     points: notAtRandom.points,
     tolerance: 1e-9,
@@ -4274,8 +4318,7 @@ describe("the recipe for responses missing not at random", () => {
   });
 
   it("estimates the intercepts of the items nearer their truth than a calibration that skips the omissions", () => {
-    const skipping = calibrateMultidimensional(omitted, {
-      model: multidimensionalTwoParameterLogistic,
+    const skipping = calibrateMultidimensional(omitted, multidimensionalTwoParameterLogistic, {
       loadings: Object.fromEntries(omitted.itemIds.map((id) => [id, ["ability"]])),
       points: notAtRandom.points,
     });
@@ -4437,11 +4480,11 @@ describe("errors", () => {
 
   it("takes at most 100 dimensions in calibration, so that every calibration can be scored", () => {
     const message = "Calibration takes at most 100 dimensions, found 101.";
-    expect(() => calibrateMultidimensional(data, { model, dimensions: 101 })).toThrow(message);
-    expect(() => calibrateMultidimensional(data, { model, dimensions: 101, method: "mhrm" })).toThrow(message);
+    expect(() => calibrateMultidimensional(data, model, { dimensions: 101 })).toThrow(message);
+    expect(() => calibrateMultidimensional(data, model, { dimensions: 101, method: "mhrm" })).toThrow(message);
     const names = Array.from({ length: 101 }, (_, d) => `D${d + 1}`);
     const wide = Object.fromEntries(m2pl.itemIds.map((id, i) => [id, i === 0 ? names : ["D1"]]));
-    expect(() => calibrateMultidimensional(data, { model, loadings: wide, method: "mhrm" })).toThrow(message);
+    expect(() => calibrateMultidimensional(data, model, { loadings: wide, method: "mhrm" })).toThrow(message);
     // 100 specific dimensions of two items each, and the general one.
     const itemIds = Array.from({ length: 200 }, (_, i) => `q${i + 1}`);
     const testlets = buildResponseMatrix(
@@ -4449,7 +4492,7 @@ describe("errors", () => {
       { itemIds },
     );
     const specific = Object.fromEntries(itemIds.map((id, i) => [id, `s${Math.floor(i / 2) + 1}`]));
-    expect(() => calibrateBifactor(testlets, { specific })).toThrow(
+    expect(() => calibrateBifactor(testlets, specific)).toThrow(
       "A bifactor or two-tier calibration takes at most 100 dimensions, found 101.",
     );
   });
@@ -4481,7 +4524,7 @@ describe("errors", () => {
     expect(() => multidimensionalInformation(wide, new Array<number>(101).fill(0))).toThrow(
       "Information takes at most 100 dimensions, found 101.",
     );
-    expect(() => createMultidimensionalAdaptiveTest({ pool: wide, stopping: testLength(1) })).toThrow(
+    expect(() => createMultidimensionalAdaptiveTest(wide, testLength(1))).toThrow(
       "A multidimensional adaptive test takes at most 100 dimensions, found 101.",
     );
     const limit = [item("q1", 100), item("q2", 100)];
@@ -4494,10 +4537,10 @@ describe("errors", () => {
     const wide = buildResponseMatrix([0, 1, 2].map((k) => Array.from({ length: 701 }, (_, j) => (j + k) % 2)));
     const message = "Standard errors take at most 2000 estimated parameters, as their information holds every pair";
     for (const standardErrors of ["hessian", "cross-product"] as const) {
-      expect(() => calibrateMultidimensional(wide, { model, dimensions: 2, standardErrors })).toThrow(message);
+      expect(() => calibrateMultidimensional(wide, model, { dimensions: 2, standardErrors })).toThrow(message);
     }
     expect(() =>
-      calibrateMultidimensional(wide, { model, dimensions: 2, method: "mhrm", standardErrors: "hessian" }),
+      calibrateMultidimensional(wide, model, { dimensions: 2, method: "mhrm", standardErrors: "hessian" }),
     ).toThrow(message);
     // Two occasions of 1,001 items each: their 2PL items alone have 2,002 parameters.
     const occasion = (seed: number) =>
@@ -4508,10 +4551,10 @@ describe("errors", () => {
   });
 
   it("needs exactly one of dimensions and loadings", () => {
-    expect(() => calibrateMultidimensional(data, { model })).toThrow(
+    expect(() => calibrateMultidimensional(data, model)).toThrow(
       "Calibration needs the option dimensions, for an exploratory model, or loadings, for a confirmatory one.",
     );
-    expect(() => calibrateMultidimensional(data, { model, dimensions: 2, loadings })).toThrow(
+    expect(() => calibrateMultidimensional(data, model, { dimensions: 2, loadings })).toThrow(
       "Calibration takes the option dimensions or the option loadings, not both.",
     );
   });
@@ -4524,18 +4567,18 @@ describe("errors", () => {
     ]);
     const single = Object.fromEntries(wide.itemIds.map((id) => [id, ["F1"]]));
     expect(() =>
-      calibrateMultidimensional(wide, { model, loadings: single, points: 1_000_000, maxIterations: 1 }),
+      calibrateMultidimensional(wide, model, { loadings: single, points: 1_000_000, maxIterations: 1 }),
     ).toThrow(
       "The items of the calibration would keep 34000000 values at the nodes of their grids, more than 16777216; use fewer points.",
     );
   });
 
   it("limits EM to three dimensions and needs at least as many items as dimensions", () => {
-    expect(() => calibrateMultidimensional(data, { model, method: "em", dimensions: 4 })).toThrow(
+    expect(() => calibrateMultidimensional(data, model, { method: "em", dimensions: 4 })).toThrow(
       "EM calibrates up to 3 dimensions, found 4.",
     );
     const names = Object.fromEntries(m2pl.itemIds.map((id, i) => [id, [`d${i % 4}`]]));
-    expect(() => calibrateMultidimensional(data, { model, method: "em", loadings: names })).toThrow(
+    expect(() => calibrateMultidimensional(data, model, { method: "em", loadings: names })).toThrow(
       "EM calibrates up to 3 dimensions, found 4.",
     );
     expect(() =>
@@ -4545,26 +4588,27 @@ describe("errors", () => {
           [1, 0],
           [1, 1],
         ]),
-        { model, dimensions: 3 },
+        model,
+        { dimensions: 3 },
       ),
     ).toThrow("An exploratory model of 3 dimensions needs at least 3 items, found 2.");
   });
 
   it("rejects the method, the seed and the options that a method does not take", () => {
-    const options = { model, loadings };
-    expect(() => calibrateMultidimensional(data, { ...options, method: "mcmc" as never })).toThrow(
+    const options = { loadings };
+    expect(() => calibrateMultidimensional(data, model, { ...options, method: "mcmc" as never })).toThrow(
       'The option method must be "em" or "mhrm", found "mcmc".',
     );
-    expect(() => calibrateMultidimensional(data, { ...options, method: JSON.parse("null") })).toThrow(DataError);
-    expect(() => calibrateMultidimensional(data, { ...options, seed: 1.5 })).toThrow(
+    expect(() => calibrateMultidimensional(data, model, { ...options, method: JSON.parse("null") })).toThrow(DataError);
+    expect(() => calibrateMultidimensional(data, model, { ...options, seed: 1.5 })).toThrow(
       "A seed must be a safe integer, found 1.5.",
     );
-    expect(() => calibrateMultidimensional(data, { ...options, seed: JSON.parse('"7"') })).toThrow(DataError);
-    expect(() => calibrateMultidimensional(data, { ...options, method: "mhrm", points: 15 })).toThrow(
+    expect(() => calibrateMultidimensional(data, model, { ...options, seed: JSON.parse('"7"') })).toThrow(DataError);
+    expect(() => calibrateMultidimensional(data, model, { ...options, method: "mhrm", points: 15 })).toThrow(
       'The option points is for EM, which the method "mhrm" does not use.',
     );
     expect(() =>
-      calibrateMultidimensional(data, { ...options, method: "mhrm", standardErrors: "cross-product" }),
+      calibrateMultidimensional(data, model, { ...options, method: "mhrm", standardErrors: "cross-product" }),
     ).toThrow(
       'MH-RM has no posterior over a grid to cross-multiply: the option standardErrors needs "none" or "hessian" with the method "mhrm".',
     );
@@ -4572,77 +4616,79 @@ describe("errors", () => {
 
   it("checks the pattern of loadings", () => {
     const first = defined(m2pl.itemIds[0]);
-    expect(() => calibrateMultidimensional(data, { model, loadings: { ...loadings, nowhere: ["F1"] } })).toThrow(
+    expect(() => calibrateMultidimensional(data, model, { loadings: { ...loadings, nowhere: ["F1"] } })).toThrow(
       'Loadings are given for "nowhere", which is not an item id.',
     );
     const { [first]: _, ...without } = loadings;
-    expect(() => calibrateMultidimensional(data, { model, loadings: without })).toThrow(
+    expect(() => calibrateMultidimensional(data, model, { loadings: without })).toThrow(
       `The loadings of item "${first}" must be an array of at least one dimension name, found undefined.`,
     );
-    expect(() => calibrateMultidimensional(data, { model, loadings: { ...loadings, [first]: [] } })).toThrow(
+    expect(() => calibrateMultidimensional(data, model, { loadings: { ...loadings, [first]: [] } })).toThrow(
       `The loadings of item "${first}" must be an array of at least one dimension name, found an array.`,
     );
-    expect(() => calibrateMultidimensional(data, { model, loadings: { ...loadings, [first]: ["F1", "F1"] } })).toThrow(
+    expect(() => calibrateMultidimensional(data, model, { loadings: { ...loadings, [first]: ["F1", "F1"] } })).toThrow(
       `Item "${first}" loads on a dimension twice: F1, F1.`,
     );
-    expect(() => calibrateMultidimensional(data, { model, loadings: JSON.parse("null") })).toThrow(
+    expect(() => calibrateMultidimensional(data, model, { loadings: JSON.parse("null") })).toThrow(
       "The option loadings must be an object of dimension names by item id, found null.",
     );
     expect(() =>
-      calibrateMultidimensional(data, { model, loadings: { ...loadings, [first]: JSON.parse('"F1"') } }),
+      calibrateMultidimensional(data, model, { loadings: { ...loadings, [first]: JSON.parse('"F1"') } }),
     ).toThrow(DataError);
     expect(() =>
-      calibrateMultidimensional(data, { model, loadings: { ...loadings, [first]: [JSON.parse("1")] } }),
+      calibrateMultidimensional(data, model, { loadings: { ...loadings, [first]: [JSON.parse("1")] } }),
     ).toThrow(DataError);
   });
 
   it("checks the other options", () => {
-    const options = { model, loadings };
-    expect(() => calibrateMultidimensional(data, JSON.parse("null"))).toThrow(
+    const options = { loadings };
+    expect(() => calibrateMultidimensional(data, model, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
-    expect(() => calibrateMultidimensional(data, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
-    expect(() => calibrateMultidimensional(JSON.parse("null"), options)).toThrow(DataError);
-    expect(() => calibrateMultidimensional(data, { ...options, dimensions: undefined, loadings: undefined })).toThrow(
-      DataError,
+    expect(() => calibrateMultidimensional(data, model, JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
     );
-    expect(() => calibrateMultidimensional(data, { model, dimensions: 1.5 })).toThrow(DataError);
-    expect(() => calibrateMultidimensional(data, { model, dimensions: JSON.parse("null") })).toThrow(DataError);
-    expect(() => calibrateMultidimensional(data, { ...options, correlated: JSON.parse('"yes"') })).toThrow(
+    expect(() => calibrateMultidimensional(JSON.parse("null"), model, options)).toThrow(DataError);
+    expect(() =>
+      calibrateMultidimensional(data, model, { ...options, dimensions: undefined, loadings: undefined }),
+    ).toThrow(DataError);
+    expect(() => calibrateMultidimensional(data, model, { dimensions: 1.5 })).toThrow(DataError);
+    expect(() => calibrateMultidimensional(data, model, { dimensions: JSON.parse("null") })).toThrow(DataError);
+    expect(() => calibrateMultidimensional(data, model, { ...options, correlated: JSON.parse('"yes"') })).toThrow(
       'The option correlated must be a boolean, found "yes".',
     );
-    expect(() => calibrateMultidimensional(data, { ...options, points: 1 })).toThrow(
+    expect(() => calibrateMultidimensional(data, model, { ...options, points: 1 })).toThrow(
       "The option points must be an integer from 2, found 1.",
     );
-    expect(() => calibrateMultidimensional(data, { ...options, points: JSON.parse('"31"') })).toThrow(DataError);
-    expect(() => calibrateMultidimensional(data, { ...options, points: 2000 })).toThrow(
+    expect(() => calibrateMultidimensional(data, model, { ...options, points: JSON.parse('"31"') })).toThrow(DataError);
+    expect(() => calibrateMultidimensional(data, model, { ...options, points: 2000 })).toThrow(
       "A grid of 2000 points in 2 dimensions has more than 1000000 nodes; use fewer points.",
     );
-    expect(() => calibrateMultidimensional(data, { ...options, standardErrors: "bootstrap" as never })).toThrow(
+    expect(() => calibrateMultidimensional(data, model, { ...options, standardErrors: "bootstrap" as never })).toThrow(
       'The option standardErrors must be "none", "hessian" or "cross-product", found "bootstrap".',
     );
-    expect(() => calibrateMultidimensional(data, { ...options, tolerance: -1 })).toThrow(DataError);
-    expect(() => calibrateMultidimensional(data, { ...options, maxIterations: 0 })).toThrow(DataError);
-    expect(() => calibrateMultidimensional(data, { ...options, priors: JSON.parse("null") })).toThrow(
+    expect(() => calibrateMultidimensional(data, model, { ...options, tolerance: -1 })).toThrow(DataError);
+    expect(() => calibrateMultidimensional(data, model, { ...options, maxIterations: 0 })).toThrow(DataError);
+    expect(() => calibrateMultidimensional(data, model, { ...options, priors: JSON.parse("null") })).toThrow(
       "The option priors must be an object of priors by parameter name, found null.",
     );
-    expect(() => calibrateMultidimensional(data, { ...options, priors: { a: JSON.parse("{}") } })).toThrow(
+    expect(() => calibrateMultidimensional(data, model, { ...options, priors: { a: JSON.parse("{}") } })).toThrow(
       'The prior of "a" must be a prior such as normalPrior(0, 1), found an object.',
     );
-    expect(() => calibrateMultidimensional(data, { ...options, priors: { d: normalPrior(1, 1) } })).toThrow(
+    expect(() => calibrateMultidimensional(data, model, { ...options, priors: { d: normalPrior(1, 1) } })).toThrow(
       'A prior is given for "d", which no estimated item has.',
     );
   });
 
   it("checks the models", () => {
     const options = { loadings };
-    expect(() => calibrateMultidimensional(data, { ...options, model: JSON.parse("null") })).toThrow(
-      "The option model must be a multidimensional model such as multidimensionalTwoParameterLogistic, found null.",
+    expect(() => calibrateMultidimensional(data, JSON.parse("null"), { ...options })).toThrow(
+      "The model must be a multidimensional model such as multidimensionalTwoParameterLogistic, found null.",
     );
-    expect(() => calibrateMultidimensional(data, { ...options, model: [model, model] })).toThrow(
+    expect(() => calibrateMultidimensional(data, [model, model], { ...options })).toThrow(
       "Found 2 models for 12 items.",
     );
-    expect(() => calibrateMultidimensional(data, { ...options, model: JSON.parse("{}") })).toThrow(DataError);
+    expect(() => calibrateMultidimensional(data, JSON.parse("{}"), { ...options })).toThrow(DataError);
     // Binary data cannot be a graded item with a single category, and graded data need every category up to the highest.
     const polytomous = buildResponseMatrix([
       [0, 1],
@@ -4650,7 +4696,7 @@ describe("errors", () => {
       [2, 1],
       [2, 0],
     ]);
-    expect(() => calibrateMultidimensional(polytomous, { dimensions: 1, model })).toThrow(
+    expect(() => calibrateMultidimensional(polytomous, model, { dimensions: 1 })).toThrow(
       'Item "item1" has a response of 2, but the M2PL model allows responses from 0 to 1.',
     );
     const gap = buildResponseMatrix([
@@ -4659,7 +4705,7 @@ describe("errors", () => {
       [3, 1],
       [0, 0],
     ]);
-    expect(() => calibrateMultidimensional(gap, { dimensions: 1, model: multidimensionalGradedResponse })).toThrow(
+    expect(() => calibrateMultidimensional(gap, multidimensionalGradedResponse, { dimensions: 1 })).toThrow(
       'Item "item1" has no response in category 1',
     );
     const constant = buildResponseMatrix([
@@ -4667,7 +4713,7 @@ describe("errors", () => {
       [0, 1],
       [0, 0],
     ]);
-    expect(() => calibrateMultidimensional(constant, { dimensions: 1, model })).toThrow(
+    expect(() => calibrateMultidimensional(constant, model, { dimensions: 1 })).toThrow(
       'Item "item1" has responses in fewer than two categories',
     );
   });
@@ -4679,7 +4725,8 @@ describe("errors", () => {
           [null, null],
           [null, null],
         ]),
-        { dimensions: 1, model },
+        model,
+        { dimensions: 1 },
       ),
     ).toThrow("Calibration needs at least one response.");
   });
@@ -4789,15 +4836,22 @@ describe("properties", () => {
 
   it("gives estimates that do not depend on the order of the persons", () => {
     const options = {
-      model: multidimensionalTwoParameterLogistic,
       loadings: m2pl.loadings,
       points: 11,
       tolerance: 1e-10,
     };
-    const fit = calibrateMultidimensional(buildResponseMatrix(rows, { itemIds: columns }), options);
+    const fit = calibrateMultidimensional(
+      buildResponseMatrix(rows, { itemIds: columns }),
+      multidimensionalTwoParameterLogistic,
+      options,
+    );
     fc.assert(
       fc.property(fc.shuffledSubarray(rows, { minLength: rows.length, maxLength: rows.length }), (shuffled) => {
-        const other = calibrateMultidimensional(buildResponseMatrix(shuffled, { itemIds: columns }), options);
+        const other = calibrateMultidimensional(
+          buildResponseMatrix(shuffled, { itemIds: columns }),
+          multidimensionalTwoParameterLogistic,
+          options,
+        );
         expectClose(other.logLikelihood, fit.logLikelihood, 1e-8);
         other.items.forEach(({ parameters }, i) => {
           expectClose(defined(parameters.a[i < 6 ? 0 : 1]), defined(fit.items[i]?.parameters.a[i < 6 ? 0 : 1]), 1e-6);

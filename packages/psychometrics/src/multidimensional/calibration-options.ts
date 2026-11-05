@@ -1,15 +1,9 @@
 import type { FieldNames } from "@measurekit/core";
 import type { FixedParameters, ParameterPrior, StandardErrorMethod } from "../irt/internal.js";
-import type { LoadingPattern, MultidimensionalModel } from "./model.js";
+import type { LoadingPattern } from "./model.js";
 
 /** Options of {@link calibrateMultidimensional}. */
 export interface MultidimensionalCalibrationOptions<TParameters> {
-  /**
-   * The model of every item, or one model per item, in item order. A list of models with different parameters needs
-   * its type written out, such as `MultidimensionalModel<MultidimensionalLogisticParameters |
-   * MultidimensionalGradedParameters>[]`.
-   */
-  readonly model: MultidimensionalModel<TParameters> | readonly MultidimensionalModel<TParameters>[];
   /**
    * How to estimate: `"em"`, which integrates theta by quadrature over a grid and calibrates up to 3 dimensions, or
    * `"mhrm"`, the Metropolis-Hastings Robbins-Monro algorithm, which draws theta and has no limit of dimensions.
@@ -116,7 +110,6 @@ export interface MultidimensionalCalibrationOptions<TParameters> {
 }
 
 export const MULTIDIMENSIONAL_CALIBRATION_OPTIONS: FieldNames<MultidimensionalCalibrationOptions<unknown>> = {
-  model: true,
   method: true,
   dimensions: true,
   loadings: true,

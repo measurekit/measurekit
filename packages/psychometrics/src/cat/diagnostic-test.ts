@@ -12,10 +12,6 @@ import type { TestControlOptions } from "./test-controls.js";
 
 /** Options of {@link createDiagnosticAdaptiveTest}. */
 export interface DiagnosticAdaptiveTestOptions extends TestControlOptions {
-  /** The item pool: calibrated items `{ id, attributes, probabilities }`, with `contentAreas` and `exposure` optional. */
-  readonly pool: readonly DiagnosticPoolItem[];
-  /** The attributes, from 1 to 20, in the order of the profiles. Every attribute of an item is among them. */
-  readonly attributes: readonly string[];
   /**
    * The prior probability of each profile, as a calibration's `profiles`: every profile once, matched by its pattern,
    * with a proportion from 0 to 1, not all 0. A proportion of 0 excludes the profile, as a hierarchy among the
@@ -24,8 +20,6 @@ export interface DiagnosticAdaptiveTestOptions extends TestControlOptions {
    * @defaultValue uniform over the profiles
    */
   readonly prior?: readonly ProfileProportion[];
-  /** The rule that ends the test. The test also ends when no item is left or the selection rule scores every eligible item `-Infinity`. */
-  readonly stopping: StoppingRule<DiagnosticTestItem, ProfileEstimate>;
   /**
    * The rule that selects the next item.
    *
@@ -35,10 +29,7 @@ export interface DiagnosticAdaptiveTestOptions extends TestControlOptions {
 }
 
 const DIAGNOSTIC_ADAPTIVE_TEST_OPTIONS: FieldNames<DiagnosticAdaptiveTestOptions> = {
-  pool: true,
-  attributes: true,
   prior: true,
-  stopping: true,
   selection: true,
   contentTargets: true,
   enemies: true,
@@ -63,8 +54,14 @@ export interface DiagnosticAdaptiveTest extends AdaptiveTest<DiagnosticPoolItem,
  * Sympson-Hetter exposure control administers or withholds the selected item. Items administered, withheld or
  * enemies of an administered item are not eligible. The test holds, for each item, an index of 2^K entries.
  *
- * @param options - The pool, the attributes, the prior, the stopping and selection rules, and the content balancing,
- *   enemy sets and testlet order; each option has its default.
+ * @param pool - The item pool: calibrated items `{ id, attributes, probabilities }`, with `contentAreas` and `exposure`
+ *   optional.
+ * @param attributes - The attributes, from 1 to 20, in the order of the profiles. Every attribute of an item is among
+ *   them.
+ * @param stopping - The rule that ends the test. The test also ends when no item is left or the selection rule scores
+ *   every eligible item `-Infinity`.
+ * @param options - The prior, the selection rule, and the content balancing, enemy sets and testlet order; each option
+ *   has its default.
  * @returns The test: `start` gives the state before the first response, and `answer` the state after a response.
  * @throws `DataError` when `stopping` or `selection` is not a rule, the attributes, the prior or the pool are
  * invalid, an item has an attribute that is not among the attributes, the pool has more than 2^22 cells of items by
@@ -81,11 +78,7 @@ export interface DiagnosticAdaptiveTest extends AdaptiveTest<DiagnosticPoolItem,
  *   { id: "q2", attributes: ["subtract"], probabilities: [0.15, 0.85] },
  *   { id: "q3", attributes: ["add", "subtract"], probabilities: [0.1, 0.4, 0.4, 0.9] },
  * ];
- * const test = createDiagnosticAdaptiveTest({
- *   pool,
- *   attributes: ["add", "subtract"],
- *   stopping: anyOf(testLength(3), posteriorThreshold(0.8)),
- * });
+ * const test = createDiagnosticAdaptiveTest(pool, ["add", "subtract"], anyOf(testLength(3), posteriorThreshold(0.8)));
  * const random = createRandom(1);
  * let state = test.start(random);
  * state.next; // => "q1", the id of the first item
@@ -94,18 +87,14 @@ export interface DiagnosticAdaptiveTest extends AdaptiveTest<DiagnosticPoolItem,
  * state.next; // => "q2"
  * ```
  */
-export function createDiagnosticAdaptiveTest(options: DiagnosticAdaptiveTestOptions): DiagnosticAdaptiveTest {
+export function createDiagnosticAdaptiveTest(
+  pool: readonly DiagnosticPoolItem[],
+  attributes: readonly string[],
+  stopping: StoppingRule<DiagnosticTestItem, ProfileEstimate>,
+  options: DiagnosticAdaptiveTestOptions = {},
+): DiagnosticAdaptiveTest {
   checkOptions(options, DIAGNOSTIC_ADAPTIVE_TEST_OPTIONS);
-  const {
-    pool,
-    attributes,
-    prior,
-    stopping,
-    selection = gdinaDiscriminationIndex,
-    contentTargets,
-    enemies,
-    withinTestlet,
-  } = options;
+  const { prior, selection = gdinaDiscriminationIndex, contentTargets, enemies, withinTestlet } = options;
   checkRules(stopping, selection, "gdinaDiscriminationIndex");
   checkAttributes(attributes);
   const checked = checkPool(pool, attributes);

@@ -43,7 +43,7 @@ export interface LordDif extends DifAnalysis<LordChiSquare> {
  * Returns Lord's chi-square of every item, as difR's `difLord`, purified on request.
  *
  * @remarks
- * Each group is calibrated separately by `calibrate` with `options`; the focal group's estimates move to the reference
+ * Each group is calibrated separately by `calibrate` with `model` and `options`; the focal group's estimates move to the reference
  * scale by the mean-sigma transformation over the anchors, a / A and A b + B, and their covariance matrices with them;
  * and each item's estimated parameters are compared. An asymptote `fixedParameters` holds is held at its value in both
  * groups and not compared, as difR's `c` holds the lower asymptotes of the 3PL; a and b may not be held, as the link
@@ -55,8 +55,9 @@ export interface LordDif extends DifAnalysis<LordChiSquare> {
  *
  * @param matrix - The responses of the persons, dichotomous.
  * @param groups - The group of each person, in the order of the matrix.
- * @param options - The model, held parameters, priors and quadrature of the calibration of each group, its stopping
- *   rules and whether to purify the link.
+ * @param model - The model of every item, or one model per item, in item order: the 2PL, 3PL or 4PL.
+ * @param options - The held parameters, priors and quadrature of the calibration of each group, its stopping rules and
+ *   whether to purify the link.
  * @returns The calibration of each group, the transformation that links the focal group to the reference group, the
  *   chi-square of every item and the purification when it was asked for.
  * @throws `DataError` when the matrix or the groups are invalid, a group has no person, a model is not the 2PL, 3PL or
@@ -64,13 +65,18 @@ export interface LordDif extends DifAnalysis<LordChiSquare> {
  * anchors do not vary in a group, or a group's calibration throws it.
  * @see {@link https://doi.org/10.4324/9780203056615 | Lord (1980)}
  */
-export function lordChiSquare(matrix: ResponseMatrix, groups: readonly DifGroup[], options: LinkedDifOptions): LordDif {
+export function lordChiSquare(
+  matrix: ResponseMatrix,
+  groups: readonly DifGroup[],
+  model: IrtModel<LogisticItem> | readonly IrtModel<LogisticItem>[],
+  options: LinkedDifOptions = {},
+): LordDif {
   checkGroups(matrix, groups);
   checkOptions(options, LINKED_DIF_OPTIONS);
-  const models = linkedModels(options.model, matrix.itemIds.length, "Lord's chi-square");
+  const models = linkedModels(model, matrix.itemIds.length, "Lord's chi-square");
   const { purify = false, ...calibration } = options;
   checkBoolean(purify, "The option purify");
-  const calibrations = linkedCalibrations(matrix, groups, calibration, models, "Lord's chi-square");
+  const calibrations = linkedCalibrations(matrix, groups, models, calibration, "Lord's chi-square");
   const statistics = (anchors: Uint8Array): LordChiSquare[] => {
     const transformation = calibrations.link(anchors);
     return matrix.itemIds.map((id, item) => ({
@@ -97,12 +103,12 @@ export function lordChiSquare(matrix: ResponseMatrix, groups: readonly DifGroup[
  * @throws `DataError` when a model is not one of them, or the number of models is not the number of items.
  */
 export function linkedModels(
-  model: LinkedDifOptions["model"],
+  model: IrtModel<LogisticItem> | readonly IrtModel<LogisticItem>[],
   itemCount: number,
   statistic: string,
 ): readonly IrtModel<LogisticItem>[] {
   return modelsOf(model, itemCount, (each) => {
-    checkRecord(each, "The option model must be the 2PL, 3PL or 4PL model");
+    checkRecord(each, "The model must be the 2PL, 3PL or 4PL model");
     if (!isLogisticModel(each) || each.parameters(2).some((parameter) => parameter.shared === true)) {
       throw new DataError(`${statistic} needs the 2PL, 3PL or 4PL model, found the ${describe(each.name)} model.`);
     }

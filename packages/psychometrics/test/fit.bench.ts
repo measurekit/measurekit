@@ -61,7 +61,7 @@ test("computes lz*, kernel curves, M2*, the RMSD and local dependence of 40 item
   const modes = abilityEstimates(matrix, items, { estimator: posteriorModeEstimate }).map(({ theta }) =>
     defined(theta),
   );
-  const calibration = calibrate(matrix, { model: twoParameterLogistic });
+  const calibration = calibrate(matrix, twoParameterLogistic);
   await benchmark(context, "fit.correctedPersonFit", () =>
     correctedPersonFit(matrix, items, modes, { correction: "posterior-mode" }),
   );

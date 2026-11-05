@@ -17,16 +17,7 @@ import {
   largestCategoryCount,
 } from "../irt/internal.js";
 import { findRoot } from "../math/internal.js";
-import {
-  locateStages,
-  type MultistageModule,
-  type MultistageRouting,
-  type MultistageTestOptions,
-  ROUTINGS,
-} from "./multistage-test.js";
-
-/** The stages of a panel, as {@link createMultistageTest} takes them. */
-type Stages = MultistageTestOptions["stages"];
+import { locateStages, type MultistageModule, type MultistageRouting, ROUTINGS } from "./multistage-test.js";
 
 /** Options of {@link multistageCuts}. */
 export interface MultistageCutsOptions {
@@ -40,7 +31,7 @@ export interface MultistageCutsOptions {
   readonly method?: "maximum-information" | "routing-shares";
   /**
    * The scale of the cuts: `theta`, or `number-correct`, the total score of the responses so far, as
-   * {@link MultistageTestOptions.routing} names them.
+   * `createMultistageTest` names them.
    *
    * @defaultValue `"theta"`
    */
@@ -142,7 +133,10 @@ const SHARE_SUM_TOLERANCE = 1e-6;
  * module on the scale `number-correct` do not ascend.
  * @see {@link https://doi.org/10.1207/s15324818ame1903_2 | Luecht, Brumfield and Breithaupt (2006)}
  */
-export function multistageCuts(stages: Stages, options: MultistageCutsOptions = {}): readonly (readonly number[])[] {
+export function multistageCuts(
+  stages: readonly (readonly MultistageModule[])[],
+  options: MultistageCutsOptions = {},
+): readonly (readonly number[])[] {
   checkOptions(options, MULTISTAGE_CUTS_OPTIONS);
   const { method = "maximum-information", scale = "theta", range, population, shares } = options;
   checkChoice(method, "The option method", METHODS);
@@ -175,7 +169,10 @@ interface InformationCurve {
 }
 
 /** Returns the cuts into each stage at the crossings of the information of its adjacent modules. */
-function informationCuts(stages: Stages, [lower, upper]: readonly [number, number]): number[][] {
+function informationCuts(
+  stages: readonly (readonly MultistageModule[])[],
+  [lower, upper]: readonly [number, number],
+): number[][] {
   if (!(upper - lower <= MAX_RANGE_WIDTH)) {
     throw new DataError(
       `The option range spans ${upper - lower} of theta, and the information is searched on a grid of ${GRID_STEP} over at most ${MAX_RANGE_WIDTH}; give a range near the items, such as [-6, 6].`,
@@ -234,7 +231,7 @@ function crossing(stage: number, below: InformationCurve, above: InformationCurv
 
 /** Returns the cuts into each stage at the quantiles of the population that send the shares to its modules. */
 function shareCuts(
-  stages: Stages,
+  stages: readonly (readonly MultistageModule[])[],
   population: ThetaDistribution | undefined,
   shares: readonly (readonly number[])[] | undefined,
 ): number[][] {
@@ -326,7 +323,7 @@ function populationQuantile(population: ThetaDistribution | undefined): (probabi
  * @throws `DataError` when the cuts do not ascend.
  */
 function numberCorrectCuts(
-  stages: Stages,
+  stages: readonly (readonly MultistageModule[])[],
   thetaCuts: readonly (readonly number[])[],
   stage: number,
   module: MultistageModule,

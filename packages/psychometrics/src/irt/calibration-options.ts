@@ -1,6 +1,5 @@
 import type { FieldNames } from "@measurekit/core";
 import type { LatentDistribution } from "./latent.js";
-import type { IrtModel } from "./model.js";
 import type { ParameterCovariance } from "./parameter-covariance.js";
 import type { ParameterPrior } from "./prior.js";
 import type { QuadratureOptions } from "./quadrature.js";
@@ -25,11 +24,6 @@ export type FixedParameters = Readonly<Record<string, Readonly<Record<string, nu
 
 /** Options of {@link calibrate}. */
 export interface CalibrationOptions<TParameters> {
-  /**
-   * The model of every item, or one model per item, in item order. A list of models with different parameters needs
-   * its type written out, such as `IrtModel<LogisticItem | ThresholdItem>[]`.
-   */
-  readonly model: IrtModel<TParameters> | readonly IrtModel<TParameters>[];
   /**
    * Parameters of anchor items by item id: they stay fixed, and the other items are estimated on their scale.
    *
@@ -147,7 +141,6 @@ export interface CalibrationOptions<TParameters> {
 }
 
 export const CALIBRATION_OPTIONS: FieldNames<CalibrationOptions<unknown>> = {
-  model: true,
   fixed: true,
   fixedCovariance: true,
   fixedParameters: true,

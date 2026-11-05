@@ -36,7 +36,7 @@ mantelHaenszel(matrix, groups).items[2]; // => { id: "item3", chiSquare: 33.6, .
 // Purification flags item3 and item4 and leaves the other eight items as anchors.
 logisticRegressionDif(matrix, groups, { purify: true }).purification;
 // => { anchors: ["item1", "item2", "item5", "item6", "item7", "item8", "item9", "item10"], iterations: 1, converged: true }
-lordChiSquare(matrix, groups, { model: twoParameterLogistic }).items[2]; // => { id: "item3", chiSquare: 19.3, ... }
+lordChiSquare(matrix, groups, twoParameterLogistic).items[2]; // => { id: "item3", chiSquare: 19.3, ... }
 ```
 
 ## Groups
@@ -48,13 +48,13 @@ whose items are studied. Both groups need persons.
 | ------------------------------------------------------- | ---------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | `mantelHaenszel(matrix, groups, options)`               | Dichotomous                        | [Matching score](#matching-score), item included                | Per item: who answered it and another matching item                     |
 | `logisticRegressionDif(matrix, groups, options)`        | Dichotomous                        | [Matching score](#matching-score), item included                | Per item: who answered it and another matching item                     |
-| `lordChiSquare(matrix, groups, options)`                | 2PL, 3PL or 4PL                    | Theta, by separate calibrations                                 | All; calibration skips missing responses                                |
+| `lordChiSquare(matrix, groups, model, options)`         | 2PL, 3PL or 4PL                    | Theta, by separate calibrations                                 | All; calibration skips missing responses                                |
 | `mantelTest(matrix, groups, options)`                   | Any                                | [Matching score](#matching-score), item included                | Per item: who answered it and another matching item                     |
 | `ordinalLogisticRegressionDif(matrix, groups, options)` | Any                                | [Matching score](#matching-score), item included, or `matching` | Per item: who answered it and another matching item, or who has a score |
 | `logisticDiscriminantDif(matrix, groups, options)`      | Any                                | [Matching score](#matching-score), item included, or `matching` | Per item: who answered it and another matching item, or who has a score |
 | `sibtest(matrix, groups, options)`                      | Any, or bundles                    | The total over the anchors, studied items left out              | Per item or bundle: who answered it and every matching item             |
-| `rajuAreaDif(matrix, groups, options)`                  | 2PL; 3PL, 4PL with held asymptotes | Theta, by separate calibrations                                 | All; calibration skips missing responses                                |
-| `irtLikelihoodRatioDif(matrix, groups, options)`        | Any model                          | Theta, by one calibration of both groups                        | All; calibration skips missing responses                                |
+| `rajuAreaDif(matrix, groups, model, options)`           | 2PL; 3PL, 4PL with held asymptotes | Theta, by separate calibrations                                 | All; calibration skips missing responses                                |
+| `irtLikelihoodRatioDif(matrix, groups, model, options)` | Any model                          | Theta, by one calibration of both groups                        | All; calibration skips missing responses                                |
 | `differentialFunctioning(reference, focal, population)` | Any model                          | Theta of the focal group's population                           | None: it takes items                                                    |
 
 ## Matching score
@@ -173,8 +173,8 @@ flowchart LR
   P --> L
 ```
 
-1. It calibrates each group separately with `calibrate` and `options`: the [calibration options](irt.md#calibration)
-   without `fixed`. The model is the 2PL, 3PL or 4PL, and `fixedParameters` holds an asymptote at its value in both
+1. It calibrates each group separately with `calibrate`, the `model` and the `options`: the [calibration
+   options](irt.md#calibration) without `fixed`. The model is the 2PL, 3PL or 4PL, and `fixedParameters` holds an asymptote at its value in both
    groups, as difR's `c` holds the lower asymptote of a 3PL item: `{ q7: { c: 0.25 } }`. It holds c and d alone, as
    the link moves a and b.
 2. It moves the focal group's estimates to the reference scale by the mean-sigma transformation over the anchors, all
@@ -254,7 +254,7 @@ mantelTest(matrix, groups).items[2];
 mantelTest(matrix, groups).items[2]?.liuAgresti; // => { oddsRatio: 3.89, logStandardError: 0.144, z: 9.47, significance: 2.8e-21 }
 ordinalLogisticRegressionDif(matrix, groups).items[2]?.uniform; // => { chiSquare: 99.4, degreesOfFreedom: 1, significance: 2.0e-23, rSquaredChange: 0.075 }
 // Matched on theta from a graded response calibration, as lordif does in one pass.
-const calibration = calibrate(matrix, { model: gradedResponse });
+const calibration = calibrate(matrix, gradedResponse);
 const matching = abilityEstimates(matrix, calibration.items).map((estimate) => estimate.theta);
 ordinalLogisticRegressionDif(matrix, groups, { matching }).items[2]?.uniform.chiSquare; // => 99.5
 logisticDiscriminantDif(matrix, groups).items[2]?.uniform; // => { chiSquare: 98.1, degreesOfFreedom: 1, significance: 4.0e-23, rSquaredChange: 0.124 }
@@ -521,7 +521,7 @@ const focal = simulateResponses(shifted, simulateThetas(500, random), random);
 const matrix = buildResponseMatrix([...reference.responses, ...focal.responses]);
 const groups: DifGroup[] = matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal"));
 
-const dif = irtLikelihoodRatioDif(matrix, groups, { model: twoParameterLogistic, purify: true });
+const dif = irtLikelihoodRatioDif(matrix, groups, twoParameterLogistic, { purify: true });
 dif.items[2]; // => { id: "item3", chiSquare: 34.0, degreesOfFreedom: 2, significance: 4.2e-8 }
 dif.purification;
 // => { anchors: ["item1", "item2", "item5", "item6", "item7", "item8", "item9", "item10"], iterations: 1, converged: true }:
@@ -547,11 +547,11 @@ The result holds `items`, the [`purification`](#purification) and `constrained`,
 `converged` reports its EM and whose items include the free items of the flagged ones. With `purify`, the items flagged at
 0.05 stay free in both models of the next round: an item not flagged is tested by freeing it, a flagged one by
 constraining it. It stops before fewer than two items are constrained, as the free item of a test is linked to the
-reference scale through the others. Each round runs one calibration more than there are items.
+reference scale through the others. Each round runs one calibration more than there are items. `model` is one model
+for every item, or one per item.
 
 | Option            | Default        | Meaning                                                                                   |
 | ----------------- | -------------- | ----------------------------------------------------------------------------------------- |
-| `model`           | Required       | One model for every item, or one per item                                                 |
 | `fixedParameters` | None           | Values held in both groups by item id, then parameter name, such as `{ q7: { c: 0.25 } }` |
 | `quadrature`      | 61 rectangular | The rule over theta; the focal group's normal distribution needs the rectangular rule     |
 | `tolerance`       | `1e-4`         | EM's tolerance in each calibration                                                        |
