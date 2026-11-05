@@ -346,6 +346,19 @@ const heldItems: IrtItem[] = fixedParameters.models.map((name, i) => ({
   parameters: defined(fixedParameters.calibrations[0]?.items[i]).parameters,
 }));
 
+/** The held items with the parameters their calibration estimated, as `calibrate` records them, less what is held. */
+function withEstimated(
+  anchors: readonly string[] = [],
+  held: Readonly<Record<string, object>> = fixedParameters.fixedParameters,
+): (IrtItem & { readonly estimated: readonly string[] })[] {
+  return heldItems.map((item, i) => {
+    const id = defined(fixedParameters.itemIds[i]);
+    const names = item.model.parameters(item.model.categoryCount(item.parameters)).map(({ name }) => name);
+    const kept = anchors.includes(id) ? [] : names.filter((name) => !Object.hasOwn(held[id] ?? {}, name));
+    return { ...item, estimated: kept };
+  });
+}
+
 /** Returns the numbers and nulls of a result, depth first. */
 function numbers(value: unknown): (number | null)[] {
   if (typeof value === "number" || value === null) return [value];
@@ -733,15 +746,15 @@ describe("summedScoreFit", () => {
   }
 
   it("matches mirt's S-X² of items with held parameters, counting the estimated ones", () => {
-    const result = summedScoreFit(heldMatrix, heldItems, { fixedParameters: fixedParameters.fixedParameters });
+    const result = summedScoreFit(heldMatrix, withEstimated());
     expectTable(result, fixedParameters.summedScore, FIT_TOLERANCE, "held parameters");
     expect(result.map((item) => item.degreesOfFreedom)).toEqual(fixedParameters.summedScore.degreesOfFreedom);
   });
 
   it("counts every parameter of an item by default and none of an anchor", () => {
     const counted = summedScoreFit(heldMatrix, heldItems);
-    const held = summedScoreFit(heldMatrix, heldItems, { fixedParameters: fixedParameters.fixedParameters });
-    const anchored = summedScoreFit(heldMatrix, heldItems, { fixed: ["item1", "item12"] });
+    const held = summedScoreFit(heldMatrix, withEstimated());
+    const anchored = summedScoreFit(heldMatrix, withEstimated(["item1", "item12"], {}));
     expect(held.map((item, i) => item.degreesOfFreedom - defined(counted[i]).degreesOfFreedom)).toEqual([
       1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1,
     ]);
@@ -750,19 +763,16 @@ describe("summedScoreFit", () => {
     ]);
   });
 
-  it("rejects anchors and held parameters that are not the items'", () => {
-    expect(() => summedScoreFit(heldMatrix, heldItems, { fixed: ["q1"] })).toThrow(
-      'The option fixed names "q1", which is not an item id.',
+  it("rejects an estimated list that does not name the item's parameters", () => {
+    const withList = (item: string, estimated: unknown) =>
+      heldItems.map((each, i) =>
+        fixedParameters.itemIds[i] === item ? { ...each, estimated: estimated as readonly string[] } : each,
+      );
+    expect(() => summedScoreFit(heldMatrix, withList("item9", ["a", "c"]))).toThrow(
+      'The estimated parameters of item "item9" name "c", which the 2PL model does not have; it has a, b.',
     );
-    expect(() => summedScoreFit(heldMatrix, heldItems, { fixedParameters: { item9: { c: 0 } } })).toThrow(
-      'The option fixedParameters holds "c" of item "item9", whose 2PL model has a, b.',
-    );
-    expect(() =>
-      summedScoreFit(heldMatrix, heldItems, { fixed: ["item1"], fixedParameters: { item1: { c: 0.25 } } }),
-    ).toThrow('The option fixedParameters holds parameters of item "item1", which the option fixed holds whole.');
-    expect(() => summedScoreFit(heldMatrix, heldItems, JSON.parse("null"))).toThrow("The options must be an object");
-    expect(() => summedScoreFit(heldMatrix, heldItems, JSON.parse('{ "fixed": "item1" }'))).toThrow(
-      "The option fixed must be an array of item ids",
+    expect(() => summedScoreFit(heldMatrix, withList("item9", JSON.parse('"a"')))).toThrow(
+      'The estimated parameters of item "item9" must be an array of the names of its parameters, found "a".',
     );
   });
 
@@ -905,8 +915,7 @@ describe("limitedInformationFit", () => {
   for (const { name, model, fixed, latent, expected, mirtStatistic } of limited.binary.cases) {
     it(`matches mirt's M2 for ${name}`, () => {
       const calibration = calibratedCase(binary, model, fixed, latent);
-      const anchors = fixed === undefined ? {} : { fixed: Object.keys(fixed) };
-      const result = limitedInformationFit(binary, calibration, anchors);
+      const result = limitedInformationFit(binary, calibration);
       expectLimitedFit(result, expected, name);
       if (mirtStatistic !== undefined) expect(mirtStatistic).toBeGreaterThan(defined(result.statistic));
     });
@@ -930,11 +939,16 @@ describe("limitedInformationFit", () => {
       tolerance: LIMITED_EM_TOLERANCE,
       maxIterations: 100_000,
     });
-    const result = limitedInformationFit(matrix, calibration, { fixedParameters: held.fixedParameters });
+    const result = limitedInformationFit(matrix, calibration);
     expectLimitedFit(result, held.expected, "held parameters");
     expect(held.mirtStatistic).toBeLessThan(defined(result.statistic));
-    expect(() => limitedInformationFit(matrix, calibration)).toThrow(
-      "The calibration estimated 23 parameters, but these items have 32; give the anchors' ids in the option fixed and the held parameters in the option fixedParameters.",
+    const recorded = calibration.items.map(({ estimated }) => estimated.length);
+    expect(recorded).toEqual(
+      calibration.items.map(
+        ({ model, parameters }, i) =>
+          model.parameters(model.categoryCount(parameters)).length -
+          Object.keys(held.fixedParameters[`item${i + 1}` as keyof typeof held.fixedParameters] ?? {}).length,
+      ),
     );
   });
 
@@ -1007,7 +1021,7 @@ describe("limitedInformationFit", () => {
       model: twoParameterLogistic,
       fixed: { [defined(matrix.itemIds[0])]: anchor },
     });
-    const result = limitedInformationFit(matrix, calibration, { fixed: [defined(matrix.itemIds[0])] });
+    const result = limitedInformationFit(matrix, calibration);
     expect(result.statistic).not.toBeNull();
     expect(result).toMatchObject({ srmsr: null, tli: null, cfi: null });
   });
@@ -1058,11 +1072,21 @@ describe("limitedInformationFit", () => {
     expect(() => limitedInformationFit(matrix, histogram)).toThrow(/empirical histogram/);
   });
 
-  it("asks for the anchors when the parameters differ from the calibration's AIC", () => {
-    const calibration = calibratedCase(binary, "2pl", limited.binary.cases[3]?.fixed);
-    expect(() => limitedInformationFit(binary, calibration)).toThrow(/give the anchors' ids in the option fixed/);
-    expect(() => limitedInformationFit(binary, calibration, { fixed: ["item1"] })).toThrow(
-      /estimated 16 parameters, but these items have 22/,
+  it("reads the estimated parameters from the items, and asks for them when a calibration lacks them", () => {
+    const anchored = calibratedCase(binary, "2pl", limited.binary.cases[3]?.fixed);
+    expect(anchored.items.map(({ estimated }) => estimated.length)).toEqual([0, 0, 0, 0, ...Array(8).fill(2)]);
+    const everyParameter = {
+      ...anchored,
+      items: anchored.items.map(({ id, model, parameters, standardErrors }) => ({
+        id,
+        model,
+        parameters,
+        standardErrors,
+      })),
+    };
+    // @ts-expect-error: the items need their estimated parameters.
+    expect(() => limitedInformationFit(binary, everyParameter)).toThrow(
+      'Item "item1" of the calibration records no estimated parameters: give the calibration as calibrate returns it.',
     );
   });
 
@@ -1112,14 +1136,6 @@ describe("limitedInformationFit", () => {
     expect(options('{ "statistic": null }')).toThrow(/The option statistic/);
     expect(options('{ "level": 1 }')).toThrow(/The option level/);
     expect(options('{ "level": "0.9" }')).toThrow(/The option level/);
-    expect(options('{ "fixed": "item1" }')).toThrow(/The option fixed/);
-    expect(options('{ "fixed": ["nobody"] }')).toThrow(/not an item id/);
-    expect(options('{ "fixed": [1] }')).toThrow(/not an item id/);
-    const calibrationWith = (fields: string) => ({ ...calibration, ...JSON.parse(fields) });
-    expect(() => limitedInformationFit(matrix, calibrationWith('{ "aic": null }'))).toThrow(
-      /The AIC of the calibration/,
-    );
-    expect(() => limitedInformationFit(matrix, calibrationWith('{ "logLikelihood": "1" }'))).toThrow(/log-likelihood/);
     const group = defined(calibration.groups[0]);
     const normal = { ...group, distribution: "normal" as const, sd: 0 };
     expect(() => limitedInformationFit(matrix, { ...calibration, groups: [normal] })).toThrow(/standard deviation/);

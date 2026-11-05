@@ -17,6 +17,7 @@ export function raschScaleItem(
       id,
       model: oneParameterLogistic,
       parameters: { a: 1, b: thresholds[0] ?? 0, c: 0, d: 1 },
+      estimated: ["b"],
       standardErrors: errors === null ? null : { b: errors[0] ?? 0 },
     };
   }
@@ -24,6 +25,7 @@ export function raschScaleItem(
     id,
     model: partialCredit,
     parameters: { a: 1, b: [...thresholds] },
+    estimated: thresholds.map((_, k) => `b${k + 1}`),
     standardErrors: errors === null ? null : Object.fromEntries(errors.map((error, k) => [`b${k + 1}`, error])),
   };
 }

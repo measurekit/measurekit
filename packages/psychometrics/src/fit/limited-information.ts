@@ -13,10 +13,10 @@ import {
 import { checkOpenUnitInterval } from "../checks.js";
 import type { ResponseMatrix } from "../data/internal.js";
 import {
+  type CalibratedItem,
   type Calibration,
   checkItemsOfMatrix,
   checkThetaDistribution,
-  type FixedParameters,
   type IrtItem,
   type IrtModel,
   itemTrace,
@@ -52,19 +52,6 @@ export interface LimitedInformationOptions {
    */
   readonly statistic?: "m2" | "m2-star" | "c2";
   /**
-   * The ids of the calibration's anchors, which add no parameters. Checked against the calibration's AIC.
-   *
-   * @defaultValue none
-   */
-  readonly fixed?: readonly string[];
-  /**
-   * The parameters the calibration held at their values, as the option of `calibrate` of that name, which add no
-   * parameters; only their names are read. Checked with the anchors against the calibration's AIC.
-   *
-   * @defaultValue none
-   */
-  readonly fixedParameters?: FixedParameters;
-  /**
    * The level of the RMSEA interval.
    *
    * @defaultValue `0.9`
@@ -74,8 +61,6 @@ export interface LimitedInformationOptions {
 
 const LIMITED_INFORMATION_OPTIONS: FieldNames<LimitedInformationOptions> = {
   statistic: true,
-  fixed: true,
-  fixedParameters: true,
   level: true,
 };
 
@@ -123,13 +108,10 @@ const MAX_MOMENTS = (MAX_MOMENT_ITEMS * (MAX_MOMENT_ITEMS + 1)) / 2;
  * covariance matrix and Δ their Jacobian. It integrates over the nodes and weights of the calibration's group, so it
  * takes one group of a normal distribution, and no covariates or testlets. Δ has a column per estimated parameter: the
  * parameter a model shares among items has one column, an anchor and a held parameter have none, and an estimated
- * normal distribution has the columns of its mean and standard deviation. Those parameters must equal the count in the
- * calibration's AIC. The
- * degrees of freedom are the moments less the rank of Δ, which is the number of parameters unless the margins leave
- * some unidentified; the statistic then uses the whole complement of Δ's span.
- *
- * A `Calibration` does not record its anchors or its held parameters, and the check of the AIC catches lists of the
- * wrong size, not lists of the right size that swap anchors or held parameters for estimated ones, which give a wrong Δ.
+ * normal distribution has the columns of its mean and standard deviation. The estimated parameters are those each item
+ * of the calibration records in `estimated`. The degrees of freedom are the moments less the rank of Δ, which is the
+ * number of parameters unless the margins leave some unidentified; the statistic then uses the whole complement of Δ's
+ * span.
  *
  * The independence model holds each item at its observed shares, without a trait. Its statistic is N Σ_(i<j) r_ij², on
  * J (J - 1) / 2 degrees of freedom. TLI = (χ²₀/df₀ - χ²/df) / (χ²₀/df₀ - 1) and CFI = 1 - (χ² - df) / (χ²₀ - df₀).
@@ -138,33 +120,28 @@ const MAX_MOMENTS = (MAX_MOMENT_ITEMS * (MAX_MOMENT_ITEMS + 1)) / 2;
  *
  * @param matrix - The responses of the persons.
  * @param calibration - The calibration of the matrix's items, in its order, on one group.
- * @param options - The statistic, the anchors, the held parameters and the level of the interval.
+ * @param options - The statistic and the level of the interval.
  * @returns The statistic, its degrees of freedom and significance, and the fit indices, each `null` where undefined.
  * @throws `DataError` when the matrix, the calibration or an option is invalid, a response is not a category of its
  * item, fewer than two persons answered every item, there are more than 60 items or, with C2, more than 1,830 moments,
  * the calibration has several groups, covariates, testlets or an empirical histogram, `"m2"` meets a polytomous item,
- * an item is nominal, or the estimated parameters differ from the count in the calibration's AIC.
+ * an item is nominal, or an item of the calibration does not record its `estimated` parameters.
  * @see {@link https://doi.org/10.1007/s11336-005-1295-9 | Maydeu-Olivares and Joe (2006)}
  * @see {@link https://doi.org/10.1111/j.2044-8317.2012.02050.x | Cai and Hansen (2013)}
  */
-export function limitedInformationFit<TParameters>(
+export function limitedInformationFit(
   matrix: ResponseMatrix,
-  calibration: Calibration<TParameters>,
+  calibration: Calibration<unknown>,
   options: LimitedInformationOptions = {},
 ): LimitedInformationFit {
   checkOptions(options, LIMITED_INFORMATION_OPTIONS);
-  const { statistic = "m2-star", fixed = [], fixedParameters = {}, level = DEFAULT_LEVEL } = options;
+  const { statistic = "m2-star", level = DEFAULT_LEVEL } = options;
   checkChoice(statistic, "The option statistic", STATISTICS);
   checkOpenUnitInterval(level, "The option level");
   const { items, group } = checkCalibration(matrix, calibration);
   checkStatistic(items, statistic);
   checkMoments(items, statistic);
-  const columns = parameterColumns(
-    items,
-    estimatedEntries(items, matrix.itemIds, fixed, fixedParameters),
-    group.normal,
-  );
-  checkParameterCount(calibration, columns.count);
+  const columns = parameterColumns(items, estimatedEntries(items, matrix.itemIds), group.normal);
   const complete = matrix.responses.filter((row) => !row.includes(null));
   if (complete.length < 2) {
     throw new DataError(
@@ -218,17 +195,22 @@ interface Population {
  * @throws `DataError` when it is not a calibration of the matrix's items, or its population is not one group of a normal
  * distribution without covariates or testlets.
  */
-function checkCalibration<TParameters>(
+function checkCalibration(
   matrix: ResponseMatrix,
-  calibration: Calibration<TParameters>,
-): { readonly items: readonly IrtItem[]; readonly group: Population } {
+  calibration: Calibration<unknown>,
+): { readonly items: readonly CalibratedItem<unknown>[]; readonly group: Population } {
   checkRecord(calibration, "The calibration must be the result of calibrate");
   const { items, groups, testlets, regression } = calibration;
   checkItemsOfMatrix(matrix, items);
-  items.forEach(({ id }, column) => {
+  items.forEach(({ id, estimated }, column) => {
     const expected = matrix.itemIds[column];
     if (id !== expected) {
       throw new DataError(`Column ${column + 1} is item "${expected}", but the calibration has ${describe(id)} there.`);
+    }
+    if (!Array.isArray(estimated)) {
+      throw new DataError(
+        `Item "${id}" of the calibration records no estimated parameters: give the calibration as calibrate returns it.`,
+      );
     }
   });
   if (items.length > MAX_MOMENT_ITEMS) {
@@ -328,22 +310,6 @@ function parameterColumns(
     });
   });
   return normal ? { ofItems, mean: count, sd: count + 1, count: count + 2 } : { ofItems, mean: -1, sd: -1, count };
-}
-
-/**
- * Checks the parameters against those a calibration counts in its AIC.
- *
- * @throws `DataError` asking for the anchors' ids when they differ.
- */
-function checkParameterCount<TParameters>({ aic, logLikelihood }: Calibration<TParameters>, count: number): void {
-  checkFinite(aic, "The AIC of the calibration");
-  checkFinite(logLikelihood, "The log-likelihood of the calibration");
-  const counted = Math.round((aic + 2 * logLikelihood) / 2);
-  if (counted !== count) {
-    throw new DataError(
-      `The calibration estimated ${counted} parameters, but these items have ${count}; give the anchors' ids in the option fixed and the held parameters in the option fixedParameters.`,
-    );
-  }
 }
 
 /** Returns the scores of the items at each node, and the first-order rows of the statistic. */

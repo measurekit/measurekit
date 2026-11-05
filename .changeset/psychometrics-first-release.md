@@ -21,7 +21,7 @@ fall, for the exploratory two-dimensional 2PL from 442 to 100.
 
 `limitedInformationFit` tests a calibration on the margins of its test, by M2, M2* or C2 with RMSEA and its interval,
 SRMSR, TLI and CFI, as mirt's `M2`. It reads Δ from the calibration, with one column for a parameter that items share and
-those of an estimated normal distribution, and checks the parameters against the calibration's AIC. Where the
+those of an estimated normal distribution, and the estimated parameters from the `estimated` of each item. Where the
 Jacobian's rank is below its columns, the statistic uses the whole complement of its span, with as many degrees of
 freedom as the moments less its rank.
 
@@ -73,9 +73,9 @@ them, and 0 gives independent draws. It forecasts a composite of several scores,
 asymptote of a 3PL item at 1/4 while its slope and difficulty are estimated, as mirt's `est = FALSE`: a held parameter
 has no standard error, prior or place in the covariance, and the AIC and BIC do not count it. `calibrateMultidimensional`
 holds them the same way, by EM and MH-RM, so an M3PL item that two dimensions share keeps its lower asymptote at 1/4. A
-held threshold of a graded item moves the starting values of the others to fit it (`ordered` of `ModelParameter`). `limitedInformationFit`
-and `summedScoreFit` take the same object, and `summedScoreFit` the anchors' ids, so that Δ and the degrees of freedom
-count only the estimated parameters, as mirt's.
+held threshold of a graded item moves the starting values of the others to fit it (`ordered` of `ModelParameter`). Each
+calibrated item records the `estimated` names, and `limitedInformationFit` and `summedScoreFit` read them, so that Δ and
+the degrees of freedom count only the estimated parameters, as mirt's.
 
 Lord's chi-square, Raju's area and the IRT likelihood-ratio test take `fixedParameters` too, held in both groups, as
 difR's `c` holds the lower asymptotes of the 3PL in `difLord` and `difRaju`, and mirt's `est = FALSE` in a multiple-group

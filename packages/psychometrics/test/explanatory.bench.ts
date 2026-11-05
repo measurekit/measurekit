@@ -35,6 +35,7 @@ const items: CalibratedItem<unknown>[] = fixture.itemIds.map((id, i) => ({
   id,
   model: twoParameterLogistic,
   parameters: { a: 1, b: defined(fixture.difficulties[i]), c: 0, d: 1 },
+  estimated: ["a", "b"],
   standardErrors: { a: 0.1, b: defined(fixture.standardErrors[i]) },
 }));
 const features = Object.fromEntries(

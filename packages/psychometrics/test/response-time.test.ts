@@ -395,6 +395,7 @@ function jointCalibration(
       id,
       model: twoParameterLogistic,
       parameters: { a: defined(reference.a[i]), b: defined(reference.b[i]), c: 0, d: 1 },
+      estimated: ["a", "b"],
       standardErrors: null,
       intensity: defined(reference.intensity[i]),
       discrimination: defined(reference.discrimination[i]),

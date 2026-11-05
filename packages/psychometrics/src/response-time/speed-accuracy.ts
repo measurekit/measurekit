@@ -221,6 +221,7 @@ export function calibrateSpeedAccuracy<TParameters>(
       id: item.id,
       model: item.model,
       parameters: item.parameters,
+      estimated: Array.from(item.freeEntries, (p) => item.names[p] ?? ""),
       standardErrors:
         covariance === null
           ? null

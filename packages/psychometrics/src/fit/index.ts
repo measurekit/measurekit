@@ -45,4 +45,4 @@ export {
   raschWaldTest,
 } from "./rasch-tests.js";
 export { type ItemDeviation, rootMeanSquareDeviation } from "./root-mean-square-deviation.js";
-export { type SummedScoreFit, type SummedScoreFitOptions, summedScoreFit } from "./summed-score-fit.js";
+export { type SummedScoreFit, summedScoreFit } from "./summed-score-fit.js";

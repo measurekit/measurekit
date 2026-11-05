@@ -79,7 +79,7 @@ alone, as they estimate the items themselves, and so do the kernel curves, which
 | `itemFit(matrix, items, thetas)`                | item: `ItemFit`               | Persons without an extreme score; missing responses skipped |
 | `personFit(matrix, items, thetas)`              | person: `PersonFit`           | Each person's answered items                                |
 | `correctedPersonFit(matrix, items, thetas, …)`  | person: `CorrectedPersonFit`  | Each person's answered items; none of an extreme score      |
-| `summedScoreFit(matrix, items, …)`              | item: `SummedScoreFit`        | Persons who answered every item                             |
+| `summedScoreFit(matrix, items)`                 | item: `SummedScoreFit`        | Persons who answered every item                             |
 | `yenQ3(matrix, items, thetas)`                  | pair of items: a matrix entry | For each pair, the persons who answered both                |
 | `yenQ3CriticalValue(matrix, items, random, …)`  | test: `Q3CriticalValue`       | As `yenQ3`; each replication misses the same responses      |
 | `rootMeanSquareDeviation(matrix, items, …)`     | item: `ItemDeviation`         | Persons with a response                                     |
@@ -127,13 +127,9 @@ mirt's `itemfit(fit_stats = "S_X2")`:
 4. S-X² = Σ (O - E)² / E over the cells left, with cells - groups - parameters degrees of freedom; `null` when none
    are left.
 
-The parameters are those the calibration estimated, as mirt's: every parameter of the item's model unless the options
-say otherwise.
-
-| Option            | Meaning                                                                                               | Default |
-| ----------------- | ----------------------------------------------------------------------------------------------------- | ------- |
-| `fixed`           | The ids of the calibration's anchors, which count no parameter                                        | none    |
-| `fixedParameters` | The calibration's [held parameters](irt.md#held-parameters), the same object; only the names are read | none    |
+The parameters are those the calibration estimated, as mirt's: the `estimated` names of a calibrated item, so none of an
+anchor's and not its [held parameters](irt.md#held-parameters), and every parameter of the model for an item without
+`estimated`.
 
 For each item the recursion sums the scores of the other items at every node, which costs the items times the square of
 the highest total score, so `summedScoreFit` takes items of a highest total score of at most 300: 300 dichotomous items,
@@ -382,12 +378,13 @@ moments less the parameters when the model holds.
 
 Each adds the mean product of the scores of each pair of items. On dichotomous items the three are equal.
 
-| Option            | Meaning                                                                                              | Default     |
-| ----------------- | ---------------------------------------------------------------------------------------------------- | ----------- |
-| `statistic`       | The statistic above                                                                                  | `"m2-star"` |
-| `fixed`           | The ids of the calibration's anchors, which add no parameters                                        | none        |
-| `fixedParameters` | The calibration's [held parameters](irt.md#held-parameters), which add none; only the names are read | none        |
-| `level`           | The level of the RMSEA interval                                                                      | `0.9`       |
+| Option      | Meaning                         | Default     |
+| ----------- | ------------------------------- | ----------- |
+| `statistic` | The statistic above             | `"m2-star"` |
+| `level`     | The level of the RMSEA interval | `0.9`       |
+
+Δ has a column for each parameter the calibration estimated: each item of the calibration records them in `estimated`,
+so an anchor, which `calibrate`'s `fixed` holds, adds none, nor does a [held parameter](irt.md#held-parameters).
 
 | Field              | Definition                                                                                                                                        |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |

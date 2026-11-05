@@ -195,6 +195,7 @@ describe("a record whose keys are the user's identifiers", () => {
       id,
       model: twoParameterLogistic,
       parameters: { a: 1, b: index / 2, c: 0, d: 1 },
+      estimated: ["b"],
       standardErrors: { b: 0.2 },
     }));
     const features = record(ids.map((id, index) => [id, { x: index * index }]));

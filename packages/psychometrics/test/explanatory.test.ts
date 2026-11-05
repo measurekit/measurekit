@@ -153,6 +153,7 @@ function calibrated(id: string, b: number, standardError: number, a = 1, slopeEr
     id,
     model: twoParameterLogistic,
     parameters: { a, b, c: 0, d: 1 },
+    estimated: ["a", "b"],
     standardErrors: { a: slopeError, b: standardError },
   };
 }
@@ -163,6 +164,7 @@ function fixtureItems(items: (typeof fixture.cases)[number]["items"]): Calibrate
     id,
     model: twoParameterLogistic,
     parameters,
+    estimated: ["a", "b"],
     standardErrors,
   }));
 }
@@ -302,6 +304,7 @@ describe("itemFeatureRegression", () => {
       id,
       model: generalizedPartialCredit,
       parameters: { a: 1, b: [-0.5 + shift, 0.6 + shift] },
+      estimated: ["a", "b1", "b2"],
       standardErrors: { a: 0.1, b1: 0.1, b2: 0.1 },
     });
     const polytomousItems = [polytomous("p1", 0), polytomous("p2", 0.4), polytomous("p3", 0.9), polytomous("p4", 1.3)];
@@ -484,6 +487,7 @@ describe("itemFeatureRegression", () => {
       id: `q${i}`,
       model: oneParameterLogistic,
       parameters: { a: 1.2, b: i / 4, c: 0, d: 1 },
+      estimated: ["b"],
       standardErrors: { a: 0.1, b: 0.1 },
     }));
     expect(() => itemFeatureRegression(shared, features, { parameter: "a" })).toThrow(
@@ -491,7 +495,10 @@ describe("itemFeatureRegression", () => {
     );
     expect(itemFeatureRegression(shared, features).itemIds).toHaveLength(4);
     expect(() =>
-      itemFeatureRegression([{ id: "q1", model: JSON.parse("null"), parameters: {}, standardErrors: null }], features),
+      itemFeatureRegression(
+        [{ id: "q1", model: JSON.parse("null"), parameters: {}, estimated: [], standardErrors: null }],
+        features,
+      ),
     ).toThrow(DataError);
   });
 
@@ -1527,6 +1534,7 @@ describe("predictItemParameter", () => {
       id: `q${i + 1}`,
       model: twoParameterLogistic,
       parameters: { a: 1, b, c: 0, d: 1 },
+      estimated: ["a", "b"],
       standardErrors: { a: 0.1, b: 0.08 },
     }));
     const { mean, sd } = predictItemParameter(itemFeatureRegression(bank, oneFeature([1, 2, 3, 4, 5, 6, 7])), { x: 8 });
@@ -1592,6 +1600,7 @@ describe("documentation examples", () => {
     id,
     model: twoParameterLogistic,
     parameters: { a: 1, b, c: 0, d: 1 },
+    estimated: ["a", "b"],
     standardErrors: { a: 0.1, b: se },
   });
   const bank = [

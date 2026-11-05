@@ -28,6 +28,11 @@ import { maximizeTestlets, type TestletEstimate, testletEstimates } from "./test
 /** An item with its calibrated parameters. */
 export interface CalibratedItem<TParameters> extends TestItem<TParameters> {
   /**
+   * The names of the parameters the calibration estimated, in the order of the model's parameter vector: none of an
+   * anchor's, and not those `fixedParameters` held. Fit statistics read it for the degrees of freedom.
+   */
+  readonly estimated: readonly string[];
+  /**
    * Standard errors of the estimated parameters by name. `null` for fixed items, without standard errors, and for
    * every item when the information matrix cannot be inverted or gives a variance that is not positive.
    */
@@ -222,6 +227,7 @@ export function calibrateResponses<TParameters>(
         id: item.id,
         model: item.model,
         parameters: item.parameters,
+        estimated: freeEntries(item).map(({ name }) => name),
         standardErrors:
           standardError === null || !item.estimated
             ? null

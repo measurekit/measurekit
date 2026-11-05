@@ -468,12 +468,20 @@ export const RULES: readonly Rule[] = [
     titles: "refuses more than 60 items",
   },
   {
-    rule: "A limited-information statistic counts the parameters the calibration estimated, so that a missing anchor is not read as an estimated item.",
+    rule: "A limited-information statistic refuses a calibration whose items do not record their estimated parameters, so that an anchor is not read as an estimated item.",
     file: "packages/psychometrics/src/fit/limited-information.ts",
-    find: "if (counted !== count) {",
+    find: "if (!Array.isArray(estimated)) {",
     replace: "if (false) {",
     test: "packages/psychometrics/test/fit.test.ts",
-    titles: "asks for the anchors",
+    titles: "reads the estimated parameters from the items",
+  },
+  {
+    rule: "The estimated parameters of an item name parameters of its model, so that a misspelled name does not count as an anchor.",
+    file: "packages/psychometrics/src/fit/inputs.ts",
+    find: "if (!known.has(name)) {",
+    replace: "if (false) {",
+    test: "packages/psychometrics/test/fit.test.ts",
+    titles: "rejects an estimated list",
   },
   {
     rule: "A limited-information statistic leaves out a person with a missing response, who is not read as a score of 0.",

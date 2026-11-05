@@ -621,6 +621,7 @@ function calibratedItems(
       id,
       model: ratingScale,
       parameters: { a: 1, b: values[item] ?? 0, steps: stepValues },
+      estimated: ["b", ...Array.from({ length: steps - 1 }, (_, k) => `step${k + 1}`)],
       standardErrors:
         errors === null
           ? null

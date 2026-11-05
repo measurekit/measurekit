@@ -674,14 +674,14 @@ calibration.items[0];
 covariance?.parameters.length; // => 16: a and b of each item
 ```
 
-| What                                      | A held parameter                                                                                    |
-| ----------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Its value                                 | Exactly the one given, in `parameters`                                                              |
-| Standard errors                           | None in the item's `standardErrors`; the information and its inverse hold the estimated parameters  |
-| Covariance                                | Not listed                                                                                          |
-| AIC, BIC                                  | Not counted: p counts the estimated parameters                                                      |
-| Priors                                    | None: `itemPriors` of a held parameter throws, and `priors` apply to the items that estimate it     |
-| `limitedInformationFit`, `summedScoreFit` | Pass the same `fixedParameters`, so that Δ and the degrees of freedom count only what was estimated |
+| What                                      | A held parameter                                                                                   |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Its value                                 | Exactly the one given, in `parameters`                                                             |
+| Standard errors                           | None in the item's `standardErrors`; the information and its inverse hold the estimated parameters |
+| Covariance                                | Not listed                                                                                         |
+| AIC, BIC                                  | Not counted: p counts the estimated parameters                                                     |
+| Priors                                    | None: `itemPriors` of a held parameter throws, and `priors` apply to the items that estimate it    |
+| `limitedInformationFit`, `summedScoreFit` | Read the item's `estimated`, so that Δ and the degrees of freedom count only what was estimated    |
 
 A held lower asymptote is the practice where the number of options sets the guessing level; a beta prior narrow
 enough to hold it gives nearly the same estimates, a little off the value. The items must be estimated, not in
