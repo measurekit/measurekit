@@ -52,7 +52,7 @@ export interface M4Index {
  * P(X ≥ x, Y ≥ y) is at most P(X ≥ m, Y ≥ n), and the significance sums the probabilities of those pairs, as
  * CopyDetect does. The index is symmetric in the persons. With dichotomous items the key is category 1 and every
  * incorrect response is the same. Missing responses leave their item out of the pair. Time grows with the cube of the
- * items a pair compares, at most 1,000, and the table of counts holds their square: about 0.3 s and 16 MB at the limit.
+ * items a pair compares, at most 1,000, and the table of counts holds their square: about 0.2 s and 16 MB at the limit.
  *
  * @param matrix - The responses: each person's category of each item, such as the option chosen, numbered from 0.
  * @param items - The calibrated items, in the order of the matrix's items, such as `nominalResponse` items.

@@ -65,7 +65,7 @@ The tolerance is against the R call of the row unless the row names another refe
 
 | R call                                            | measurekit                                                      | Tolerance                                                | Time over R |
 | ------------------------------------------------- | --------------------------------------------------------------- | -------------------------------------------------------- | ----------: |
-| `mirt(data, 1, itemtype = "2PL")`                 | `calibrate(matrix, { model: twoParameterLogistic })`            | 1e-5 absolute, the item parameters                       |       0.51× |
+| `mirt(data, 1, itemtype = "2PL")`                 | `calibrate(matrix, twoParameterLogistic)`                       | 1e-5 absolute, the item parameters                       |       0.51× |
 | `mirt(data, 1, itemtype = "graded")`              | `calibrate` with `gradedResponse`                               | 2e-4 absolute                                            |       0.26× |
 | `mirt(data, 1, itemtype = "gpcm")`                | `calibrate` with `generalizedPartialCredit`                     | 2e-4 absolute                                            |       0.19× |
 | `mirt(data, model, quadpts = 31)`, two dimensions | `calibrateMultidimensional`                                     | 1e-5 absolute, the M2PL's parameters                     |        0.3× |
