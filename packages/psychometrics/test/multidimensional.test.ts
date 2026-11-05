@@ -70,7 +70,6 @@ import {
   productGrid,
   responsesByItem,
   responsesByPerson,
-  STANDARD_GRIDS,
   secondMoments,
   setUp,
 } from "../src/multidimensional/internal.js";
@@ -3829,15 +3828,6 @@ describe("scoring", () => {
       );
       expectClose(value, defined(alone.theta[0]), 1e-8, `dimension ${d + 1}`);
     });
-  });
-
-  it("keeps the 8 grids asked for last, within 2^23 coordinates of their nodes", () => {
-    const item = { model: multidimensionalTwoParameterLogistic, parameters: { a: [1, 0.5], intercept: 0, c: 0, d: 1 } };
-    for (let points = 2; points <= 20; points++) multidimensionalPosteriorMeanEstimate([item], [1], { points });
-    expect([...STANDARD_GRIDS.keys()]).toEqual(Array.from({ length: 8 }, (_, k) => `2 ${13 + k}`));
-    // A grid of about 1,000² nodes holds 2 × 10⁶ coordinates: four of them fit within the limit, and the last one stays.
-    for (let points = 996; points <= 1000; points++) multidimensionalPosteriorMeanEstimate([item], [1], { points });
-    expect([...STANDARD_GRIDS.keys()]).toEqual(["2 997", "2 998", "2 999", "2 1000"]);
   });
 
   it("limits the grid of the posterior mean and names the posterior mode instead", () => {

@@ -86,7 +86,7 @@ export { generalizedPartialCredit, partialCredit } from "./partial-credit.js";
 export { estimatePersons } from "./person-estimates.js";
 export { checkPrior, type ParameterPrior } from "./prior.js";
 export { logProbability, MIN_PROBABILITY } from "./probability.js";
-export { type QuadratureOptions, quadratureRule, STANDARD_RULES } from "./quadrature.js";
+export { type QuadratureOptions, quadratureRule } from "./quadrature.js";
 export { type RatingScaleParameters, ratingScale } from "./rating-scale.js";
 export {
   type CategoryTally,

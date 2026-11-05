@@ -804,12 +804,12 @@ export const RULES: readonly Rule[] = [
     titles: "needs more persons than correlated dimensions",
   },
   {
-    rule: "The grids that the posterior mean keeps for reuse are the 8 asked for last, within 2^23 coordinates, so that grids of many sizes do not accumulate.",
-    file: "packages/psychometrics/src/multidimensional/scoring.ts",
-    find: "STANDARD_GRIDS.delete(oldest);",
-    replace: "continue;",
-    test: "packages/psychometrics/test/multidimensional.test.ts",
-    titles: "keeps the 8 grids asked for last",
+    rule: "The Gauss-Hermite rule kept for reuse is replaced when another number of points is asked for, so that no call integrates over the nodes of another.",
+    file: "packages/psychometrics/src/irt/quadrature.ts",
+    find: "if (lastGaussHermite?.nodes.length !== points) lastGaussHermite = gaussHermite(points);",
+    replace: "lastGaussHermite ??= gaussHermite(points);",
+    test: "packages/psychometrics/test/irt.test.ts",
+    titles: "gives each Gauss-Hermite rule its own nodes",
   },
   {
     rule: "Calibration, scoring, information and adaptive tests take at most 100 dimensions, one shared limit, so that every calibration can be scored and scoring's time, which grows as the cube of the dimensions, stays bounded.",

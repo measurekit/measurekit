@@ -30,14 +30,17 @@ const METHODS: readonly QuadratureMethod[] = ["rectangular", "gauss-hermite"];
  * that keeps an option from allocating gigabytes for its nodes and for every item's table over them.
  */
 const MAX_POINTS = 1_000;
-/** The most rules kept for reuse, the latest asked for, so that rules of many sizes do not accumulate. */
-const MAX_CACHED_RULES = 8;
 
 /**
- * The standard rules computed lately, by method and number of points, in the order they were last asked for: EAP
- * estimation asks for one per person.
+ * The Gauss-Hermite rule asked for last: it takes a third of a millisecond at 61 nodes, and EAP estimation asks for one per
+ * person. A rectangular rule takes a microsecond.
  */
-export const STANDARD_RULES = new Map<string, Quadrature>();
+let lastGaussHermite: Quadrature | undefined;
+
+function gaussHermiteRule(points: number): Quadrature {
+  if (lastGaussHermite?.nodes.length !== points) lastGaussHermite = gaussHermite(points);
+  return lastGaussHermite;
+}
 
 /**
  * Returns the rule of `options` for the normal distribution N(mean, sd²): nodes of the standard rule scaled to it,
@@ -55,14 +58,6 @@ export function quadratureRule(options: QuadratureOptions = {}, mean = 0, sd = 1
     throw new DataError(`The quadrature points must be an integer from 2 to ${MAX_POINTS}, found ${points}.`);
   }
   checkChoice(method, "The quadrature method", METHODS);
-  const key = `${method} ${points}`;
-  const rule = STANDARD_RULES.get(key) ?? (method === "rectangular" ? rectangular(points) : gaussHermite(points));
-  // Moved to the end of the order, as the latest asked for; the earliest asked for leaves past the limit.
-  STANDARD_RULES.delete(key);
-  STANDARD_RULES.set(key, rule);
-  for (const [oldest] of STANDARD_RULES) {
-    if (STANDARD_RULES.size <= MAX_CACHED_RULES) break;
-    STANDARD_RULES.delete(oldest);
-  }
+  const rule = method === "rectangular" ? rectangular(points) : gaussHermiteRule(points);
   return { nodes: rule.nodes.map((z) => mean + sd * z), weights: rule.weights.slice() };
 }
