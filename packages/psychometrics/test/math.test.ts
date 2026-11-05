@@ -91,8 +91,12 @@ const QUADRATURE_TOLERANCE = 1e-12;
  * largest absolute eigenvalue.
  */
 const EIGEN_TOLERANCE = 1e-12;
-/** The most items of a matrix of every pair of items, `MAX_MATRIX_ITEMS` of `data/`. */
-const MATRIX_ITEMS = 1000;
+/**
+ * The items of the matrix of correlations that is decomposed: the QL iteration takes about two iterations for each
+ * eigenvalue at any size, and the decomposition costs the cube of the size, 2.4 s at the 1,000 items that a matrix of items
+ * takes at most, which the benchmark of smoothing runs.
+ */
+const MATRIX_ITEMS = 300;
 
 function expectRelative(actual: number, expected: number, tolerance: number, label: string): void {
   expect(Math.abs(actual - expected), label).toBeLessThanOrEqual(tolerance * Math.abs(expected));
@@ -396,7 +400,7 @@ describe("symmetricEigen", () => {
     expect([...diagonal.values]).toEqual([1e308, 1e308]);
   });
 
-  it("decomposes the correlations of 1,000 items, the most a matrix of items takes", () => {
+  it("decomposes the correlations of 300 items that five factors load on", () => {
     // Five factors of seeded loadings: five leading eigenvalues and the rest spread between the uniquenesses.
     const random = createRandom(29);
     const loadings = Float64Array.from({ length: MATRIX_ITEMS * 5 }, () => 0.4 * random.uniform());
