@@ -26,14 +26,19 @@ export interface Identifiability {
 interface Setup {
   readonly states: number;
   readonly items: number;
-  /** 1 at state × items + item when the state masters the item. */
-  readonly mastery: Uint8Array;
   readonly probabilities: readonly number[];
-  readonly blim: Blim;
-  /** The column of each item's slip and guess in the Jacobian, or -1 where the rate is fixed. */
-  readonly slipColumn: Int32Array;
-  readonly guessColumn: Int32Array;
+  /**
+   * At 2 (state × items + item) + answer, the probability of the answer, 1 for right and 0 for wrong, to the item in the
+   * state: 1 - slip or slip where the state masters the item, guess or 1 - guess where it does not.
+   */
+  readonly factor: Float64Array;
+  /** At the same index, the sign of the derivative of that probability by the rate it holds: -1 for 1 - rate, 1 for rate. */
+  readonly slope: Float64Array;
+  /** At state × items + item, the column of the rate that the probability holds, slip or guess, or -1 where it is fixed. */
+  readonly rateColumn: Int32Array;
   readonly columns: Float64Array[];
+  /** The derivatives of one pattern, by column, summed before they are written to the columns. */
+  readonly row: Float64Array;
   readonly factors: Float64Array;
   readonly prefix: Float64Array;
 }
@@ -77,17 +82,26 @@ export function localIdentifiability(
       `Local identifiability needs a Jacobian of 2 ^ ${items} patterns by ${width} parameters, more than the limit of ${MAX_JACOBIAN_CELLS} cells. Check a structure with fewer items or states, or hold more rates with fixed.`,
     );
   }
+  const cells = compiled.count * items;
+  const mastered = (cell: number): boolean => holds(compiled, Math.floor(cell / items), cell % items);
+  const rateOf = (cell: number): number => (mastered(cell) ? blim.slip[cell % items] : blim.guess[cell % items]) ?? 0;
+  // The answer of index answer % 2 to the item, 1 right, has probability 1 - rate where the state masters the item.
+  const isComplement = (answer: number): boolean => (answer % 2 === 1) === mastered(Math.floor(answer / 2));
   const setup: Setup = {
     states: compiled.count,
     items,
-    mastery: Uint8Array.from({ length: compiled.count * items }, (_, at) =>
-      holds(compiled, Math.floor(at / items), at % items) ? 1 : 0,
-    ),
     probabilities: parameters.probabilities,
-    blim,
-    slipColumn,
-    guessColumn,
+    factor: Float64Array.from({ length: 2 * cells }, (_, answer) => {
+      const rate = rateOf(Math.floor(answer / 2));
+      return isComplement(answer) ? 1 - rate : rate;
+    }),
+    slope: Float64Array.from({ length: 2 * cells }, (_, answer) => (isComplement(answer) ? -1 : 1)),
+    rateColumn: Int32Array.from(
+      { length: cells },
+      (_, cell) => (mastered(cell) ? slipColumn : guessColumn)[cell % items] ?? -1,
+    ),
     columns: Array.from({ length: width }, () => new Float64Array(rows)),
+    row: new Float64Array(width),
     factors: new Float64Array(items),
     prefix: new Float64Array(items + 1),
   };
@@ -96,31 +110,31 @@ export function localIdentifiability(
   return { parameters: width, rank: found, identifiable: found === width };
 }
 
-/** Writes the derivatives of one pattern's probability into its row of every column. */
+/**
+ * Writes the derivatives of one pattern's probability into its row of every column. They are summed in a row of their
+ * own and written once, as the columns are far apart in memory.
+ */
 function fillRow(setup: Setup, pattern: number): void {
-  const { states, columns } = setup;
+  const { states, columns, row } = setup;
+  row.fill(0);
   let last = 0;
   for (let k = 0; k < states; k++) {
     const probability = addState(setup, pattern, k);
-    if (k < states - 1) {
-      const column = columns[k];
-      if (column !== undefined) column[pattern] = (column[pattern] ?? 0) + probability;
-    } else {
-      last = probability;
-    }
+    if (k < states - 1) row[k] = (row[k] ?? 0) + probability;
+    else last = probability;
   }
-  for (let k = 0; k < states - 1; k++) {
-    const column = columns[k];
-    if (column !== undefined) column[pattern] = (column[pattern] ?? 0) - last;
-  }
+  for (let k = 0; k < states - 1; k++) row[k] = (row[k] ?? 0) - last;
+  columns.forEach((column, at) => {
+    column[pattern] = row[at] ?? 0;
+  });
 }
 
 /** Returns the probability of a pattern of responses given a state, and adds the state's share of the rate columns. */
 function addState(setup: Setup, pattern: number, k: number): number {
-  const { items, factors, prefix } = setup;
+  const { items, factor, factors, prefix } = setup;
   prefix[0] = 1;
   for (let q = 0; q < items; q++) {
-    factors[q] = factorOf(setup, pattern, k, q);
+    factors[q] = factor[2 * (k * items + q) + ((pattern >>> q) & 1)] ?? 0;
     prefix[q + 1] = (prefix[q] ?? 1) * (factors[q] ?? 1);
   }
   addRateDerivatives(setup, pattern, k);
@@ -128,27 +142,19 @@ function addState(setup: Setup, pattern: number, k: number): number {
 }
 
 /**
- * Adds to the rate columns the state's share of the derivatives of the pattern's probability: its probability times the
- * product of the other items' factors, signed by the slope of the item's own factor.
+ * Adds to the row of the rate columns the state's share of the derivatives of the pattern's probability: its probability
+ * times the product of the other items' factors, signed by the slope of the item's own factor.
  */
 function addRateDerivatives(setup: Setup, pattern: number, k: number): void {
-  const { items, factors, prefix, mastery } = setup;
+  const { items, factors, prefix, row, rateColumn, slope, probabilities } = setup;
   let suffix = 1;
   for (let q = items - 1; q >= 0; q--) {
-    const mastered = mastery[k * items + q] === 1;
-    const column = setup.columns[(mastered ? setup.slipColumn : setup.guessColumn)[q] ?? -1];
-    if (column !== undefined) {
-      // The factor falls with the slip where the answer is right and rises with it where wrong; the guess does the opposite.
-      const slope = (((pattern >>> q) & 1) === 1) === mastered ? -1 : 1;
-      column[pattern] = (column[pattern] ?? 0) + (setup.probabilities[k] ?? 0) * (prefix[q] ?? 1) * suffix * slope;
+    const cell = k * items + q;
+    const at = rateColumn[cell] ?? -1;
+    if (at >= 0) {
+      const sign = slope[2 * cell + ((pattern >>> q) & 1)] ?? 0;
+      row[at] = (row[at] ?? 0) + (probabilities[k] ?? 0) * (prefix[q] ?? 1) * suffix * sign;
     }
     suffix *= factors[q] ?? 1;
   }
-}
-
-/** Returns the probability of the answer to item q in a pattern, given that state k masters the item or not. */
-function factorOf({ mastery, items, blim }: Setup, pattern: number, k: number, q: number): number {
-  const mastered = mastery[k * items + q] === 1;
-  const rate = (mastered ? blim.slip[q] : blim.guess[q]) ?? 0;
-  return (((pattern >>> q) & 1) === 1) === mastered ? 1 - rate : rate;
 }
