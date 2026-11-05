@@ -1,4 +1,12 @@
-import { checkOptions, DataError, type FieldNames, mean, normalCdf, studentLowerTail } from "@measurekit/core";
+import {
+  checkBoolean,
+  checkOptions,
+  DataError,
+  type FieldNames,
+  mean,
+  normalCdf,
+  studentLowerTail,
+} from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import { defaultGroupSize, restScoreGroups } from "./groups.js";
 import { checkMonotonicityOptions, criterionOf, type ItemCheck, type MonotonicityOptions } from "./item-check.js";
@@ -71,9 +79,7 @@ export function invariantItemOrdering(
   checkOptions(options, INVARIANT_ORDERING_OPTIONS);
   const checked = checkMonotonicityOptions(options);
   const { selection = true } = options;
-  if (typeof selection !== "boolean") {
-    throw new DataError(`The option selection must be true or false, found ${String(selection)}.`);
-  }
+  checkBoolean(selection, "The option selection");
   const data = mokkenData(matrix, "The invariant item ordering check", 3);
   const minimumViolation = checked.minimumViolation ?? MINIMUM_VIOLATION_PER_STEP * (data.categories - 1);
   const minimumGroupSize = checked.minimumGroupSize ?? defaultGroupSize(data.persons);

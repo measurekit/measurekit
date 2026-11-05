@@ -1111,7 +1111,7 @@ describe("invariantItemOrdering", () => {
       'There is no option "verbose"',
     );
     expect(() => invariantItemOrdering(noisyMatrix, { selection: JSON.parse('"yes"') })).toThrow(
-      "The option selection must be true or false, found yes.",
+      'The option selection must be a boolean, found "yes".',
     );
     expect(() => invariantItemOrdering(noisyMatrix, { minimumGroupSize: 1 })).toThrow(DataError);
     expect(() => invariantItemOrdering(noisyMatrix, { alpha: 0 })).toThrow(DataError);
