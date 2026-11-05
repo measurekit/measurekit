@@ -67,6 +67,7 @@ import {
   compressResponses,
   type ExpectationItem,
   expectationStep,
+  fromUnbounded,
   type Iteration,
   itemFunctions,
   logFunction,
@@ -78,6 +79,8 @@ import {
   rescaledWeights,
   squarem,
   startAtHeldParameters,
+  toUnbounded,
+  unboundedDerivative,
   unfoldingStarts,
 } from "../src/irt/internal.js";
 import { invert, rectangular } from "../src/math/internal.js";
@@ -1838,6 +1841,30 @@ describe("item priors", () => {
     );
   });
 
+  it("apply once to a parameter that the items share, which a tight prior holds at the prior's median", () => {
+    // The 1PL's slope is one parameter of all the items. The curvature of a log-normal prior of sd 0.001 on it is 1e6 per
+    // unit of ln a, a thousand times the information of the data: the estimate is the median e^0.4 to within 1e-3, where
+    // the free estimate is further, and a prior of sd 0.3 puts it between the two.
+    const free = calibrate(matrix, oneParameterLogistic, { tolerance: EM_TOLERANCE, maxIterations: 10_000 });
+    const slope = (fit: typeof free): number => defined(fit.items[0]).parameters.a;
+    const held = calibrate(matrix, oneParameterLogistic, {
+      priors: { a: logNormalPrior(0.4, 0.001) },
+      tolerance: EM_TOLERANCE,
+      maxIterations: 10_000,
+    });
+    expect(new Set(held.items.map((item) => item.parameters.a)).size).toBe(1);
+    expectClose(Math.log(slope(held)), 0.4, 1e-3, "tight prior");
+    expect(Math.abs(Math.log(slope(free)) - 0.4)).toBeGreaterThan(0.05);
+    const loose = calibrate(matrix, oneParameterLogistic, {
+      priors: { a: logNormalPrior(0.4, 0.3) },
+      tolerance: EM_TOLERANCE,
+      maxIterations: 10_000,
+    });
+    const [low, high] = [Math.log(slope(free)), 0.4].sort((x, y) => x - y);
+    expect(Math.log(slope(loose))).toBeGreaterThan(defined(low));
+    expect(Math.log(slope(loose))).toBeLessThan(defined(high));
+  });
+
   it("apply to the parameters of models that do not share them", () => {
     const grades = buildResponseMatrix(science.responses, { itemIds: science.itemIds });
     const free = calibrate(grades, generalizedPartialCredit);
@@ -2247,6 +2274,21 @@ describe("fixed parameters", () => {
     });
     expectClose(held.logLikelihood, free.logLikelihood, 1e-8, "log-likelihood");
     expectClose(held.aic, free.aic - 2, 1e-7, "AIC");
+  });
+
+  it("give the free calibration when every item but one has its difficulty held at its estimate, so that they have only the shared slope", () => {
+    const sample = buildResponseMatrix(simulate(20261029, 300, ITEMS_2PL.slice(0, 6)));
+    const options = { tolerance: EM_TOLERANCE, maxIterations: 10_000 };
+    const free = calibrate(sample, oneParameterLogistic, options);
+    const held = calibrate(sample, oneParameterLogistic, {
+      ...options,
+      fixedParameters: Object.fromEntries(free.items.slice(1).map((item) => [item.id, { b: item.parameters.b }])),
+    });
+    free.items.forEach((item, i) => {
+      expectParameters(defined(held.items[i]).parameters, item.parameters, 1e-6, item.id);
+    });
+    expectClose(held.logLikelihood, free.logLikelihood, 1e-8, "log-likelihood");
+    expectClose(held.aic, free.aic - 2 * (free.items.length - 1), 1e-7, "AIC");
   });
 
   it("move the starts of the other ordered parameters to fit the held ones, and no others", () => {
@@ -3344,6 +3386,45 @@ describe("latent regression", () => {
     expect(() =>
       calibrate(matrix, twoParameterLogistic, { covariates: JSON.parse(JSON.stringify({ x: column })) }),
     ).toThrow('Covariate "x" of person 3 must be a finite number, found "2".');
+  });
+});
+
+describe("the unbounded coordinates of a bounded parameter", () => {
+  const infinity = Number.POSITIVE_INFINITY;
+  /** The bounds a parameter can have: none, below only, above only, and both. */
+  const bounds = [
+    [-infinity, infinity],
+    [0, infinity],
+    [-infinity, 2],
+    [-1, 3],
+  ] as const;
+  /** Values of the unbounded coordinate, which the bounds map inside them. */
+  const coordinates = [-6, -2.5, -0.3, 0, 0.7, 2, 5];
+
+  it("maps a value to its coordinate and back, whichever of the bounds are finite", () => {
+    for (const [lower, upper] of bounds) {
+      for (const eta of coordinates) {
+        const x = fromUnbounded(eta, lower, upper);
+        expect(x > lower && x < upper, `${lower}, ${upper}, ${eta}`).toBe(true);
+        expectClose(toUnbounded(x, lower, upper), eta, 1e-9, `${lower}, ${upper}, ${eta}`);
+      }
+    }
+  });
+
+  it("has the derivative of the value with respect to the coordinate, which the Hessian is scaled by", () => {
+    const step = 1e-5;
+    for (const [lower, upper] of bounds) {
+      for (const eta of coordinates) {
+        const slope = (fromUnbounded(eta + step, lower, upper) - fromUnbounded(eta - step, lower, upper)) / (2 * step);
+        const x = fromUnbounded(eta, lower, upper);
+        expectClose(
+          unboundedDerivative(x, lower, upper),
+          slope,
+          1e-6 * Math.max(1, Math.abs(slope)),
+          `${lower}, ${upper}, ${eta}`,
+        );
+      }
+    }
   });
 });
 
