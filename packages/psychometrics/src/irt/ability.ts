@@ -91,18 +91,26 @@ export interface ThetaIntegrationOptions {
 
 export const THETA_INTEGRATION_OPTIONS: FieldNames<ThetaIntegrationOptions> = { prior: true, quadrature: true };
 
-/** Options of {@link posteriorMeanEstimate}. */
-export interface PosteriorMeanOptions extends ThetaIntegrationOptions {
+/** The testlets whose effects an integral over theta takes out. */
+export interface TestletOptions {
   /**
-   * Testlets, whose effects the estimate integrates out (the testlet response model), each over the quadrature rule
-   * placed on N(0, sd²).
+   * Testlets, such as a calibration's `testlets`: the ids of each testlet's items and the SD of its effect. An item of a
+   * testlet answers at θ + γ, γ ~ N(0, sd²), as in the testlet response model, and each testlet's effect is integrated
+   * out over the quadrature rule placed on N(0, sd²). Ids that none of the items has are skipped, so the testlets of a
+   * pool serve each of its forms.
    *
-   * @defaultValue `[]`
+   * @defaultValue `[]`: the items answer independently given theta
    */
   readonly testlets?: readonly TestletEffect[];
 }
 
-const POSTERIOR_MEAN_OPTIONS: FieldNames<PosteriorMeanOptions> = { testlets: true, prior: true, quadrature: true };
+/** Options of {@link posteriorMeanEstimate} and `summedScoreTable`: the integral over theta, with testlets. */
+export interface PosteriorMeanOptions extends ThetaIntegrationOptions, TestletOptions {}
+
+export const POSTERIOR_MEAN_OPTIONS: FieldNames<PosteriorMeanOptions> = {
+  ...THETA_INTEGRATION_OPTIONS,
+  testlets: true,
+};
 
 /**
  * A function that estimates theta from items and one response per item, `null` when missing.

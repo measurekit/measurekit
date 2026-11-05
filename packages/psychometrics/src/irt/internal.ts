@@ -7,10 +7,12 @@ export {
   checkThetaPrior,
   DEFAULT_THETA_RANGE,
   modalTheta,
+  type PosteriorMeanOptions,
   posteriorMeanEstimate,
   posteriorModeEstimate,
   RANGE_OPTIONS,
   type RangeOptions,
+  type TestletOptions,
   type ThetaPrior,
 } from "./ability.js";
 export { ABILITY_ESTIMATES_OPTIONS, type AbilityEstimatesOptions, abilityEstimates } from "./ability-estimates.js";
@@ -105,12 +107,10 @@ export { type Iteration, squarem } from "./squarem.js";
 export { checkStandardErrorSize, withinStandardErrorSize } from "./standard-error-size.js";
 export {
   itemTrace,
-  type SummedScoreOptions,
   scoreLikelihoods,
   scoreTestlets,
   summedScoreLikelihoods,
   summedScoreTable,
-  type TestletOptions,
 } from "./summed-score.js";
 export { combine, itemFunctions, logFunction, NO_ITEMS } from "./symmetric-functions.js";
 export { type CheckedThetaDistribution, checkThetaDistribution } from "./theta-distribution.js";

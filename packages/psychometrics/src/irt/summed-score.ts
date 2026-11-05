@@ -1,10 +1,10 @@
-import { checkOptions, type FieldNames } from "@measurekit/core";
+import { checkOptions } from "@measurekit/core";
 import type { Quadrature } from "../math/internal.js";
 import {
   checkThetaPrior,
+  POSTERIOR_MEAN_OPTIONS,
+  type PosteriorMeanOptions,
   type TestletEffect,
-  THETA_INTEGRATION_OPTIONS,
-  type ThetaIntegrationOptions,
   testletMembership,
 } from "./ability.js";
 import { checkItemList } from "./items.js";
@@ -22,24 +22,6 @@ export interface SummedScoreEstimate {
   /** The probability of the total score under the prior: Σ_q w_q L(s | θ_q). */
   readonly probability: number;
 }
-
-/** The testlets of a form whose effects a summed-score likelihood integrates out. */
-export interface TestletOptions {
-  /**
-   * Testlets, as `posteriorMeanEstimate` takes them: the ids of each testlet's items and the SD of its effect, such as
-   * a calibration's `testlets`. An item of a testlet answers at θ + γ, γ ~ N(0, sd²), and each testlet's effect is
-   * integrated out over the quadrature rule placed on N(0, sd²). Ids that none of the items has are skipped, so the
-   * testlets of a pool serve each of its forms.
-   *
-   * @defaultValue `[]`: the items answer independently given theta
-   */
-  readonly testlets?: readonly TestletEffect[];
-}
-
-/** Options of {@link summedScoreTable}. */
-export interface SummedScoreOptions extends ThetaIntegrationOptions, TestletOptions {}
-
-const SUMMED_SCORE_OPTIONS: FieldNames<SummedScoreOptions> = { ...THETA_INTEGRATION_OPTIONS, testlets: true };
 
 /** The checked testlets of a form: each item's testlet, -1 for none, each testlet's SD and the rule over its effect. */
 export interface ScoreTestlets {
@@ -74,10 +56,10 @@ export interface ScoreTestlets {
  */
 export function summedScoreTable(
   items: readonly IrtItem[],
-  options: SummedScoreOptions = {},
+  options: PosteriorMeanOptions = {},
 ): readonly SummedScoreEstimate[] {
   checkItemList(items, "A summed-score table");
-  checkOptions(options, SUMMED_SCORE_OPTIONS);
+  checkOptions(options, POSTERIOR_MEAN_OPTIONS);
   const testlets = scoreTestlets(items, options.testlets, options.quadrature);
   const { mean, sd } = checkThetaPrior(options.prior);
   const { nodes, weights } = quadratureRule(options.quadrature, mean, sd);

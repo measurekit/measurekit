@@ -7,8 +7,8 @@ import {
   expectedScore,
   type IrtItem,
   largestCategoryCount,
+  type PosteriorMeanOptions,
   type RangeOptions,
-  type SummedScoreOptions,
   scoreLikelihoods,
   scoreTestlets,
   summedScoreTable,
@@ -24,7 +24,7 @@ import { checkScale, type ScoreScale, scoreOfTheta } from "./score-scale.js";
 export type ConversionMethod = "eap-sum" | "true-score";
 
 /** Options of {@link conversionTable}. */
-export interface ConversionTableOptions extends SummedScoreOptions, RangeOptions {
+export interface ConversionTableOptions extends PosteriorMeanOptions, RangeOptions {
   /**
    * How the theta of a total score is found. `prior`, `quadrature` and `testlets` are the options of `"eap-sum"`;
    * `"true-score"` takes none of them. `range` is the interval of the thetas of total scores that have none.
@@ -147,7 +147,7 @@ export function conversionTable(
 /** Returns the posterior mean and standard deviation of theta given each total score. */
 function eapSumThetas(
   items: readonly IrtItem[],
-  options: SummedScoreOptions,
+  options: PosteriorMeanOptions,
   range: readonly [number, number],
 ): ScoreThetas[] {
   const table = summedScoreTable(items, options);
