@@ -148,23 +148,23 @@ whose limits bound them.
 
 | Reader                       | Input                                                                | JSON (MB) | Peak added (MB) |
 | ---------------------------- | -------------------------------------------------------------------- | --------- | --------------- |
-| `buildEventLog`              | 1,000,000 events of 1,000 learners and 1,000 items                   | 72        | 79              |
+| `buildEventLog`              | 1,000,000 events of 1,000 learners and 1,000 items                   | 67        | 76              |
 | `buildEventLog`              | 1,000,000 events, each of its own learner, item and skill            | 82        | 12              |
 | `bkt` with stored parameters | 100,000 skills                                                       | 6.6       | 22              |
-| `kst` with a structure       | 10,000 states of 64 items                                            | 1.9       | 1               |
+| `kst` with a structure       | 10,000 states of 64 items                                            | 1.8       | 1               |
 | `iita`                       | 1,000,000 events, each of its own learner and item, which it refuses | 73        | 100             |
 | `iita`                       | 1,000 items, 276 learners: 24 candidates of 23.9 million cells       | 18        | 237             |
-| `diffTest`                   | 1,000 items, 200 learners                                            | 14        | 38              |
-| `structureValidity`          | 1,000 items, 200 learners, a chain                                   | 14        | 42              |
+| `diffTest`                   | 1,000 items, 200 learners, a chain, from their log                   | 13        | 26              |
+| `structureValidity`          | 1,000 items, 200 learners, a chain, from their log and structure     | 13        | 4               |
 | `surmiseStructure`           | 1,000 elements, 12 free and a class of 988: 8,192 states             | 0.02      | 101             |
 | `kst`, its masks             | 4,096 sets of 16 skills, 65,536 states                               | 0.33      | 240             |
 
-A log takes at most about twice the bytes of its JSON, and stored BKT parameters about 3 times. The analyses of
+A log takes at most about 1.2 times the bytes of its JSON, and stored BKT parameters about 3 times. The analyses of
 knowledge structures take up to about 240 MB within their limits: IITA's candidates from 18 MB of responses, and the
 masks of a model from a few hundred kilobytes of sets of skills.
 
 `scripts/test/peak-memory.test.ts`, which `pnpm test --project scripts` runs without a build, measures the readers of
-`scripts/peak-memory.ts`, the worst rows of the tables of each library, from the sources, each in a pair of child
+`scripts/peak-memory.ts`, every row of the table above among them, from the sources, each in a pair of child
 processes whose heap is bounded, as STANDARDS.md section 7 asks: twice the least heap in which the reading ended on
 Node.js 22, 24 and 26, rounded up to 16 MiB, so that a reading that keeps more alive at once fails, whenever the
 collector runs and however busy the machine is. The test fails too when a reading adds more than its budget to the peak:

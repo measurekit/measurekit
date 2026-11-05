@@ -83,6 +83,26 @@ const pairInput = ({ rows, items }: PairItems, psychometrics: Libraries["psychom
   })),
 });
 
+/** The prerequisites of a chain: each item needs the one before it. */
+const chainOf = (items: readonly string[]): Record<string, string[]> =>
+  Object.fromEntries(items.map((item, k) => [item, k === 0 ? [] : [items[k - 1] ?? ""]]));
+
+/**
+ * The responses of 200 learners to 1,000 items of a chain, the most items that the analyses of the relations between them
+ * take: learner l solves the first 5 l + 3 items, and one answer in 10 goes the other way, so that every item is solved and
+ * the chain has counterexamples.
+ */
+const chainResponses = (): unknown[] =>
+  Array.from({ length: 200 }, (_, learner) =>
+    Array.from({ length: 1000 }, (_, k) => ({
+      learner: `l${learner}`,
+      item: `i${k + 1}`,
+      skills: [],
+      time: learner * 1000 + k,
+      outcome: Number(k < 5 * learner + 3 !== ((learner * 31 + k * 17) % 10 === 0)),
+    })),
+  ).flat();
+
 /** The cases, the worst input of each reader within its limits. */
 export const READERS: readonly ReaderCase[] = [
   {
@@ -197,6 +217,58 @@ export const READERS: readonly ReaderCase[] = [
       state: unknown;
       attempts: unknown[];
     }) => model.nextQuestion(state, attempts),
+  },
+  {
+    name: "buildEventLog: 1,000,000 events of 1,000 learners and 1,000 items",
+    budget: 390,
+    heap: 800,
+    input: () =>
+      Array.from({ length: 1_000_000 }, (_, k) => ({
+        learner: `l${k % 1000}`,
+        item: `i${Math.floor(k / 1000)}`,
+        skills: [],
+        time: k,
+        outcome: k % 2,
+      })),
+    read: (events: unknown[], { "knowledge-tracing": tracing }) => tracing.buildEventLog(events),
+  },
+  {
+    name: "kst: a structure of 10,000 states of 64 items",
+    budget: 10,
+    heap: 48,
+    // The empty state, the whole domain, and 9,998 states that the first 14 items tell apart, each with the items k mod 51
+    // of the other 50.
+    input: () => {
+      const domain = ids("q", 64);
+      const states = Array.from({ length: 9998 }, (_, index) => {
+        const k = index + 1;
+        return domain.filter((_, i) => (i < 14 ? ((k >>> i) & 1) === 1 : i - 14 < k % 51));
+      });
+      return { domain, states: [[], ...states, domain] };
+    },
+    read: (structure: unknown, { "knowledge-tracing": tracing }) => tracing.kst(structure, { over: "items" }),
+  },
+  {
+    name: "diffTest: 1,000 items, 200 learners, a chain",
+    budget: 150,
+    heap: 208,
+    input: () => chainResponses(),
+    // Both processes build the log of the responses; the reading tests the chain against it.
+    prepare: (events: unknown[], { "knowledge-tracing": tracing }) => tracing.buildEventLog(events),
+    read: (log: unknown, { "knowledge-tracing": tracing }) => tracing.diffTest(log, chainOf(ids("i", 1000))),
+  },
+  {
+    name: "structureValidity: 1,000 items, 200 learners, a chain",
+    budget: 50,
+    heap: 208,
+    input: () => chainResponses(),
+    // Both processes build the log and the structure of the chain, 1,001 states; the reading measures the one against the other.
+    prepare: (events: unknown[], { "knowledge-tracing": tracing }) => ({
+      log: tracing.buildEventLog(events),
+      structure: tracing.surmiseStructure(chainOf(ids("i", 1000))),
+    }),
+    read: ({ log, structure }: { log: unknown; structure: unknown }, { "knowledge-tracing": tracing }) =>
+      tracing.structureValidity(structure, log),
   },
   {
     name: "qMatrixIdentifiability: 100,000 items of 20 attributes",
