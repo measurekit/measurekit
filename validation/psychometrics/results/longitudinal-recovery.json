@@ -6,7 +6,11 @@
       "itemsPerOccasion": 10,
       "occasions": 2,
       "points": 31,
-      "seeds": [1, 2, 3],
+      "seeds": [
+        1,
+        2,
+        3
+      ],
       "thresholds": {
         "mean": 0.03,
         "sd": 0.025,
@@ -55,7 +59,11 @@
       "itemsPerOccasion": 40,
       "occasions": 2,
       "points": 31,
-      "seeds": [1, 2, 3],
+      "seeds": [
+        1,
+        2,
+        3
+      ],
       "thresholds": {
         "mean": 0.03,
         "sd": 0.025,
@@ -104,7 +112,11 @@
       "itemsPerOccasion": 10,
       "occasions": 3,
       "points": 21,
-      "seeds": [1, 2, 3],
+      "seeds": [
+        1,
+        2,
+        3
+      ],
       "thresholds": {
         "mean": 0.03,
         "sd": 0.035,
@@ -153,7 +165,11 @@
       "itemsPerOccasion": 40,
       "occasions": 3,
       "points": 21,
-      "seeds": [1, 2, 3],
+      "seeds": [
+        1,
+        2,
+        3
+      ],
       "thresholds": {
         "mean": 0.03,
         "sd": 0.035,
@@ -221,23 +237,47 @@
       "persons": 2000,
       "itemsPerOccasion": 40,
       "occasions": 3,
-      "points": [15, 21, 31],
+      "points": [
+        15,
+        21,
+        31
+      ],
       "seed": 101,
       "fifteenAgainstThirtyOne": 0.10931428450829905,
       "twentyOneAgainstThirtyOne": 0.020756733253988302,
-      "converged": [true, true, true],
-      "seconds": [4.7, 6.1, 28.2]
+      "converged": [
+        true,
+        true,
+        true
+      ],
+      "seconds": [
+        4.7,
+        6.1,
+        28.2
+      ]
     },
     {
       "persons": 2000,
       "itemsPerOccasion": 40,
       "occasions": 3,
-      "points": [15, 21, 31],
+      "points": [
+        15,
+        21,
+        31
+      ],
       "seed": 102,
       "fifteenAgainstThirtyOne": 0.10427836743398333,
       "twentyOneAgainstThirtyOne": 0.008360144941741199,
-      "converged": [true, true, true],
-      "seconds": [2.8, 8.7, 30.6]
+      "converged": [
+        true,
+        true,
+        true
+      ],
+      "seconds": [
+        2.8,
+        8.7,
+        30.6
+      ]
     }
   ]
 }

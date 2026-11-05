@@ -1,6 +1,10 @@
 {
   "source": "calibrateMultidimensional by MH-RM, createRandom(seed) and the same seed for MH-RM: 30 M2PL items, 6 on each of 5 dimensions correlated 0.4 to the power of their distance, 2,000 simulated persons, Hessian standard errors. The errors are in standard errors of the estimate.",
-  "seeds": [20261029, 20261030, 20261031],
+  "seeds": [
+    20261029,
+    20261030,
+    20261031
+  ],
   "sizes": {
     "persons": 2000,
     "dimensions": 5,

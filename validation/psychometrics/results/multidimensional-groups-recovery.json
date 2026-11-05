@@ -1,8 +1,16 @@
 {
   "source": "calibrateMultidimensional, createRandom(seed): three groups of 700, 600 and 600 persons, 40 M2PL items on each of 3 dimensions with slopes from 0.8 to 1.8, at 21 and 15 nodes per dimension. The error is the largest distance of a group's mean or covariance from the value that generated it.",
-  "seeds": [20261031, 20261032, 20261033],
+  "seeds": [
+    20261031,
+    20261032,
+    20261033
+  ],
   "sizes": {
-    "persons": [700, 600, 600],
+    "persons": [
+      700,
+      600,
+      600
+    ],
     "dimensions": 3,
     "itemsPerDimension": 40
   },

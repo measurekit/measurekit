@@ -7,7 +7,7 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!pnpm-lock.yaml", "!**/CHANGELOG.md", "!docs/api", "!**/test/fixtures"]
+    "includes": ["**", "!pnpm-lock.yaml", "!**/CHANGELOG.md", "!docs/api", "!**/test/fixtures", "!validation/*/results"]
   },
   "formatter": {
     "enabled": true,
