@@ -1058,8 +1058,10 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
   1,500 simulated persons: every slope, intercept and correlation within four standard errors of the true value, and a
   root mean square error of the slopes below 0.2 (3.0 standard errors at most, 0.10 found).
 - **Multidimensional recovery by MH-RM.** 30 simulated M2PL items, 6 on each of 5 dimensions correlated 0.4 to the power
-  of their distance, from 2,000 simulated persons: every slope, intercept and correlation within four standard errors of
-  the true value, and a root mean square error of the slopes below 0.2 (2.3 standard errors at most, 0.11 found).
+  of their distance, from 2,000 simulated persons, three seeds: every slope, intercept and correlation within four
+  standard errors of the true value, and a root mean square error of the slopes below 0.2 (3.3 standard errors at most,
+  0.11 found). `validation/psychometrics/multidimensional-mhrm-recovery.ts` runs it in minutes and records it in
+  `results/`; no test does, as MH-RM on five dimensions takes seconds even for a few hundred persons.
 - **Bifactor recovery.** Simulated bifactor 2PLs of 1,000 persons, 12 items in 3 specific dimensions and 40 in 4: the root
   mean square errors of the general and the specific slopes are at most those of `mirt::bfactor` plus 0.005 (0.275 and 0.438,
   0.131 and 0.159 found; mirt's the same within 0.001).

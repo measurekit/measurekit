@@ -1,0 +1,52 @@
+{
+  "source": "calibrateMultidimensional by MH-RM, createRandom(seed) and the same seed for MH-RM: 30 M2PL items, 6 on each of 5 dimensions correlated 0.4 to the power of their distance, 2,000 simulated persons, Hessian standard errors. The errors are in standard errors of the estimate.",
+  "seeds": [20261029, 20261030, 20261031],
+  "sizes": {
+    "persons": 2000,
+    "dimensions": 5,
+    "items": 30
+  },
+  "thresholds": {
+    "standardErrors": 4,
+    "slopeRmse": 0.2
+  },
+  "worst": {
+    "standardErrors": 3.3475527999720964,
+    "slopeRmse": 0.10916868295509928
+  },
+  "fits": [
+    {
+      "seed": 20261029,
+      "slope": 2.1984981540155335,
+      "intercept": 2.284591863352167,
+      "correlation": 1.5862116049157207,
+      "slopeRmse": 0.10916868295509928,
+      "within": true,
+      "iterations": 61,
+      "converged": true,
+      "seconds": 29.9
+    },
+    {
+      "seed": 20261030,
+      "slope": 3.3475527999720964,
+      "intercept": 2.273326775231781,
+      "correlation": 2.075845363712233,
+      "slopeRmse": 0.0937520839802847,
+      "within": true,
+      "iterations": 63,
+      "converged": true,
+      "seconds": 33.9
+    },
+    {
+      "seed": 20261031,
+      "slope": 3.056313910607122,
+      "intercept": 1.7933354448307464,
+      "correlation": 1.882535906318061,
+      "slopeRmse": 0.10818266810969805,
+      "within": true,
+      "iterations": 64,
+      "converged": true,
+      "seconds": 31.9
+    }
+  ]
+}
