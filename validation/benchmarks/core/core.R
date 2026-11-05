@@ -10,7 +10,9 @@ points <- 12 * (seq_len(POINTS) - 1) / POINTS - 6
 correlations <- CORRELATION^abs(outer(seq_len(ORDER), seq_len(ORDER), "-"))
 
 bench_task("numerics.normalQuantile", "Normal quantile function", "1,000,000 probabilities",
-           reference("stats", "qnorm"), function() qnorm(probabilities))
+           reference("stats", "qnorm"), function() qnorm(probabilities),
+           note = paste("on Node.js 22, the CI runner's and these tables', the loop takes about twice as long as on Node.js 24",
+                        "and 26: 8.7 ms on Node.js 26.8.1, run in turns with Node.js 22 on the same machine"))
 bench_task("numerics.logistic", "Logistic function", "1,000,000 points", reference("stats", "plogis"),
            function() plogis(points))
 bench_task("numerics.cholesky", "Cholesky factorization", "A correlation matrix of order 200",
@@ -21,4 +23,6 @@ bench_task("numerics.cholesky", "Cholesky factorization", "A correlation matrix 
                         "and, compiled with both, 0.48 times as long"))
 bench_task("random.uniform", "Uniform draws", "1,000,000 draws", reference("stats", "runif"),
            function() runif(POINTS))
-bench_task("random.normal", "Normal draws", "1,000,000 draws", reference("stats", "rnorm"), function() rnorm(POINTS))
+bench_task("random.normal", "Normal draws", "1,000,000 draws", reference("stats", "rnorm"), function() rnorm(POINTS),
+           note = paste("on Node.js 22, the CI runner's and these tables', the loop takes about twice as long as on Node.js 24",
+                        "and 26: 18 ms on Node.js 26.8.1, run in turns with Node.js 22 on the same machine"))

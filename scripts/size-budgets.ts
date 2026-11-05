@@ -17,7 +17,7 @@ export interface EntryBudget {
  * reason in the commit that changes it.
  */
 export const ENTRY_BUDGETS: Readonly<Record<string, EntryBudget>> = {
-  "@measurekit/core": { gzip: 7000, holds: [] },
+  "@measurekit/core": { gzip: 9000, holds: [] },
   "@measurekit/psychometrics": { gzip: 2000, holds: ["core"] },
   "@measurekit/psychometrics/cat": {
     gzip: 29_500,

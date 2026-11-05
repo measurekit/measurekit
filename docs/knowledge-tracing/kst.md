@@ -258,7 +258,7 @@ held.identifiability(); // => { parameters: 11, rank: 11, identifiable: true }
 ```
 
 The Jacobian has 2^items rows and one column for each parameter, so `identifiability` stops at `MAX_JACOBIAN_CELLS`, 10
-million cells (80 MB): a chain of 12 items takes about 13 ms, and 20 items with 10,000 states would need 84 GB.
+million cells (80 MB): a chain of 12 items takes about 17 ms, and 20 items with 10,000 states would need 84 GB.
 
 ## Events without an outcome
 

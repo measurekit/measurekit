@@ -46,10 +46,7 @@ bench_task("kst.mdml", "Fit of the basic local independence model of a chain of 
            note = sprintf("pks and measurekit both stop within 1e-9 of the maximum: pks when no parameter changes by more than 1e-8, after %d iterations, and measurekit when the log-likelihood changes by at most 1e-8, after 331. At pks's tolerance of 1e-4 it stops after 41 iterations, 2.5e-3 from the maximum", mdml_iterations))
 bench_task("kst.identifiability", "Rank of the Jacobian of the pattern probabilities of the model of a chain of 12 items",
            sprintf("%d items, %d states, %d parameters", item_count, nrow(states), nrow(states) - 1 + 2 * item_count),
-           reference("pks", "jacobian` and `qr"), function() qr(jacobian(list(K = states)))$rank,
-           note = paste("pks's `jacobian` takes 10 ms and `qr` 1 ms, measurekit's Jacobian 5 ms and its rank",
-                        "10 ms: the rank orthogonalizes each column twice by Gram-Schmidt in JavaScript, where `qr`",
-                        "runs Householder reflections in compiled Fortran"))
+           reference("pks", "jacobian` and `qr"), function() qr(jacobian(list(K = states)))$rank)
 
 chain <- kstructure(as.set(lapply(seq_len(nrow(states)), function(r) as.set(colnames(states)[states[r, ] == 1]))))
 bench_task("kst.validity", "Validity of the chain against the responses: gamma, violational coefficient, solution rates, discrepancy index and distance agreement",

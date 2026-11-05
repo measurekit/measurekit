@@ -88,7 +88,7 @@ bench_task("irt.nominal", "Replay of the responses of learners to nominal items,
                        verbose = FALSE)
              }
            },
-           note = "As for the 2PL items, mirt scores each of the 40 prefixes of the responses from the first.")
+           note = "as for the 2PL items, mirt scores each of the 40 prefixes of the responses from the first")
 
 # The responses of the first 200 learners a minute apart, with a drift of variance 0.02 a week, on 241 points: the
 # forward pass in logs of validation/knowledge-tracing/irt.R, with the kernel e^-t I_d(t) of besselI folded at the
