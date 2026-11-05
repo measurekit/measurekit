@@ -23,6 +23,7 @@ export {
   calibrate,
   calibratedItem,
   calibrateWithCovariance,
+  checkCalibrationOptions,
 } from "./calibration.js";
 export {
   type CalibrationOptions,

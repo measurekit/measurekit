@@ -197,20 +197,8 @@ export function calibrateResponses<TParameters>(
   starts?: readonly TParameters[],
 ): CovarianceCalibration<TParameters> {
   const { tolerance = DEFAULT_TOLERANCE, maxIterations = DEFAULT_MAX_ITERATIONS, standardErrors = "none" } = options;
-  checkStopping(tolerance, maxIterations);
-  checkChoice(standardErrors, "The option standardErrors", STANDARD_ERROR_METHODS);
-  checkRegressionOptions(options, standardErrors);
-  const { answered, respondents } = respondentsOf(responses);
-  const rule = quadratureRule(options.quadrature);
-  const { nodes } = rule;
-  const setup = setUp(responses, model, options, answered, rule, starts);
+  const { setup, nodes, respondents, fixedError } = checkedSetup(responses, model, options, starts);
   const { items, values, population: latent, design } = setup;
-  const fixedError = fixedErrorOf(options.fixedCovariance, items, standardErrors);
-  if (standardErrors !== "none") {
-    // The covariance reported lists a parameter that items share once for each of them.
-    const listed = items.reduce((sum, item) => sum + freeEntries(item).length, 0);
-    checkStandardErrorSize(Math.max(values.length, listed, fixedError?.targets.length ?? 0));
-  }
   const mStep = maximization(setup, nodes);
   const eStep = expectationStep(responses, items, nodes, latent, design);
 
@@ -239,6 +227,52 @@ export function calibrateResponses<TParameters>(
     },
     covariance: parameterCovariance(items, covariance, size),
   };
+}
+
+/**
+ * Checks the options of a calibration of `data` with `model`, as {@link calibrate} does before its first iteration,
+ * and runs none.
+ *
+ * @throws `DataError` as {@link calibrate} does for the data, the model and the options.
+ */
+export function checkCalibrationOptions<TParameters>(
+  data: ResponseMatrix | ResponseRecords,
+  model: IrtModel<TParameters> | readonly IrtModel<TParameters>[],
+  options: CalibrationOptions<TParameters>,
+): void {
+  checkOptions(options, CALIBRATION_OPTIONS);
+  checkedSetup(compressResponses(data), model, options);
+}
+
+/**
+ * Checks the options of a calibration against its responses and model and returns its setup, the nodes of its rule,
+ * the persons with a response and the fixed items' error.
+ */
+function checkedSetup<TParameters>(
+  responses: CompressedResponses,
+  model: IrtModel<TParameters> | readonly IrtModel<TParameters>[],
+  options: CalibrationOptions<TParameters>,
+  starts?: readonly TParameters[],
+): {
+  readonly setup: Setup<TParameters>;
+  readonly nodes: Float64Array;
+  readonly respondents: number;
+  readonly fixedError: ReturnType<typeof fixedErrorOf>;
+} {
+  const { tolerance = DEFAULT_TOLERANCE, maxIterations = DEFAULT_MAX_ITERATIONS, standardErrors = "none" } = options;
+  checkStopping(tolerance, maxIterations);
+  checkChoice(standardErrors, "The option standardErrors", STANDARD_ERROR_METHODS);
+  checkRegressionOptions(options, standardErrors);
+  const { answered, respondents } = respondentsOf(responses);
+  const rule = quadratureRule(options.quadrature);
+  const setup = setUp(responses, model, options, answered, rule, starts);
+  const fixedError = fixedErrorOf(options.fixedCovariance, setup.items, standardErrors);
+  if (standardErrors !== "none") {
+    // The covariance reported lists a parameter that items share once for each of them.
+    const listed = setup.items.reduce((sum, item) => sum + freeEntries(item).length, 0);
+    checkStandardErrorSize(Math.max(setup.values.length, listed, fixedError?.targets.length ?? 0));
+  }
+  return { setup, nodes: rule.nodes, respondents, fixedError };
 }
 
 /**

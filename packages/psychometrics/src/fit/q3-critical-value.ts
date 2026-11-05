@@ -17,6 +17,7 @@ import {
   abilityEstimates,
   type CalibrationOptions,
   calibrate,
+  checkCalibrationOptions,
   checkItemsOfMatrix,
   type IrtItem,
   posteriorMeanEstimate,
@@ -157,8 +158,8 @@ const DEFAULT_SLOPE_LIMIT = 4;
  * @returns The critical excess, the observed mean Q3 and the pairs above the critical excess, each replication's
  *   largest excess, and the counts of replications, redraws and calibrations that did not converge.
  * @throws `DataError` when the matrix, the items or `random` are invalid, the items' ids are not the matrix's, an
- * option is invalid, there are more than 1,000 items, or a replication's calibration throws it, as for an invalid
- * calibration option.
+ * option is invalid, as a calibration option that `calibrate` refuses for the matrix and the items' models, which is
+ * checked before any draw, there are more than 1,000 items, or a replication's calibration throws it.
  * @see {@link https://doi.org/10.1177/0146621616677520 | Christensen, Makransky and Horton (2017)}
  * @see {@link https://doi.org/10.1177/014662168400800201 | Yen (1984)}
  *
@@ -192,6 +193,12 @@ export function yenQ3CriticalValue<TParameters>(
   checkItemIds(matrix, items);
   checkRandom(random);
   const settings = bootstrapSettings(options);
+  // Every draw can be drawn again before any is calibrated, so the calibration's options are checked here.
+  checkCalibrationOptions(
+    matrix,
+    items.map(({ model }) => model),
+    settings.calibration,
+  );
   const { slopeLimit, estimator } = settings;
   const tested = items.map((item) => !((slopeOf(item) ?? 0) > slopeLimit));
   const nearDeterministic = items.flatMap((item, j) => (tested[j] === true ? [] : [item.id]));
@@ -239,7 +246,7 @@ interface BootstrapSettings<TParameters> {
 
 /**
  * Checks the options of {@link yenQ3CriticalValue} and returns them with their defaults; the calibration's options are
- * checked by each replication's calibration.
+ * checked against the matrix apart.
  *
  * @throws `DataError` when an option of the bootstrap is invalid or an option is unknown.
  */

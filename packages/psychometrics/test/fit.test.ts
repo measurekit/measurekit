@@ -1740,6 +1740,19 @@ describe("yenQ3CriticalValue", () => {
     expect(anchored.redrawn).toBe(0);
   });
 
+  it("checks the calibration's options before any draw, also when every draw is drawn again", () => {
+    // Item 10 at b = 30 never draws a 1, so every replication is drawn again and none is calibrated.
+    const never = items.map((item, j) => ({ ...item, parameters: { a: 1, b: j === 9 ? 30 : 0, c: 0, d: 1 } }));
+    const few = buildResponseMatrix(q3Bootstrap.responses.slice(0, 40), { itemIds: q3Bootstrap.itemIds });
+    const options = { replications: 2, maxRedraws: 2 };
+    expect(yenQ3CriticalValue(few, never, createRandom(4), options)).toMatchObject({ replications: 0, redrawn: 2 });
+    expect(() => yenQ3CriticalValue(few, never, createRandom(4), { ...options, tolerance: -1 })).toThrow(
+      "The option tolerance",
+    );
+    const unknown = { item99: { a: 1, b: 0, c: 0, d: 1 } };
+    expect(() => yenQ3CriticalValue(few, never, createRandom(4), { ...options, fixed: unknown })).toThrow(DataError);
+  });
+
   it("counts the replications whose calibration stops before it converges", () => {
     const result = yenQ3CriticalValue(matrix, items, createRandom(6), {
       replications: 2,
