@@ -4,11 +4,13 @@ import type { ScaleTransformation } from "../equating/internal.js";
 import { checkGroups, type DifGroup } from "./groups.js";
 import {
   estimatedParameters,
+  LINKED_DIF_OPTIONS,
   type LinkedCalibrations,
+  type LinkedDifOptions,
   linkedCalibrations,
   MINIMUM_LINK_ANCHORS,
 } from "./linked-calibrations.js";
-import { LORD_OPTIONS, type LordOptions, linkedModels } from "./lord.js";
+import { linkedModels } from "./lord.js";
 import { type DifAnalysis, purified, significant } from "./purification.js";
 
 /** Raju's areas between an item's curves in the two groups, with their z tests. */
@@ -67,10 +69,10 @@ const UNDEFINED_AREA = {
 export function rajuAreaDif(
   matrix: ResponseMatrix,
   groups: readonly DifGroup[],
-  options: LordOptions,
+  options: LinkedDifOptions,
 ): DifAnalysis<RajuArea> {
   checkGroups(matrix, groups);
-  checkOptions(options, LORD_OPTIONS);
+  checkOptions(options, LINKED_DIF_OPTIONS);
   const models = linkedModels(options.model, matrix.itemIds.length, "Raju's area");
   estimatedParameters(matrix.itemIds, models, options.fixedParameters, "Raju's area").forEach((names, item) => {
     if (names.join() !== AREA_PARAMETERS) {

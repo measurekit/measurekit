@@ -18,12 +18,13 @@ const ESTIMATORS: readonly PersonFitEstimator[] = ["maximum-likelihood", "weight
 /** Options of {@link correctedPersonFit}. */
 export interface CorrectedPersonFitOptions {
   /**
-   * The estimator of the thetas given, which sets Snijders' correction: `maximumLikelihoodEstimate`,
-   * `weightedLikelihoodEstimate` or `posteriorModeEstimate`.
+   * Snijders' correction, set by the estimator of the thetas given: `"maximum-likelihood"` for
+   * `maximumLikelihoodEstimate`, `"weighted-likelihood"` for `weightedLikelihoodEstimate` or `"posterior-mode"` for
+   * `posteriorModeEstimate`.
    *
    * @defaultValue `"maximum-likelihood"`
    */
-  readonly estimator?: PersonFitEstimator;
+  readonly correction?: PersonFitEstimator;
   /**
    * The normal prior of the posterior mode, as the estimator took it; the other estimators have none.
    *
@@ -32,7 +33,7 @@ export interface CorrectedPersonFitOptions {
   readonly prior?: ThetaPrior;
 }
 
-const CORRECTED_PERSON_FIT_OPTIONS: FieldNames<CorrectedPersonFitOptions> = { estimator: true, prior: true };
+const CORRECTED_PERSON_FIT_OPTIONS: FieldNames<CorrectedPersonFitOptions> = { correction: true, prior: true };
 
 /** The corrected person fit of one person's responses. */
 export interface CorrectedPersonFit {
@@ -77,8 +78,8 @@ interface ItemTerms {
  *
  * @param matrix - The 0/1 responses of the persons.
  * @param items - The calibrated dichotomous items, in the order of the matrix's items.
- * @param thetas - Each person's theta from the estimator of `options`, in the order of the matrix.
- * @param options - The estimator and, for the posterior mode, its prior.
+ * @param thetas - Each person's theta, from the estimator that `correction` names, in the order of the matrix.
+ * @param options - The correction and, for the posterior mode, its prior.
  * @returns For each person, lz*.
  * @throws `DataError` when the matrix, the items, the thetas or the options are invalid, an item is not dichotomous, or a
  * response is not a category of its item.
@@ -94,8 +95,8 @@ export function correctedPersonFit(
   checkItemsOfMatrix(matrix, items);
   checkPersonThetas(matrix, thetas);
   checkOptions(options, CORRECTED_PERSON_FIT_OPTIONS);
-  const { estimator = "maximum-likelihood", prior } = options;
-  checkChoice(estimator, "The option estimator", ESTIMATORS);
+  const { correction = "maximum-likelihood", prior } = options;
+  checkChoice(correction, "The option correction", ESTIMATORS);
   const { mean, sd } = checkThetaPrior(prior);
   items.forEach((item, column) => {
     const count = item.model.categoryCount(item.parameters);
@@ -109,8 +110,7 @@ export function correctedPersonFit(
     const theta = thetas[person] ?? 0;
     if (isExtreme(items, row)) return { id, standardized: null };
     fillTerms(terms, items, row, theta);
-    const correction = estimatorTerm(estimator, terms, theta, mean, sd);
-    const standardized = lzStar(terms, correction);
+    const standardized = lzStar(terms, estimatorTerm(correction, terms, theta, mean, sd));
     return { id, standardized: Number.isFinite(standardized) ? standardized : null };
   });
 }

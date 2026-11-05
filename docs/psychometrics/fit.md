@@ -195,10 +195,10 @@ gives Snijders' (2001) lz* of dichotomous items, which corrects for the estimate
 Balanced technical reports of South Dakota and Connecticut flag students by lz in data forensics, citing Snijders for
 its null distribution.
 
-| Option      | Default                | Meaning                                                                                                  |
-| ----------- | ---------------------- | -------------------------------------------------------------------------------------------------------- |
-| `estimator` | `"maximum-likelihood"` | The estimator of the thetas given: `"maximum-likelihood"`, `"weighted-likelihood"` or `"posterior-mode"` |
-| `prior`     | N(0, 1)                | The prior of `"posterior-mode"`, `{ mean, sd }`, as the estimator took it                                |
+| Option       | Default                | Meaning                                                                                                  |
+| ------------ | ---------------------- | -------------------------------------------------------------------------------------------------------- |
+| `correction` | `"maximum-likelihood"` | The estimator of the thetas given: `"maximum-likelihood"`, `"weighted-likelihood"` or `"posterior-mode"` |
+| `prior`      | N(0, 1)                | The prior of `"posterior-mode"`, `{ mean, sd }`, as the estimator took it                                |
 
 With P the probability of a correct response at the person's theta, Q = 1 - P, P' and P'' its derivatives,
 w = ln(P / Q) and r = P' / (P Q), over the answered items:
@@ -224,7 +224,7 @@ const random = createRandom(11);
 const items = simulateItems(twoParameterLogistic, 8, random);
 const matrix = simulateResponses(items, simulateThetas(400, random), random);
 const thetas = matrix.responses.map((row) => weightedLikelihoodEstimate(items, row).theta);
-const fit = correctedPersonFit(matrix, items, thetas, { estimator: "weighted-likelihood" });
+const fit = correctedPersonFit(matrix, items, thetas, { correction: "weighted-likelihood" });
 fit[0]; // => { id: "person1", standardized: 1.20 }
 fit[217]; // => { id: "person218", standardized: -2.66 }: that guide's outlier
 ```

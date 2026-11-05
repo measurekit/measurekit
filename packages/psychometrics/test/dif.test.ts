@@ -16,9 +16,9 @@ import {
   type IrtDifTest,
   type IrtModel,
   irtLikelihoodRatioDif,
+  type LinkedDifOptions,
   type LogisticItem,
   type LogisticRegressionDif,
-  type LordOptions,
   logisticDiscriminantDif,
   logisticRegressionDif,
   lordChiSquare,
@@ -1273,7 +1273,7 @@ describe("lordChiSquare", () => {
   });
 
   it("takes no person weights, which align with the whole matrix while each group's calibration takes its own", () => {
-    expectTypeOf<LordOptions>().not.toHaveProperty("personWeights");
+    expectTypeOf<LinkedDifOptions>().not.toHaveProperty("personWeights");
   });
 });
 

@@ -9,17 +9,17 @@ export interface TwoWayImputationOptions {
    *
    * @defaultValue the lowest response of the matrix
    */
-  readonly minimum?: number;
+  readonly lowest?: number;
   /**
    * The highest score an imputed response may take, an integer at least the highest response of the matrix and at most
    * 2³¹ - 1, the largest response.
    *
    * @defaultValue the highest response of the matrix
    */
-  readonly maximum?: number;
+  readonly highest?: number;
 }
 
-const TWO_WAY_IMPUTATION_OPTIONS: FieldNames<TwoWayImputationOptions> = { minimum: true, maximum: true };
+const TWO_WAY_IMPUTATION_OPTIONS: FieldNames<TwoWayImputationOptions> = { lowest: true, highest: true };
 
 /**
  * Returns a copy of a response matrix with each missing response imputed by two-way imputation with a random error,
@@ -27,7 +27,7 @@ const TWO_WAY_IMPUTATION_OPTIONS: FieldNames<TwoWayImputationOptions> = { minimu
  *
  * @remarks
  * A missing response of person i to item j takes TW + e, rounded to an integer, halves to the even one as R's `round`,
- * and kept from `minimum` to `maximum`. TW = PM_i + IM_j - OM, with PM_i the mean of the person's responses, IM_j that
+ * and kept from `lowest` to `highest`. TW = PM_i + IM_j - OM, with PM_i the mean of the person's responses, IM_j that
  * of the item's and OM that of all of them, and e a normal error of variance the sample variance of the observed
  * responses less their TW, drawn from `random` in the order of the persons, then the items. Responses that are present
  * are kept, and so are the ids and the response times. The error is van Ginkel, van der Ark and Sijtsma's, whose variance
@@ -51,9 +51,9 @@ export function twoWayImputation(
   checkRandom(random);
   checkOptions(options, TWO_WAY_IMPUTATION_OPTIONS);
   const observed = observedMoments(matrix);
-  const { minimum = observed.lowest, maximum = observed.highest } = options;
-  checkBound(minimum, "The option minimum", observed.lowest, "at most the lowest");
-  checkBound(maximum, "The option maximum", observed.highest, "at least the highest");
+  const { lowest = observed.lowest, highest = observed.highest } = options;
+  checkBound(lowest, "The option lowest", observed.lowest, "at most the lowest");
+  checkBound(highest, "The option highest", observed.highest, "at least the highest");
   const { personMeans, itemMeans, mean } = observed;
   const twoWay = (person: number, item: number): number => (personMeans[person] ?? 0) + (itemMeans[item] ?? 0) - mean;
   const errorDeviation = Math.sqrt(residualVariance(matrix, twoWay));
@@ -61,7 +61,7 @@ export function twoWayImputation(
     row.map((response, item) => {
       if (response !== null) return response;
       const value = roundHalfToEven(twoWay(person, item) + errorDeviation * random.normal());
-      return Math.min(maximum, Math.max(minimum, value));
+      return Math.min(highest, Math.max(lowest, value));
     }),
   );
   const { personIds, itemIds, times } = matrix;

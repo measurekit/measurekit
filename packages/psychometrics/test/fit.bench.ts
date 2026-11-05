@@ -63,7 +63,7 @@ test("computes lz*, kernel curves, M2*, the RMSD and local dependence of 40 item
   );
   const calibration = calibrate(matrix, { model: twoParameterLogistic });
   await benchmark(context, "fit.correctedPersonFit", () =>
-    correctedPersonFit(matrix, items, modes, { estimator: "posterior-mode" }),
+    correctedPersonFit(matrix, items, modes, { correction: "posterior-mode" }),
   );
   await benchmark(context, "fit.kernelItemCurves", () => kernelItemCurves(matrix));
   await benchmark(context, "fit.limitedInformationFit", () => limitedInformationFit(matrix, calibration));

@@ -78,12 +78,12 @@ imputation with a random error, as mokken's `twoway`:
 1. A missing response of person i to item j takes TW = PM_i + IM_j - OM, the person's mean response plus the item's
    less the mean of all observed responses.
 2. A normal error is added, of variance the sample variance of the observed responses less their TW.
-3. The value is rounded, a half to the even integer as R's `round`, and kept from `minimum` to `maximum`.
+3. The value is rounded, a half to the even integer as R's `round`, and kept from `lowest` to `highest`.
 
 | Option    | Default                            | Meaning                                                                                 |
 | --------- | ---------------------------------- | --------------------------------------------------------------------------------------- |
-| `minimum` | The lowest response of the matrix  | The lowest imputed score, an integer at most the lowest response                        |
-| `maximum` | The highest response of the matrix | The highest imputed score, an integer at least the highest response and at most 2³¹ - 1 |
+| `lowest`  | The lowest response of the matrix  | The lowest imputed score, an integer at most the lowest response                        |
+| `highest` | The highest response of the matrix | The highest imputed score, an integer at least the highest response and at most 2³¹ - 1 |
 
 ```ts
 import { buildResponseMatrix, createRandom } from "@measurekit/psychometrics";

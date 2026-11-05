@@ -1,51 +1,18 @@
-import {
-  checkBoolean,
-  checkOptions,
-  checkRecord,
-  chiSquareUpperTail,
-  DataError,
-  describe,
-  type FieldNames,
-} from "@measurekit/core";
+import { checkBoolean, checkOptions, checkRecord, chiSquareUpperTail, DataError, describe } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import type { ScaleTransformation } from "../equating/internal.js";
-import {
-  type Calibration,
-  type CalibrationOptions,
-  type IrtModel,
-  isLogisticModel,
-  type LogisticItem,
-  modelsOf,
-} from "../irt/internal.js";
+import { type Calibration, type IrtModel, isLogisticModel, type LogisticItem, modelsOf } from "../irt/internal.js";
 
 import { invert } from "../math/internal.js";
 import { checkGroups, type DifGroup } from "./groups.js";
-import { type LinkedCalibrations, linkedCalibrations, MINIMUM_LINK_ANCHORS } from "./linked-calibrations.js";
-import { type DifAnalysis, type PurificationOptions, purified, significant } from "./purification.js";
-
-/**
- * Options of {@link lordChiSquare}: the calibration of each group, with the asymptotes `fixedParameters` holds held in
- * both, such as a 3PL item's lower asymptote, without fixed items, groups, distributions of theta, covariates or the
- * choice of standard errors, which the statistic needs, or person weights, which align with the whole matrix while
- * each group's calibration takes its own persons, and `purify`.
- */
-export type LordOptions = Omit<
-  CalibrationOptions<LogisticItem>,
-  "fixed" | "fixedCovariance" | "groups" | "latent" | "covariates" | "standardErrors" | "personWeights"
-> &
-  PurificationOptions;
-
-export const LORD_OPTIONS: FieldNames<LordOptions> = {
-  fixedParameters: true,
-  testlets: true,
-  priors: true,
-  itemPriors: true,
-  model: true,
-  quadrature: true,
-  tolerance: true,
-  maxIterations: true,
-  purify: true,
-};
+import {
+  LINKED_DIF_OPTIONS,
+  type LinkedCalibrations,
+  type LinkedDifOptions,
+  linkedCalibrations,
+  MINIMUM_LINK_ANCHORS,
+} from "./linked-calibrations.js";
+import { type DifAnalysis, purified, significant } from "./purification.js";
 
 /** Lord's chi-square of one item. */
 export interface LordChiSquare {
@@ -97,9 +64,9 @@ export interface LordDif extends DifAnalysis<LordChiSquare> {
  * anchors do not vary in a group, or a group's calibration throws it.
  * @see {@link https://doi.org/10.4324/9780203056615 | Lord (1980)}
  */
-export function lordChiSquare(matrix: ResponseMatrix, groups: readonly DifGroup[], options: LordOptions): LordDif {
+export function lordChiSquare(matrix: ResponseMatrix, groups: readonly DifGroup[], options: LinkedDifOptions): LordDif {
   checkGroups(matrix, groups);
-  checkOptions(options, LORD_OPTIONS);
+  checkOptions(options, LINKED_DIF_OPTIONS);
   const models = linkedModels(options.model, matrix.itemIds.length, "Lord's chi-square");
   const { purify = false, ...calibration } = options;
   checkBoolean(purify, "The option purify");
@@ -130,7 +97,7 @@ export function lordChiSquare(matrix: ResponseMatrix, groups: readonly DifGroup[
  * @throws `DataError` when a model is not one of them, or the number of models is not the number of items.
  */
 export function linkedModels(
-  model: LordOptions["model"],
+  model: LinkedDifOptions["model"],
   itemCount: number,
   statistic: string,
 ): readonly IrtModel<LogisticItem>[] {

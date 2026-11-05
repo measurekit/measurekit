@@ -647,7 +647,7 @@ describe("correctedPersonFit", () => {
         ),
       );
       const result = correctedPersonFit(matrix, three ? threePl : fixtureItems(sat12.items), fixture.thetas, {
-        estimator,
+        correction: estimator,
         prior: fixture.prior,
       });
       result.forEach((person, i) => {
@@ -676,8 +676,8 @@ describe("correctedPersonFit", () => {
     const sparse = buildResponseMatrix(matrix.responses.map((row) => [null, ...row.slice(1)]));
     const shorter = buildResponseMatrix(matrix.responses.map((row) => row.slice(1)));
     expectSameNumbers(
-      correctedPersonFit(sparse, pool, thetas, { estimator: "weighted-likelihood" }),
-      correctedPersonFit(shorter, pool.slice(1), thetas, { estimator: "weighted-likelihood" }),
+      correctedPersonFit(sparse, pool, thetas, { correction: "weighted-likelihood" }),
+      correctedPersonFit(shorter, pool.slice(1), thetas, { correction: "weighted-likelihood" }),
     );
   });
 
@@ -699,11 +699,11 @@ describe("correctedPersonFit", () => {
   it("corrects by the prior of the posterior mode", () => {
     const { matrix, items: pool } = simulated(50, 30, 8);
     const thetas = matrix.personIds.map((_, person) => Math.cos(person));
-    const standard = correctedPersonFit(matrix, pool, thetas, { estimator: "posterior-mode" });
-    const given = correctedPersonFit(matrix, pool, thetas, { estimator: "posterior-mode", prior: { mean: 0, sd: 1 } });
+    const standard = correctedPersonFit(matrix, pool, thetas, { correction: "posterior-mode" });
+    const given = correctedPersonFit(matrix, pool, thetas, { correction: "posterior-mode", prior: { mean: 0, sd: 1 } });
     expectSameNumbers(given, standard);
     const shifted = correctedPersonFit(matrix, pool, thetas, {
-      estimator: "posterior-mode",
+      correction: "posterior-mode",
       prior: { mean: 1, sd: 2 },
     });
     expect(shifted.some((person, i) => person.standardized !== standard[i]?.standardized)).toBe(true);
@@ -716,8 +716,8 @@ describe("correctedPersonFit", () => {
     expect(() => correctedPersonFit(matrix, [defined(pool[0]), polytomous], thetas)).toThrow(
       'lz* needs dichotomous items, but item "item2" has 3 categories.',
     );
-    expect(() => correctedPersonFit(matrix, pool, thetas, JSON.parse('{ "estimator": "eap" }'))).toThrow(
-      'The option estimator must be "maximum-likelihood", "weighted-likelihood" or "posterior-mode", found "eap".',
+    expect(() => correctedPersonFit(matrix, pool, thetas, JSON.parse('{ "correction": "eap" }'))).toThrow(
+      'The option correction must be "maximum-likelihood", "weighted-likelihood" or "posterior-mode", found "eap".',
     );
     expect(() => correctedPersonFit(matrix, pool, thetas, { prior: { mean: 0, sd: 0 } })).toThrow(
       "The sd of the prior must be a positive number, found 0.",

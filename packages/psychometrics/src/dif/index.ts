@@ -17,9 +17,10 @@ export { type DiscriminantDif, logisticDiscriminantDif } from "./discriminant.js
 export type { DifGroup } from "./groups.js";
 export { type IrtDif, type IrtDifOptions, type IrtDifTest, irtLikelihoodRatioDif } from "./irt-likelihood-ratio.js";
 export type { LikelihoodRatioTest } from "./likelihood-ratio.js";
+export type { LinkedDifOptions } from "./linked-calibrations.js";
 export type { LiuAgresti } from "./liu-agresti.js";
 export { type LogisticRegressionDif, logisticRegressionDif } from "./logistic-regression.js";
-export { type LordChiSquare, type LordDif, type LordOptions, lordChiSquare } from "./lord.js";
+export { type LordChiSquare, type LordDif, lordChiSquare } from "./lord.js";
 export {
   type EtsCategory,
   type MantelHaenszel,

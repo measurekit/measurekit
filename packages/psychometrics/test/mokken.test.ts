@@ -265,8 +265,8 @@ describe("twoWayImputation", () => {
 
   for (const reference of imputation.cases) {
     const options = {
-      ...(reference.minimum === null ? {} : { minimum: reference.minimum }),
-      ...(reference.maximum === null ? {} : { maximum: reference.maximum }),
+      ...(reference.minimum === null ? {} : { lowest: reference.minimum }),
+      ...(reference.maximum === null ? {} : { highest: reference.maximum }),
     };
     const matrix = buildResponseMatrix(reference.responses);
 
@@ -368,17 +368,17 @@ describe("twoWayImputation", () => {
         createRandom(1),
       ),
     ).toThrow('Two-way imputation needs a response to every item; "item2" has none.');
-    expect(() => twoWayImputation(matrix, createRandom(1), { minimum: 1 })).toThrow(
-      "The option minimum must be at most the lowest response, 0, found 1.",
+    expect(() => twoWayImputation(matrix, createRandom(1), { lowest: 1 })).toThrow(
+      "The option lowest must be at most the lowest response, 0, found 1.",
     );
     // Above 2³¹ - 1 an imputed response could leave the responses of a matrix, as 2,423,739,370 did.
-    expect(() => twoWayImputation(matrix, createRandom(1), { maximum: 2 ** 31 })).toThrow(
-      "The option maximum must be at most 2147483647, the largest response, found 2147483648.",
+    expect(() => twoWayImputation(matrix, createRandom(1), { highest: 2 ** 31 })).toThrow(
+      "The option highest must be at most 2147483647, the largest response, found 2147483648.",
     );
-    expect(() => twoWayImputation(matrix, createRandom(1), { maximum: 1 })).toThrow(
-      "The option maximum must be at least the highest response, 2, found 1.",
+    expect(() => twoWayImputation(matrix, createRandom(1), { highest: 1 })).toThrow(
+      "The option highest must be at least the highest response, 2, found 1.",
     );
-    expect(() => twoWayImputation(matrix, createRandom(1), { minimum: 0.5 })).toThrow("The option minimum");
+    expect(() => twoWayImputation(matrix, createRandom(1), { lowest: 0.5 })).toThrow("The option lowest");
     expect(() => twoWayImputation(matrix, createRandom(1), JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );

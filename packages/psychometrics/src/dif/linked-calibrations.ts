@@ -1,4 +1,4 @@
-import { DataError } from "@measurekit/core";
+import { DataError, type FieldNames } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import { meanSigmaLinking, type ScaleTransformation, transformItem } from "../equating/internal.js";
 import {
@@ -13,6 +13,7 @@ import {
   readFixedParameters,
 } from "../irt/internal.js";
 import type { DifGroup } from "./groups.js";
+import type { PurificationOptions } from "./purification.js";
 
 /** The fewest anchors that link two scales: the mean-sigma transformation needs two locations to have a spread. */
 export const MINIMUM_LINK_ANCHORS = 2;
@@ -20,11 +21,29 @@ export const MINIMUM_LINK_ANCHORS = 2;
 /** The parameters the link leaves unchanged, which alone may be held: the asymptotes. */
 const UNLINKED_PARAMETERS: ReadonlySet<string> = new Set(["c", "d"]);
 
-/** The calibration options of each group in the statistics that compare separate calibrations. */
-type GroupCalibrationOptions = Omit<
+/**
+ * Options of `lordChiSquare` and `rajuAreaDif`: the calibration of each group, with the asymptotes `fixedParameters`
+ * holds held in both, such as a 3PL item's lower asymptote, without fixed items, groups, distributions of theta,
+ * covariates or the choice of standard errors, which the statistic needs, or person weights, which align with the
+ * whole matrix while each group's calibration takes its own persons, and `purify`.
+ */
+export type LinkedDifOptions = Omit<
   CalibrationOptions<LogisticItem>,
   "fixed" | "fixedCovariance" | "groups" | "latent" | "covariates" | "standardErrors" | "personWeights"
->;
+> &
+  PurificationOptions;
+
+export const LINKED_DIF_OPTIONS: FieldNames<LinkedDifOptions> = {
+  fixedParameters: true,
+  testlets: true,
+  priors: true,
+  itemPriors: true,
+  model: true,
+  quadrature: true,
+  tolerance: true,
+  maxIterations: true,
+  purify: true,
+};
 
 /** An item's estimated parameters in both groups, the focal group's on the reference scale, with their covariances. */
 interface LinkedEstimates {
@@ -96,7 +115,7 @@ export function estimatedParameters(
 export function linkedCalibrations(
   matrix: ResponseMatrix,
   groups: readonly DifGroup[],
-  options: GroupCalibrationOptions,
+  options: LinkedDifOptions,
   models: readonly IrtModel<LogisticItem>[],
   statistic: string,
 ): LinkedCalibrations {
