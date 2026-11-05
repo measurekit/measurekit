@@ -252,8 +252,10 @@ Where the code departs from `STANDARDS.md`, with the reason:
   extending it (`EloModel`); a family that cannot work without a value takes it first, as `irt(parameters, options)` and
   `kst(structure, options)` do. Its files: `<family>.ts` for the factory, `state.ts` and `parameters.ts` for the plain data
   and their checks, `estimation.ts` for a fit's numerics.
-- Iterative methods take `tolerance` and `maxIterations` and report `converged` and `iterations`; random starts take
-  `restarts` and `seed`. Defaults are named constants, such as `DEFAULT_TOLERANCE`.
+- Public iterative methods take `tolerance` and `maxIterations` and report `converged` and `iterations`; random starts
+  take `restarts` and `seed`. Defaults are named constants, such as `DEFAULT_TOLERANCE`. An internal iteration that a
+  public method runs inside its own, such as `symmetricEigen` or `poissonFit`, may stop at named constants with their
+  source instead, such as `MAX_ITERATIONS`, and reports `converged` to its caller where it can fail to.
 
 ## Code
 
