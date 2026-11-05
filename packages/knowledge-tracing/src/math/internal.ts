@@ -17,3 +17,4 @@ export { type Jet, quinticDerivative, quinticHermite, quinticMaximum } from "./q
 export { rank } from "./rank.js";
 export { reflectedWalk } from "./reflected-walk.js";
 export type { SparseMatrix } from "./sparse-matrix.js";
+export { standardErrors } from "./standard-errors.js";

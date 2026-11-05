@@ -18,6 +18,7 @@ import {
   rank,
   type SparseMatrix,
   smoothSequence,
+  standardErrors,
 } from "../src/math/internal.js";
 import { defined, expectAllClose, expectClose } from "./assertions.js";
 import { readFixture } from "./fixtures.js";
@@ -175,6 +176,50 @@ describe("newtonCg", () => {
   });
 });
 
+describe("newtonCg away from a positive definite Hessian", () => {
+  it("steps along the preconditioned negative gradient where the curvature is not positive, to the minimum of a function that is not convex at its start", () => {
+    // f = x⁴ / 4 - x² / 2 has its minima at ±1 and f'' = 3x² - 1, which is negative for |x| under 1 / √3: from 0.1 the
+    // system has no curvature along the gradient.
+    let point = 0;
+    const doubleWell = {
+      value: (x: Float64Array) => (x[0] ?? 0) ** 4 / 4 - (x[0] ?? 0) ** 2 / 2,
+      linearize(x: Float64Array, gradient: Float64Array, diagonal: Float64Array) {
+        point = x[0] ?? 0;
+        gradient[0] = point ** 3 - point;
+        diagonal[0] = 1;
+      },
+      hessianVector(v: Float64Array, out: Float64Array) {
+        out[0] = (3 * point * point - 1) * (v[0] ?? 0);
+      },
+    };
+    const x = Float64Array.of(0.1);
+    const result = newtonCg(doubleWell, x, { tolerance: 1e-10, maxIterations: 100 });
+    expect(result.converged).toBe(true);
+    expect(Math.abs((x[0] ?? 0) - 1)).toBeLessThan(1e-9);
+  });
+
+  it("stops without convergence at a minimum that is a kink, where no step short enough lowers the value", () => {
+    // f = 1e6 |x|: its gradient is ±1e6 and its Hessian 0 everywhere, so the step is the negative gradient over the
+    // diagonal, ∓1. The line search tries lengths down to 2⁻³⁹, and from within 2⁻⁴⁰ of the minimum every one rises by
+    // more than the 1e-12 of rounding that it allows.
+    const kink = {
+      value: (x: Float64Array) => 1e6 * Math.abs(x[0] ?? 0),
+      linearize(x: Float64Array, gradient: Float64Array, diagonal: Float64Array) {
+        gradient[0] = 1e6 * Math.sign(x[0] ?? 0);
+        diagonal[0] = 1e6;
+      },
+      hessianVector(_: Float64Array, out: Float64Array) {
+        out[0] = 0;
+      },
+    };
+    const x = Float64Array.of(0.3);
+    const result = newtonCg(kink, x, { tolerance: 1e-8, maxIterations: 500 });
+    expect(result.converged).toBe(false);
+    expect(result.iterations).toBeLessThan(500);
+    expect(Math.abs(x[0] ?? 1)).toBeLessThan(2 ** -39);
+  });
+});
+
 describe("logisticRegression with a ridge", () => {
   const regression = defined(regressions.regressions[0]);
   const design = sparse(regression.design);
@@ -235,6 +280,139 @@ describe("logisticRegression with a ridge", () => {
   });
 });
 
+describe("penalizedNewton where the Schur complement is not positive definite", () => {
+  it("follows the negative gradient of the coefficients and the group intercepts, down to the minimum", () => {
+    // Twenty rows of the intercept in two groups, each with five successes in ten: the minimum of the penalized loss is
+    // at 0 by symmetry. A ridge of -1 and a penalty of 1 on the group intercepts make the Hessian at 0 positive
+    // definite, and a start at 6 not: there the rows weigh p (1 - p) = 0.0025 each, and the coefficient's Schur
+    // complement is under -0.9, whatever the damping.
+    const outcomes = Float64Array.from({ length: 20 }, (_, row) => row % 2);
+    const design = sparse(Array.from(outcomes, () => [1]));
+    const problem = createProblem(
+      design,
+      outcomes,
+      Int32Array.from({ length: 20 }, (_, row) => Math.floor((row % 4) / 2)),
+      2,
+    );
+    const beta = Float64Array.of(6);
+    const intercepts = new Float64Array(2);
+    const result = penalizedNewton(problem, beta, intercepts, {
+      ridge: -1,
+      groupPenalty: 1,
+      flats: [],
+      tolerance: 1e-10,
+      maxIterations: 100,
+    });
+    expect(result.converged).toBe(true);
+    expectAllClose([beta[0] ?? 1, ...intercepts], [0, 0, 0], 1e-8);
+  });
+});
+
+/**
+ * The Laplace approximation of the marginal log-likelihood of a logistic model with an intercept and a slope on x and a
+ * random intercept for each group, at β and σ: the mode of each group by bisection on its score, which is decreasing,
+ * so that nothing of the package's Newton iteration is in it.
+ */
+function laplaceApproximation(
+  rows: readonly { x: number; y: number; group: number }[],
+  groupCount: number,
+  beta: readonly [number, number],
+  sd: number,
+): number {
+  const variance = sd * sd;
+  const softplus = (eta: number): number => Math.max(eta, 0) + Math.log1p(Math.exp(-Math.abs(eta)));
+  let total = 0;
+  for (let group = 0; group < groupCount; group++) {
+    const own = rows.filter((row) => row.group === group);
+    const eta = own.map((row) => beta[0] + beta[1] * row.x);
+    const score = (b: number): number =>
+      own.reduce((sum, row, i) => sum + row.y - logistic((eta[i] ?? 0) + b), 0) - b / variance;
+    let low = -60;
+    let high = 60;
+    for (let i = 0; i < 200; i++) {
+      const middle = (low + high) / 2;
+      if (score(middle) > 0) low = middle;
+      else high = middle;
+    }
+    const b = (low + high) / 2;
+    let information = 0;
+    let logLikelihood = 0;
+    own.forEach((row, i) => {
+      const e = (eta[i] ?? 0) + b;
+      information += logistic(e) * (1 - logistic(e));
+      logLikelihood += row.y * e - softplus(e);
+    });
+    total += logLikelihood - (b * b) / (2 * variance) - Math.log1p(variance * information) / 2;
+  }
+  return total;
+}
+
+/** Draws `groupCount` groups of `perGroup` rows with a slope of 0.8 on x, an intercept of -0.5 and random intercepts of sd `sigma`. */
+function randomInterceptData(seed: number, groupCount: number, perGroup: number, sigma: number) {
+  const random = createRandom(seed);
+  const intercepts = Array.from({ length: groupCount }, () => sigma * random.normal());
+  const rows = Array.from({ length: groupCount * perGroup }, (_, i) => {
+    const group = i % groupCount;
+    const x = random.normal();
+    const y = random.uniform() < logistic(-0.5 + 0.8 * x + defined(intercepts[group])) ? 1 : 0;
+    return { x, y, group };
+  });
+  const design = sparse(rows.map((row) => [1, row.x]));
+  const groups = { indices: Int32Array.from(rows.map((row) => row.group)), count: groupCount, kind: "random" as const };
+  return { rows, design, groups, outcomes: Float64Array.from(rows.map((row) => row.y)) };
+}
+
+describe("logisticRegression with random intercepts", () => {
+  /** The group counts, rows per group and standard deviations of the data sets. */
+  const shapes = [
+    [10, 5, 1],
+    [27, 4, 3],
+    [10, 6, 3],
+    [16, 3, 1],
+    [25, 3, 3],
+    [9, 3, 3],
+  ] as const;
+
+  it("reaches the maximum of the Laplace approximation, whatever the step that its quasi-Newton iteration has to shorten", () => {
+    // The first step of the iteration, from σ = 1, overshoots on some of these sets: the approximation is not concave
+    // in β and ln σ, and a conditional mode takes several bounded steps where the likelihood is flat in a group.
+    shapes.forEach(([groupCount, perGroup, sigma], i) => {
+      const { rows, design, groups, outcomes } = randomInterceptData(100 + i, groupCount, perGroup, sigma);
+      const fit = logisticRegression(design, outcomes, { groups, tolerance: 1e-9, maxIterations: 200 });
+      const label = `data set ${i}`;
+      expect(fit.converged, label).toBe(true);
+      const at = (b0: number, b1: number, tau: number): number =>
+        laplaceApproximation(rows, groupCount, [b0, b1], Math.exp(tau));
+      const [b0 = 0, b1 = 0] = fit.coefficients;
+      const tau = Math.log(defined(fit.sd));
+      expect(Math.abs(fit.logLikelihood - at(b0, b1, tau)), label).toBeLessThan(1e-9);
+      // The score at the estimates, by central differences of the approximation.
+      const h = 1e-5;
+      const slopes = [
+        (at(b0 + h, b1, tau) - at(b0 - h, b1, tau)) / (2 * h),
+        (at(b0, b1 + h, tau) - at(b0, b1 - h, tau)) / (2 * h),
+        (at(b0, b1, tau + h) - at(b0, b1, tau - h)) / (2 * h),
+      ];
+      slopes.forEach((slope, j) => {
+        expect(Math.abs(slope), `${label}, parameter ${j}`).toBeLessThan(1e-6);
+      });
+    });
+  });
+
+  it("stops without convergence once rounding hides any gain, at a point where the score is 0 to the precision of the approximation", () => {
+    const { rows, design, groups, outcomes } = randomInterceptData(100, 10, 5, 1);
+    const fit = logisticRegression(design, outcomes, { groups, tolerance: Number.MIN_VALUE, maxIterations: 500 });
+    expect(fit.converged).toBe(false);
+    expect(fit.iterations).toBeLessThan(500);
+    const at = (b0: number, b1: number, tau: number): number => laplaceApproximation(rows, 10, [b0, b1], Math.exp(tau));
+    const [b0 = 0, b1 = 0] = fit.coefficients;
+    const tau = Math.log(defined(fit.sd));
+    const h = 1e-5;
+    expect(Math.abs((at(b0 + h, b1, tau) - at(b0 - h, b1, tau)) / (2 * h))).toBeLessThan(1e-6);
+    expect(Math.abs((at(b0, b1, tau + h) - at(b0, b1, tau - h)) / (2 * h))).toBeLessThan(1e-6);
+  });
+});
+
 describe("logisticRegression standard errors", () => {
   const regression = defined(regressions.regressions[0]);
   const design = sparse(regression.design);
@@ -284,6 +462,69 @@ describe("logisticRegression standard errors", () => {
       maxIterations: 50,
     });
     expect(fit.standardErrors).toBeNull();
+  });
+
+  describe("with fixed intercepts in learner sets that share no skill", () => {
+    /** The successes out of 4 attempts of each learner at each skill of its set: no cell is all right or all wrong. */
+    const successes = {
+      first: [
+        [1, 3],
+        [2, 2],
+      ],
+      second: [
+        [3, 1],
+        [2, 3],
+      ],
+    };
+
+    /** The rows of a set of two learners, from `learner` and `skill` as their first numbers, one skill a row. */
+    function setRows(counts: readonly (readonly number[])[], learner: number, skill: number) {
+      return counts.flatMap((perSkill, i) =>
+        perSkill.flatMap((right, j) =>
+          Array.from({ length: 4 }, (_, k) => ({ learner: learner + i, skill: skill + j, outcome: k < right ? 1 : 0 })),
+        ),
+      );
+    }
+
+    /** Fits the sets together or apart: the columns are the skills, the groups the learners, and each set has its flat. */
+    function fitSets(sets: readonly (readonly (readonly number[])[])[], standardErrorsAsked = true) {
+      const rows = sets.flatMap((counts, set) => setRows(counts, 2 * set, 2 * set));
+      const design = sparse(
+        rows.map((row) => Array.from({ length: 2 * sets.length }, (_, c) => (c === row.skill ? 1 : 0))),
+      );
+      const flats = sets.map((_, set) => ({
+        coefficients: Float64Array.from({ length: 2 * sets.length }, (_, c) => (Math.floor(c / 2) === set ? -1 : 0)),
+        groups: Int32Array.of(2 * set, 2 * set + 1),
+      }));
+      const indices = Int32Array.from(rows.map((row) => row.learner));
+      const outcomes = Float64Array.from(rows.map((row) => row.outcome));
+      const groups = { indices, count: 2 * sets.length, kind: "fixed" as const, flats };
+      const fit = logisticRegression(design, outcomes, {
+        groups,
+        standardErrors: standardErrorsAsked,
+        tolerance: 1e-12,
+        maxIterations: 100,
+      });
+      return { fit, problem: createProblem(design, outcomes, indices, groups.count), flats };
+    }
+
+    it("are those of each set fitted alone: a flat direction leaves the coefficients of the other sets as they are", () => {
+      const joint = defined(fitSets([successes.first, successes.second]).fit.standardErrors);
+      const first = defined(fitSets([successes.first]).fit.standardErrors);
+      const second = defined(fitSets([successes.second]).fit.standardErrors);
+      expectAllClose(joint.coefficients, [...first.coefficients, ...second.coefficients], 1e-8, "coefficients");
+      expectAllClose(joint.groups, [...first.groups, ...second.groups], 1e-8, "groups");
+    });
+
+    it("give the coefficients the same whether the groups are asked for or not, and no group when they are not", () => {
+      const { fit, problem, flats } = fitSets([successes.first, successes.second]);
+      const asked = defined(fit.standardErrors);
+      const withoutGroups = defined(
+        standardErrors(problem, fit.coefficients, fit.groupIntercepts, { groupPenalty: 0, flats, groups: false }),
+      );
+      expect(withoutGroups.groups).toHaveLength(0);
+      expectAllClose(withoutGroups.coefficients, asked.coefficients, 1e-12);
+    });
   });
 });
 
