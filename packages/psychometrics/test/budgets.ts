@@ -1,13 +1,14 @@
 import { benchmarksOf } from "../../../scripts/bench-harness.js";
 
 /**
- * The most that the fastest sample of each benchmark may take, in milliseconds: five times the fastest sample that the CI
- * runner took, rounded up to one significant digit, as validation/README.md explains. The budgets of irt, multidimensional,
- * cdm, cat, responseTime and sim take the fastest over the six green runs of `bench` of 2026-11-05 from 87fec1e6 to
- * 1c23153c; those of dimensionality, fit, scaling and equating the fastest over the 16 from 2e538dd8 to 1c23153c; the
- * others the median over the green runs of 2026-11-03 and 2026-11-04 of each run's fastest. A budget marked
- * "laptop" is for a benchmark that the runner has not taken, or took only before its code changed: five times the laptop's
- * fastest sample times the median ratio of the runner's to the laptop's in its module, until the runner's samples replace it.
+ * The most that the fastest sample of each benchmark may take, in milliseconds: five times the fastest sample of the CI
+ * runner over at least five green runs of `bench`, rounded up to one significant digit, the one rule of STANDARDS.md section
+ * 11 that validation/README.md explains. The budgets of irt, multidimensional, cdm, cat, responseTime and sim take the six
+ * runs of 2026-11-05 from 87fec1e6 to 1c23153c, the others the 13 runs of 2026-11-05 from 00:30 UTC. equating.linear,
+ * whose fastest samples the runner shows at 0.000 and 0.001 ms, below the thousandth the harness prints, keeps five times
+ * 0.001 ms. A budget marked "laptop" is for a benchmark that the runner has not taken, or took only before its code changed:
+ * five times the laptop's fastest sample times the median ratio of the runner's to the laptop's in its module, until the
+ * runner's samples replace it.
  */
 const BUDGETS = {
   "irt.calibrate1pl": 500,
@@ -94,14 +95,14 @@ const BUDGETS = {
   "fit.andersenTest": 70,
   "fit.martinLofTest": 60,
   "fit.raschWaldTest": 40,
-  "dif.mantelHaenszel": 60,
-  "dif.logisticRegression": 700,
-  "dif.lordChiSquare": 8_000,
-  "dif.lordChiSquarePurified": 8_000,
-  "dif.ordinalLogistic": 600,
-  "dif.irtLikelihoodRatio": 20_000,
-  "dif.rajuArea": 3_000,
-  "dif.sibtest": 80,
+  "dif.mantelHaenszel": 40,
+  "dif.logisticRegression": 400,
+  "dif.lordChiSquare": 5_000,
+  "dif.lordChiSquarePurified": 5_000,
+  "dif.ordinalLogistic": 300,
+  "dif.irtLikelihoodRatio": 8_000,
+  "dif.rajuArea": 2_000,
+  "dif.sibtest": 50,
   "equating.linear": 0.005,
   "equating.equipercentile": 0.02,
   "equating.presmoothing": 0.2,
@@ -116,10 +117,10 @@ const BUDGETS = {
   "equating.kernel": 20,
   "equating.linkCovariance": 30,
   "equating.linkedErrors": 50,
-  "ctt.itemStatistics": 60,
-  "ctt.cronbachAlpha": 20,
-  "ctt.mcdonaldOmega": 9,
-  "ctt.subscoreValue": 20,
+  "ctt.itemStatistics": 30,
+  "ctt.cronbachAlpha": 7,
+  "ctt.mcdonaldOmega": 5,
+  "ctt.subscoreValue": 9,
   "dimensionality.polychoricCorrelations": 80,
   "dimensionality.parallelAnalysis": 800,
   "dimensionality.exploratoryFactorAnalysis": 60,
@@ -131,50 +132,50 @@ const BUDGETS = {
   "dimensionality.smoothCorrelations100": 4, // laptop
   "dimensionality.smoothCorrelations200": 20, // laptop
   "dimensionality.smoothCorrelations1000": 2_000, // laptop
-  "mokken.scalability": 20,
-  "mokken.automatedItemSelection": 6,
+  "mokken.scalability": 10,
+  "mokken.automatedItemSelection": 4,
   "mokken.monotonicity": 20,
-  "mokken.invariantItemOrdering": 200,
-  "mokken.guttmanErrors": 4,
-  "mokken.conditionalAssociation": 200,
-  "mokken.twoWayImputation": 4,
+  "mokken.invariantItemOrdering": 80,
+  "mokken.guttmanErrors": 2,
+  "mokken.conditionalAssociation": 80,
+  "mokken.twoWayImputation": 2,
   "mokken.personScalability": 20,
-  "generalizability.generalizabilityStudy": 30,
-  "generalizability.generalizabilityStudyUnbalanced": 40,
-  "rater.exactAgreement": 0.3,
-  "rater.adjacentAgreement": 0.3,
-  "rater.meanDifference": 3,
-  "rater.cohenKappa": 0.6,
-  "rater.fleissKappa": 0.6,
-  "rater.intraclassCorrelation": 0.4,
-  "rater.automatedScoring": 30, // laptop
-  "rater.automatedScoringGroups": 6, // laptop
-  "rater.routingCurve": 20, // laptop
-  "rater.scoreMappingIsotonic": 8, // laptop
-  "rater.manyFacetRasch": 700,
-  "rater.manyFacetRaschInteractions": 600,
+  "generalizability.generalizabilityStudy": 20,
+  "generalizability.generalizabilityStudyUnbalanced": 20,
+  "rater.exactAgreement": 0.2,
+  "rater.adjacentAgreement": 0.2,
+  "rater.meanDifference": 2,
+  "rater.cohenKappa": 0.4,
+  "rater.fleissKappa": 0.4,
+  "rater.intraclassCorrelation": 0.2,
+  "rater.automatedScoring": 10,
+  "rater.automatedScoringGroups": 3,
+  "rater.routingCurve": 9,
+  "rater.scoreMappingIsotonic": 6,
+  "rater.manyFacetRasch": 400,
+  "rater.manyFacetRaschInteractions": 400,
   "responseTime.calibrateResponseTimes": 40,
   "responseTime.calibrateSpeedAccuracy": 4_000,
   "responseTime.speedEstimates": 7,
-  "explanatory.lltm": 900,
-  "explanatory.linearChange": 9,
-  "explanatory.itemFeatureRegression": 5,
+  "explanatory.lltm": 500,
+  "explanatory.linearChange": 6,
+  "explanatory.itemFeatureRegression": 3,
   "sim.simulateResponses": 20,
-  "similarity.selectPairs": 4, // laptop
-  "similarity.omegaIndex": 20, // laptop
-  "similarity.generalizedBinomialTest": 30, // laptop
-  "similarity.m4Index": 200, // laptop
-  "similarity.kIndex": 40, // laptop
-  "data.scoreResponses": 9,
+  "similarity.selectPairs": 4,
+  "similarity.omegaIndex": 20,
+  "similarity.generalizedBinomialTest": 20,
+  "similarity.m4Index": 200,
+  "similarity.kIndex": 20,
+  "data.scoreResponses": 6,
   "scaling.conversionTableEapSum": 2,
   "scaling.conversionTableTrueScore": 4,
   "scaling.drawJointThetas": 6,
   "scaling.normStatisticsWeighted": 9,
-  "standardSetting.bookmarkCutScore": 0.4,
-  "standardSetting.classificationAccuracy": 6,
-  "standardSetting.livingstonLewis": 5,
-  "parameterization.writeMirtSlopeIntercept": 20,
-  "parameterization.writeMirtIrt": 20,
+  "standardSetting.bookmarkCutScore": 0.2,
+  "standardSetting.classificationAccuracy": 4,
+  "standardSetting.livingstonLewis": 3,
+  "parameterization.writeMirtSlopeIntercept": 7,
+  "parameterization.writeMirtIrt": 7,
 } as const;
 
 /** Runs a benchmark against its budget. */
