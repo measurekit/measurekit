@@ -1,4 +1,4 @@
-import { cholesky } from "@measurekit/core";
+import { cholesky, type ThetaDistribution } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
@@ -47,7 +47,6 @@ import {
   type ParameterCovariance,
   ratingScale,
   type TestItem,
-  type ThetaDistribution,
   threeParameterLogistic,
   twoParameterLogistic,
 } from "../src/irt/index.js";

@@ -220,7 +220,8 @@ Where the code departs from `STANDARDS.md`, with the reason:
   `MeasurekitError` of `@measurekit/core`, so these four have two entries. A user installs one library, and should not
   have to import a transitive dependency for the generator every simulation takes and the errors every function throws;
   `instanceof DataError` holds for both entries, as they are one module. The roots hold nothing else but knowledge
-  tracing's `LearnerModel` and `ModelFit`, which no module owns: every other name has one entry, its module's subpath.
+  tracing's `LearnerModel` and `ModelFit`, which no module owns: every other name has one entry, that of its owner, a
+  module's subpath or `@measurekit/core` for a type of core such as `QMatrix`, which no module re-exports.
 
 ## Naming
 

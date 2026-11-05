@@ -1,4 +1,4 @@
-import { chiSquareUpperTail, normalQuantile } from "@measurekit/core";
+import { chiSquareUpperTail, normalQuantile, type ThetaDistribution, type ThresholdItem } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { createAdaptiveTest, simulateAdaptiveTest, testLength } from "../src/cat/index.js";
@@ -43,8 +43,6 @@ import {
   ratingScale,
   type StandardErrorMethod,
   summedScoreTable,
-  type ThetaDistribution,
-  type ThresholdItem,
   testInformation,
   thetaPosterior,
   threeParameterLogistic,

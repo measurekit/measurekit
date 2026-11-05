@@ -1,3 +1,4 @@
+import type { ThresholdItem } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { buildResponseMatrix, buildResponseRecords, type ResponseMatrix } from "../src/data/index.js";
@@ -22,7 +23,6 @@ import {
   normalPrior,
   oneParameterLogistic,
   partialCredit,
-  type ThresholdItem,
   twoParameterLogistic,
 } from "../src/irt/index.js";
 import { simulateResponses, simulateThetas } from "../src/sim/index.js";

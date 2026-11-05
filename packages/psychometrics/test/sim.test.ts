@@ -1,4 +1,4 @@
-import { cholesky, mean } from "@measurekit/core";
+import { cholesky, mean, type NominalParameters, type ThresholdItem } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { createRandom, DataError } from "../src/index.js";
@@ -11,13 +11,11 @@ import {
   type IrtItem,
   type IrtModel,
   type LogisticItem,
-  type NominalParameters,
   nominalResponse,
   oneParameterLogistic,
   partialCredit,
   type RatingScaleParameters,
   ratingScale,
-  type ThresholdItem,
   threeParameterLogistic,
   twoParameterLogistic,
 } from "../src/irt/index.js";

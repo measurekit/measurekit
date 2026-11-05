@@ -8,7 +8,6 @@
  *
  * @module @measurekit/psychometrics/rater
  */
-export type { KappaWeights } from "@measurekit/core";
 export {
   ACCEPTANCE_THRESHOLDS,
   type AcceptanceFailure,

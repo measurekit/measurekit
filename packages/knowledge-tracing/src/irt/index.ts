@@ -6,7 +6,6 @@
  * @module @measurekit/knowledge-tracing/irt
  */
 
-export type { ThetaDistribution } from "@measurekit/core";
 export type { Ability } from "./ability.js";
 export {
   type AbilityOptions,

@@ -35,7 +35,7 @@ A `QMatrix` lists the attributes each item measures, by item id. It is the `QMat
 `@measurekit/core`, which `@measurekit/knowledge-tracing` shares, so one Q-matrix serves both packages:
 
 ```ts
-import type { QMatrix } from "@measurekit/psychometrics/cdm";
+import type { QMatrix } from "@measurekit/core";
 
 const qMatrix: QMatrix = {
   q1: ["fractions"],

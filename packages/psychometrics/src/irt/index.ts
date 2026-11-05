@@ -6,7 +6,6 @@
  * @module @measurekit/psychometrics/irt
  */
 
-export type { NominalParameters, ThetaDistribution, ThresholdItem } from "@measurekit/core";
 export {
   type AbilityEstimate,
   type AbilityEstimator,

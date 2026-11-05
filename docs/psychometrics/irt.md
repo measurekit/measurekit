@@ -55,7 +55,8 @@ The 1PL is the Rasch model on the N(0, 1) scale: the Rasch difficulty is a · b 
 | `ratingScale` (RSM)        | `{ a, b, steps: [τ1, ...] }`     | ∝ exp(Σ_(j ≤ k) a (θ - b - τ_j)), a and τ shared                | `rsm` with equal free slopes |
 | `nominalResponse` (NRM)    | `{ a: [a1, ...], c: [c1, ...] }` | ∝ exp(a_k θ + c_k)                                              | `nominal`                    |
 
-The type `ThresholdItem` is `{ a, b }`; `RatingScaleParameters` and `NominalParameters` are the others.
+The type `ThresholdItem` of `@measurekit/core` is `{ a, b }`; `RatingScaleParameters` and core's `NominalParameters` are
+the others.
 
 - **GRM** (Samejima). b1 to b(K-1) increase when a > 0 and decrease when a < 0.
 - **GPCM** (Muraki). The step thresholds b1 to b(K-1) need not be ordered.
@@ -102,6 +103,7 @@ number of categories.
 ## Calibration
 
 ```ts
+import type { ThresholdItem } from "@measurekit/core";
 import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import {
   betaPrior,
@@ -111,7 +113,6 @@ import {
   type LogisticItem,
   logNormalPrior,
   threeParameterLogistic,
-  type ThresholdItem,
 } from "@measurekit/psychometrics/irt";
 
 // Items 1 to 3 are multiple choice, scored 0 or 1; item 4 is a constructed response, scored 0 to 2.
@@ -1176,6 +1177,7 @@ flowchart LR
 ```
 
 ```ts
+import type { ThresholdItem } from "@measurekit/core";
 import { createRandom } from "@measurekit/psychometrics";
 import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import {
@@ -1184,7 +1186,6 @@ import {
   type IrtModel,
   type LogisticItem,
   summedScoreTable,
-  type ThresholdItem,
   twoParameterLogistic,
 } from "@measurekit/psychometrics/irt";
 import { simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";

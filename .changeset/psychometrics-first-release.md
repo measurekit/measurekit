@@ -20,7 +20,8 @@ misspell.
 
 Each module is imported from its subpath, such as `@measurekit/psychometrics/irt`, and each name from one entry. The
 package's name gives only what every module uses and core owns: `createRandom`, `Random`, `DataError` and
-`MeasurekitError`.
+`MeasurekitError`. A type of core that the modules take, such as `QMatrix`, `ThresholdItem`, `ThetaDistribution` or
+`KappaWeights`, is imported from `@measurekit/core`.
 
 The EM calibrations of the multidimensional models, the many-facet Rasch model and the linear logistic test model
 accelerate EM with SQUAREM, and the posterior means of a data set tabulate the log probabilities of each item once. At the

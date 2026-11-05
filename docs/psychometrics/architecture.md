@@ -81,7 +81,8 @@ one subpath per module: `@measurekit/psychometrics/cat`,
 `@measurekit/psychometrics/sim`, `@measurekit/psychometrics/similarity` and `@measurekit/psychometrics/standard-setting`.
 Each public name has one entry, its module's subpath. `.` holds only what every module uses and core owns, `createRandom`,
 `Random`, `DataError` and `MeasurekitError`, so that a user does not import core
-([AGENTS.md](../../AGENTS.md#deviations-from-the-standards)). `math/` is not exported.
+([AGENTS.md](../../AGENTS.md#deviations-from-the-standards)). A type of core that the modules take, such as `QMatrix`,
+`ThresholdItem`, `ThetaDistribution` or `KappaWeights`, is imported from `@measurekit/core`. `math/` is not exported.
 
 ## Dependencies between modules
 

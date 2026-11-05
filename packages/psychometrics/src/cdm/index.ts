@@ -6,7 +6,6 @@
  * @module @measurekit/psychometrics/cdm
  */
 
-export type { QMatrix } from "@measurekit/core";
 export { type CdmAccuracyOptions, type CdmClassificationAccuracy, cdmClassificationAccuracy } from "./accuracy.js";
 export {
   type CdmCalibration,

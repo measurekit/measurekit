@@ -5,7 +5,6 @@
  * @module @measurekit/knowledge-tracing/data
  */
 
-export type { QMatrix } from "@measurekit/core";
 export type { Attempt, Event } from "./event.js";
 export { buildEventLog, type EventInput, type EventLog, type EventLogOptions } from "./event-log.js";
 export { type FirstAttemptsOptions, type HintedFirstAttempt, selectFirstAttempts } from "./first-attempts.js";

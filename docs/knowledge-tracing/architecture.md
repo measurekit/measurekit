@@ -71,7 +71,8 @@ and one subpath per module: `@measurekit/knowledge-tracing/data`,
 and `@measurekit/knowledge-tracing/sim`. Each public name has one entry, its module's subpath. `.` holds the model
 interface, `LearnerModel` and `ModelFit`, which no module owns, and what every module uses and core owns, `createRandom`,
 `Random`, `DataError` and `MeasurekitError`, so that a user does not import core
-([AGENTS.md](../../AGENTS.md#deviations-from-the-standards)). `math/` is not exported.
+([AGENTS.md](../../AGENTS.md#deviations-from-the-standards)). A type of core that the modules take, such as `QMatrix` or
+`ThetaDistribution`, is imported from `@measurekit/core`. `math/` is not exported.
 
 ## Dependencies between modules
 

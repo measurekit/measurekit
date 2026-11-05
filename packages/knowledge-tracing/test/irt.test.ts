@@ -3,6 +3,7 @@ import {
   logisticProbabilities,
   nominalProbabilities,
   partialCreditProbabilities,
+  type ThetaDistribution,
 } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
@@ -18,7 +19,6 @@ import {
   type IrtState,
   irt,
   type NominalItem,
-  type ThetaDistribution,
 } from "../src/irt/index.js";
 import { categoryCount, categoryTerms, differences, expectedOutcome } from "../src/irt/internal.js";
 import { reflectedWalk } from "../src/math/internal.js";

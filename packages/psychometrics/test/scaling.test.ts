@@ -1,4 +1,4 @@
-import { chiSquareUpperTail, mean, normalCdf } from "@measurekit/core";
+import { chiSquareUpperTail, mean, normalCdf, type ThetaDistribution } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { buildResponseMatrix } from "../src/data/index.js";
@@ -11,7 +11,6 @@ import {
   summedScoreTable,
   type TestItem,
   type TestletEffect,
-  type ThetaDistribution,
   thetaPosterior,
   twoParameterLogistic,
 } from "../src/irt/index.js";
