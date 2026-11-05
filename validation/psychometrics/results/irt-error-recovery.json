@@ -131,7 +131,10 @@
     {
       "fixedItemsCalibratedOn": "150 other persons",
       "replications": 20,
-      "seeds": [7000, 7019],
+      "seeds": [
+        7000,
+        7019
+      ],
       "shares": {
         "carried": {
           "a": 0.943125,
@@ -450,7 +453,10 @@
     {
       "fixedItemsCalibratedOn": "the same 1,000 persons",
       "replications": 20,
-      "seeds": [7000, 7019],
+      "seeds": [
+        7000,
+        7019
+      ],
       "shares": {
         "carried": {
           "a": 0.9425,
