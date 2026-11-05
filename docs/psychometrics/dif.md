@@ -173,8 +173,8 @@ flowchart LR
   P --> L
 ```
 
-1. It calibrates each group separately with `calibrate`, the `model` and the `options`: the [calibration
-   options](irt.md#calibration) without `fixed`. The model is the 2PL, 3PL or 4PL, and `fixedParameters` holds an asymptote at its value in both
+1. It calibrates each group separately with `calibrate`, the `model` and the `options`, those of the table below.
+   The model is the 2PL, 3PL or 4PL, and `fixedParameters` holds an asymptote at its value in both
    groups, as difR's `c` holds the lower asymptote of a 3PL item: `{ q7: { c: 0.25 } }`. It holds c and d alone, as
    the link moves a and b.
 2. It moves the focal group's estimates to the reference scale by the mean-sigma transformation over the anchors, all
@@ -191,11 +191,11 @@ With `purify: true` the two calibrations are kept: each round links the scales a
 round before, and compares every item, flagged ones included, on that link. The calibrations are not repeated, as in
 difR, so purification costs the linking and the statistics only.
 
-| Option            | Default        | Meaning                                                                                                 |
-| ----------------- | -------------- | ------------------------------------------------------------------------------------------------------- |
-| `fixedParameters` | None           | Values of c and d held in both groups by item id, as in [calibration](irt.md#calibration); not compared |
-| `purify`          | `false`        | [Purification](#purification), with at least 2 anchors and 10 rounds                                    |
-| Others            | As `calibrate` | The [calibration options](irt.md#calibration) without `fixed`, `groups`, `latent` and `standardErrors`  |
+| Option            | Default        | Meaning                                                                                                                                                                                    |
+| ----------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `fixedParameters` | None           | Values of c and d held in both groups by item id, as in [calibration](irt.md#calibration); not compared                                                                                    |
+| `purify`          | `false`        | [Purification](#purification), with at least 2 anchors and 10 rounds                                                                                                                       |
+| Others            | As `calibrate` | `priors`, `itemPriors`, `testlets`, `quadrature`, `tolerance` and `maxIterations` of [calibration](irt.md#calibration); the rest, such as `fixed`, `groups` or `personWeights`, is refused |
 
 The result holds `items`, `{ id, chiSquare, degreesOfFreedom, significance }` each, both calibrations, whose
 `converged` reports their EM, the `transformation` of the final round and the `purification`. difR's ltm uses 21
