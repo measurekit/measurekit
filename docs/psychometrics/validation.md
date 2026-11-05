@@ -970,7 +970,8 @@ Several results of the reference packages are not references:
   has no exact reference. mirt's MH-RM with ten seeds differs from its mean over the seeds by up to 0.19 in a parameter
   (median 0.014), and its standard errors by 44% at the median and 151% at most, with some missing where its information
   is not positive definite. The estimates of each seed here are compared with that mean; the standard errors, whose
-  ratio for one seed is noise, are averaged over the same ten seeds of each program and then compared.
+  ratio for one seed is noise, are averaged over the same ten seeds of each program and held to the standard deviation
+  of the estimates over simulated data sets (below), which shows mirt's to run small.
 - **mirt's MH-RM log-likelihood.** On the five-dimensional case mirt's reported log-likelihood is 22 to 42 below the
   importance-sampling estimate here, which at mirt's own parameters gives -29548.6 against mirt's -29570 to -29590. On
   three dimensions the estimate agrees within about 1 with the exact log-likelihood of EM, so mirt's is not compared.
@@ -1557,7 +1558,7 @@ one item, two persons) are tested against values derived by hand in `test/ctt.te
 | MH-RM against EM, 200 persons: parameters held by `fixedParameters`                                     | 0.7 absolute                                                    | 0.46                      |
 | MH-RM graded parameters; log-likelihood against EM, 120 persons                                         | 0.35; 1.6 absolute                                              | 0.23; 1.04                |
 | MH-RM five-dimensional parameters; correlations against the mean of mirt's runs                         | 0.3; 0.08 absolute                                              | 0.20; 0.034               |
-| MH-RM five-dimensional standard errors averaged over 10 seeds against mirt's: median, range             | 1 ± 0.1; 0.6 to 1.6                                             | 1.12; 0.95 to 1.43        |
+| MH-RM five-dimensional standard errors against the deviation of 50 simulated data sets: median, range   | 1 ± 0.1; 0.6 to 1.6                                             | 1.01; 0.80 to 1.25        |
 | MH-RM complete-data score against `Deriv`                                                               | 1e-10 relative to max(1, \|score\|)                             | 5.4e-14                   |
 | MH-RM observed information against `Deriv`: central, forward differences                                | 1e-8, 2e-4 relative to max(1, \|entry\|)                        | 1.3e-9, 3.9e-5            |
 | Exploratory parameters against the base R maximum                                                       | 2e-4 absolute                                                   | 1.8e-6                    |
@@ -1628,11 +1629,14 @@ variance free; the comparison converts it to the scale of that standard deviatio
 The MH-RM calibrations of the tests run with the default `tolerance` of 1e-3 and the seed 1, on the first 200 persons of
 a fixture, 120 for the graded model, against EM on the same persons; each bound is 1.5 times the worst over the seeds 1 to
 20, rounded up. `validation/psychometrics/multidimensional-mhrm-mirt.ts` compares the five-dimensional case with mirt's
-runs on the seeds 1 to 10, in about four minutes. Each seed's estimates are within 0.20 of mirt's mean and its
-correlations within 0.034, after a dimension that came out reflected, C on seed 5, is turned back. Each standard error
-averaged over the ten seeds of each program gives ratios from 0.95 to 1.43, within 0.6 to 1.6, and a median of 1.12, above
-the bound of 1.1: the standard errors here are larger than mirt's by about a tenth across the parameters, and the study
-fails on it.
+runs on the seeds 1 to 10, in about four minutes: each seed's estimates are within 0.20 of mirt's mean and its
+correlations within 0.034. Each standard error averaged over the ten seeds of each program is a median 1.12 of mirt's,
+from 0.95 to 1.43, so `validation/psychometrics/multidimensional-mhrm-errors.ts` settles which are right, in about 25
+minutes: 50 data sets of 800 persons simulated from the mean of mirt's estimates, each calibrated by MH-RM, give each
+estimate's standard deviation, less MH-RM's own variance over ten seeds of one data set. Against it the averaged errors
+here are a median 1.01, from 0.80 to 1.25, and those of the simulated calibrations 1.01, from 0.80 to 1.26, within the
+bounds of a median within 0.1 of 1 and every ratio from 0.6 to 1.6; mirt's are 0.92, from 0.61 to 1.20, so mirt's MH-RM
+standard errors run small and the study holds this library's to the simulation.
 
 catR's `thetaEst` finds ML, MAP and WLE roots with `uniroot`'s default tolerance, about 1.2e-4; this library's are
 good to 1e-12. catR's EAP uses the trapezoid rule on the 61 points of `posteriorMeanEstimate`, which halves the two

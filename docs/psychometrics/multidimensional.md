@@ -899,7 +899,10 @@ Invalid input throws `DataError` naming the value found.
   here they are the person-wise Louis estimate above. MH-RM's standard errors vary with the seed, in mirt too: mirt's
   differ from their mean over ten seeds by 44% at the median and 151% at most, and some are missing where its
   information is not positive definite, so one seed's are compared with nothing. Averaged over the same ten seeds, the
-  standard errors here are a median 1.12 of mirt's, half of them from 1.04 to 1.17 and all from 0.95 to 1.43.
+  standard errors here are a median 1.12 of mirt's, half of them from 1.04 to 1.17 and all from 0.95 to 1.43. A
+  simulation settles which are right: over 50 data sets of 800 persons drawn from the mean of mirt's estimates, the
+  standard deviation of each estimate is the error both should give, and the errors here are a median 1.01 of it, from
+  0.80 to 1.25, where mirt's are 0.92, from 0.61 to 1.20. mirt's MH-RM standard errors run small, by about 8%.
 - **MH-RM log-likelihood.** The importance-sampling estimate here agrees within about 1 with the exact log-likelihood
   of EM on three dimensions. On the five-dimensional data mirt's reported log-likelihood is 22 to 42 below the estimate
   here, at mirt's own parameters as well, so the two are not compared.
