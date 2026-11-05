@@ -1761,6 +1761,14 @@ describe("yenQ3CriticalValue", () => {
     const anonymous = items.map(({ model, parameters }) => ({ model, parameters }));
     // @ts-expect-error: the items need their ids.
     expect(() => yenQ3CriticalValue(matrix, anonymous, random)).toThrow("Item 1 needs the id");
+    // An id that JSON cannot write, as a circular object, is described, not written.
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    const unwritable = items.map((item, j) => (j === 0 ? { ...item, id: circular } : item));
+    // @ts-expect-error: an id is a string.
+    expect(() => yenQ3CriticalValue(matrix, unwritable, random)).toThrow(
+      'Item 1 needs the id "item1" of the matrix\'s item 1, found an object',
+    );
     expect(() => yenQ3CriticalValue(matrix, items, JSON.parse("{}"))).toThrow(DataError);
     expect(() => yenQ3CriticalValue(matrix, items, random, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",

@@ -6,6 +6,7 @@ import {
   checkRandom,
   checkUnitInterval,
   DataError,
+  describe,
   type FieldNames,
   type Random,
 } from "@measurekit/core";
@@ -315,7 +316,7 @@ function checkItemIds(matrix: ResponseMatrix, items: readonly TestItem[]): void 
     const expected = matrix.itemIds[column];
     if (id !== expected) {
       throw new DataError(
-        `Item ${column + 1} needs the id "${expected}" of the matrix's item ${column + 1}, found ${JSON.stringify(id)}: give the items of a calibration of the matrix, in its order.`,
+        `Item ${column + 1} needs the id "${expected}" of the matrix's item ${column + 1}, found ${describe(id)}: give the items of a calibration of the matrix, in its order.`,
       );
     }
   });
