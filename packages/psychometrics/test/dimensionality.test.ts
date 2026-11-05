@@ -1714,7 +1714,7 @@ describe("smoothCorrelations", () => {
       [1, 0.5],
       [0.5, 1],
     ];
-    expect(() => smoothCorrelations([])).toThrow("The correlations needs at least one row, found 0.");
+    expect(() => smoothCorrelations([])).toThrow("The correlations must have at least one row, found 0.");
     expect(() => smoothCorrelations(JSON.parse("0.5"))).toThrow("The correlations must be an array of rows");
     expect(() => smoothCorrelations([[1, 0.5, 0.5], [0.5]])).toThrow("Row 1 of the correlations needs 2 entries");
     expect(() => smoothCorrelations(JSON.parse("[[1, 0.5], 1]"))).toThrow("Row 2 of the correlations must be an array");

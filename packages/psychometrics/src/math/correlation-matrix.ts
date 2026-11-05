@@ -17,7 +17,7 @@ export function checkCorrelationMatrix(matrix: unknown, label: string, size?: nu
   const rows = matrix as readonly unknown[];
   if (rows.length === 0 || (size !== undefined && rows.length !== size)) {
     throw new DataError(
-      `${name} needs ${size === undefined ? "at least one row" : `${size} rows`}, found ${rows.length}.`,
+      `${name} must have ${size === undefined ? "at least one row" : `${size} rows`}, found ${rows.length}.`,
     );
   }
   const square: (readonly unknown[])[] = [];

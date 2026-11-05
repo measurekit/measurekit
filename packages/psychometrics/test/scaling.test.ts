@@ -1743,7 +1743,7 @@ describe("drawJointThetas", () => {
 
     it("rejects a correlation that is not a symmetric matrix with 1 on the diagonal and entries from -1 to 1", () => {
       expect(() => drawJointThetas(posteriors, [[1, 0.5]], 10, random)).toThrow(
-        "The correlation needs 2 rows, found 1.",
+        "The correlation must have 2 rows, found 1.",
       );
       expect(() => drawJointThetas(posteriors, [[1, 0.5], [0.5]], 10, random)).toThrow(
         "Row 2 of the correlation needs 2 entries, found 1.",
