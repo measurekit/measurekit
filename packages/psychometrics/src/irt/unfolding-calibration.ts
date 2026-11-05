@@ -105,8 +105,9 @@ export function calibrateUnfolding(
   // Checks the quadrature before any stage runs.
   quadratureRule(quadrature);
   const all = compressResponses(data);
-  // The starts hold sums and correlations of every pair of items and decompose them: at the limit of 1,000, about 2 s
-  // and 70 MB on two persons, whatever the data.
+  // The starts hold sums and correlations of every pair of items and decompose them: at the limit of 1,000, about 3 s
+  // and 130 MB on two persons, whatever the data. The three stages then take up to `maxIterations` iterations each,
+  // about 0.1 ms per item an iteration on a few persons, so the item limit bounds their memory and not their time.
   checkMatrixItems(all.itemIds.length, "Unfolding calibration");
   const allTallies = categoryTallies(all);
   const categoryCounts = all.itemIds.map(
