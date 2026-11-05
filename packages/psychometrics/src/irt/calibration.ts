@@ -1,7 +1,12 @@
 import { checkChoice, checkOptions, checkStopping, DataError, iterateToConvergence } from "@measurekit/core";
 import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
 import { largestChange } from "../math/internal.js";
-import { CALIBRATION_OPTIONS, type CalibrationOptions, type StandardErrorMethod } from "./calibration-options.js";
+import {
+  CALIBRATION_OPTIONS,
+  type CalibrationOptions,
+  STANDARD_ERROR_METHODS,
+  type StandardErrorMethod,
+} from "./calibration-options.js";
 import { type ItemState, type Setup, setUp } from "./calibration-setup.js";
 import { crossProductCovariance } from "./cross-product.js";
 import { type ExpectationStep, expectationStep } from "./expectation.js";
@@ -155,8 +160,6 @@ export interface CovarianceCalibration<TParameters> {
    */
   readonly covariance: ParameterCovariance | null;
 }
-
-const STANDARD_ERROR_METHODS: readonly StandardErrorMethod[] = ["none", "hessian", "cross-product"];
 
 /**
  * Calibrates as {@link calibrate} does and also returns the covariance matrix of the estimated item parameters.

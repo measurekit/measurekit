@@ -21,7 +21,12 @@ export {
   calibrate,
   calibrateWithCovariance,
 } from "./calibration.js";
-export type { CalibrationOptions, FixedParameters, StandardErrorMethod } from "./calibration-options.js";
+export {
+  type CalibrationOptions,
+  type FixedParameters,
+  STANDARD_ERROR_METHODS,
+  type StandardErrorMethod,
+} from "./calibration-options.js";
 export { type Setup, setUp } from "./calibration-setup.js";
 export { type ConditionalCalibrationOptions, type ConditionalFit, conditionalFit } from "./conditional-likelihood.js";
 export { derivativeRatios } from "./cross-product.js";

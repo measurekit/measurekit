@@ -1,7 +1,7 @@
 import { checkChoice, checkOptions, checkStopping, DataError, type FieldNames } from "@measurekit/core";
 import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
 import { type Calibration, calibrateResponses } from "./calibration.js";
-import type { CalibrationOptions, StandardErrorMethod } from "./calibration-options.js";
+import { type CalibrationOptions, STANDARD_ERROR_METHODS, type StandardErrorMethod } from "./calibration-options.js";
 import type { IrtModel } from "./model.js";
 import { type QuadratureOptions, quadratureRule } from "./quadrature.js";
 import {
@@ -69,7 +69,6 @@ const DEFAULT_MAX_ITERATIONS = 500;
  * grows with the cube of the items, about 0.3 seconds at 500 and 3 at 1,000, from data of any size.
  */
 const MAX_ITEMS = 500;
-const STANDARD_ERROR_METHODS: readonly StandardErrorMethod[] = ["none", "hessian", "cross-product"];
 
 /**
  * Calibrates the generalized graded unfolding model in the GGUM package's three stages, each starting from the last:

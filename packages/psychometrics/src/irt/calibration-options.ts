@@ -5,12 +5,15 @@ import type { ParameterCovariance } from "./parameter-covariance.js";
 import type { ParameterPrior } from "./prior.js";
 import type { QuadratureOptions } from "./quadrature.js";
 
+/** The values of {@link StandardErrorMethod}, which the calibrations check their option against. */
+export const STANDARD_ERROR_METHODS = ["none", "hessian", "cross-product"] as const;
+
 /**
  * How calibration computes standard errors: `"none"`; `"hessian"`, the observed information, the Hessian of the
  * log-posterior by central differences of its exact gradient, as mirt's `SE.type = "Richardson"`; `"cross-product"`,
  * the sum over persons of the outer products of their score vectors, as mirt's `SE.type = "crossprod"`.
  */
-export type StandardErrorMethod = "none" | "hessian" | "cross-product";
+export type StandardErrorMethod = (typeof STANDARD_ERROR_METHODS)[number];
 
 /**
  * Values of single parameters of estimated items, by item id, then the name of the entry in the item's parameter vector,

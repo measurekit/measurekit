@@ -14,6 +14,7 @@ import {
   type IrtModel,
   maximization,
   oneParameterLogistic,
+  STANDARD_ERROR_METHODS,
   type StandardErrorMethod,
   setUp,
   type TestItem,
@@ -121,7 +122,6 @@ export interface LongitudinalCalibration {
 
 /** The nodes per axis that 2 and 3 occasions default to: mirt's 31 for two dimensions, and 21 for three. */
 const DEFAULT_POINTS: readonly number[] = [31, 21];
-const STANDARD_ERROR_METHODS: readonly StandardErrorMethod[] = ["none", "hessian", "cross-product"];
 
 /**
  * Estimates the item parameters and the distribution of a trait that changes over 2 or 3 occasions, by marginal

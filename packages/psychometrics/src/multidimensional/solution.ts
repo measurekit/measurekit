@@ -1,3 +1,4 @@
+import type { StandardErrorMethod } from "../irt/internal.js";
 import type { ItemState } from "./calibration-setup.js";
 
 /** The estimated distribution of one group of persons. */
@@ -37,6 +38,6 @@ export interface Settings {
   readonly tolerance: number;
   readonly maxIterations: number;
   readonly seed: number;
-  readonly standardErrors: "none" | "hessian" | "cross-product";
+  readonly standardErrors: StandardErrorMethod;
   readonly points: number | undefined;
 }

@@ -1,11 +1,6 @@
 import { checkChoice, checkOptions, checkSeed, checkStopping, DataError } from "@measurekit/core";
 import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
-import {
-  type CompressedResponses,
-  compressResponses,
-  respondentsOf,
-  type StandardErrorMethod,
-} from "../irt/internal.js";
+import { type CompressedResponses, compressResponses, respondentsOf, STANDARD_ERROR_METHODS } from "../irt/internal.js";
 import {
   type CalibrationMethod,
   MULTIDIMENSIONAL_CALIBRATION_OPTIONS,
@@ -93,7 +88,6 @@ export const EM_MAX_ITERATIONS = 500;
 /** The defaults of MH-RM: mirt's `TOL` and `NCYCLES`. */
 const MHRM_TOLERANCE = 1e-3;
 const MHRM_MAX_ITERATIONS = 2000;
-const STANDARD_ERROR_METHODS: readonly StandardErrorMethod[] = ["none", "hessian", "cross-product"];
 const METHODS: readonly CalibrationMethod[] = ["em", "mhrm"];
 
 /**

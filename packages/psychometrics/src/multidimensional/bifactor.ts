@@ -1,6 +1,12 @@
 import { checkChoice, checkIntegerFrom, checkOptions, checkStopping, type FieldNames } from "@measurekit/core";
 import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
-import { compressResponses, type ParameterPrior, respondentsOf, type StandardErrorMethod } from "../irt/internal.js";
+import {
+  compressResponses,
+  type ParameterPrior,
+  respondentsOf,
+  STANDARD_ERROR_METHODS,
+  type StandardErrorMethod,
+} from "../irt/internal.js";
 import { bifactorFit, solveBifactor } from "./bifactor-fit.js";
 import { structureOf } from "./bifactor-structure.js";
 import { assemble, type MultidimensionalCalibration } from "./calibration.js";
@@ -85,7 +91,6 @@ const DEFAULT_TOLERANCE = 1e-4;
 const DEFAULT_MAX_ITERATIONS = 500;
 /** The nodes per dimension: mirt's `bfactor` uses 31, and a second primary dimension makes a three-dimensional grid. */
 const DEFAULT_POINTS = [31, 21] as const;
-const STANDARD_ERROR_METHODS: readonly StandardErrorMethod[] = ["none", "hessian", "cross-product"];
 
 /**
  * Estimates the item parameters of a bifactor or two-tier model by marginal maximum likelihood, with the specific
