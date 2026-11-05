@@ -1270,6 +1270,44 @@ describe("calibration", () => {
     });
   });
 
+  it("gives the same standard errors for records listed against the order of the items as for a matrix", () => {
+    // The scores of a person's items are summed in pairs of the order of the items, which a person's records, in any
+    // order, must not change.
+    const rows = missing.responses.slice(0, 150);
+    const records = rows.flatMap((row, person) =>
+      row
+        .map((response, item) => ({ person: `p${person}`, item: defined(missing.itemIds[item]), response }))
+        .reverse()
+        .flatMap((record) => (record.response === null ? [] : [{ ...record, response: record.response }])),
+    );
+    for (const standardErrors of ["hessian", "cross-product"] as const) {
+      const options = { loadings: missing.loadings, points: 11, tolerance: 1e-8, standardErrors };
+      const listed = calibrateMultidimensional(
+        buildResponseRecords(records, {
+          personIds: rows.map((_, person) => `p${person}`),
+          itemIds: [...missing.itemIds],
+        }),
+        multidimensionalTwoParameterLogistic,
+        options,
+      );
+      const dense = calibrateMultidimensional(
+        buildResponseMatrix(rows, { itemIds: [...missing.itemIds] }),
+        multidimensionalTwoParameterLogistic,
+        options,
+      );
+      dense.items.forEach((item, i) => {
+        for (const [name, error] of Object.entries(defined(item.standardErrors))) {
+          expectClose(
+            defined(listed.items[i]?.standardErrors?.[name]),
+            error,
+            1e-9,
+            `${standardErrors} ${name} ${i + 1}`,
+          );
+        }
+      });
+    }
+  });
+
   it("ignores persons without responses", () => {
     const rows = [...missing.responses.slice(0, 300)];
     const base = calibrateMultidimensional(
@@ -1317,6 +1355,33 @@ describe("calibration", () => {
       priors: { a: logNormalPrior(0, 0.3) },
     });
     expect(lognormal.items.every(({ parameters }) => (parameters.a[0] ?? 0) >= 0)).toBe(true);
+  });
+
+  it("adds the curvature of a prior to the information of both kinds of standard errors", () => {
+    // The information is the data's plus the precision 1 / sd² of a normal prior on an intercept, so that with a prior
+    // whose sd of 0.01 is far tighter than the data's standard error, a tenth of a unit or more, the standard error of
+    // the intercept is the prior's sd: the data's information of a few tens raises 1e4 by half a percent.
+    const data = buildResponseMatrix(m2pl.responses.slice(0, 200), { itemIds: [...m2pl.itemIds] });
+    for (const standardErrors of ["hessian", "cross-product"] as const) {
+      const plain = calibrateMultidimensional(data, multidimensionalTwoParameterLogistic, {
+        loadings: m2pl.loadings,
+        points: 15,
+        tolerance: 1e-8,
+        standardErrors,
+      });
+      const tight = calibrateMultidimensional(data, multidimensionalTwoParameterLogistic, {
+        loadings: m2pl.loadings,
+        points: 15,
+        tolerance: 1e-8,
+        standardErrors,
+        priors: { intercept: normalPrior(0, 0.01) },
+      });
+      tight.items.forEach((item, j) => {
+        const error = defined(item.standardErrors?.intercept);
+        expectClose(error, 0.01, 1e-4, `${standardErrors} intercept ${j + 1}`);
+        expect(error).toBeLessThan(defined(plain.items[j]?.standardErrors?.intercept));
+      });
+    }
   });
 
   it("starts exploratory models from the principal components and uses the dimensions of each item once", () => {
@@ -4156,6 +4221,98 @@ describe("maximum and weighted likelihood estimates", () => {
         const expectedWle = weightedLikelihoodEstimate(unidimensional, pattern, options);
         expectClose(defined(wle.theta[0]), expectedWle.theta, 1e-8, `WLE ${pattern}`);
         expectClose(defined(wle.standardErrors[0]), expectedWle.standardError, 1e-8, `WLE se ${pattern}`);
+      }
+    }
+  });
+
+  it("agrees with the one-dimensional WLE for items so steep that the information underflows away from their answers", () => {
+    // Slopes of several hundreds make P (1 - P) 0 in a double a few hundredths from an item's location, so that the
+    // test information is singular at the points that Fisher scoring and the line search try first, and the estimate
+    // must come from the points where it is not. Each case is the slopes a, the locations b, the responses and the
+    // range, with the intercepts -a b of the logit.
+    const cases: readonly (readonly [number[], number[], number[], readonly [number, number]])[] = [
+      [
+        [1002, 1411, 1177],
+        [0.4, 0.7, -0.8],
+        [1, 0, 1],
+        [-12, 15],
+      ],
+      [
+        [318, 173, 159],
+        [-1.7, 0, -1.8],
+        [1, 0, 1],
+        [-12, 15],
+      ],
+      [
+        [1216, 852, 1317, 1455],
+        [1, 1, 0.8, -1.4],
+        [0, 0, 0, 0],
+        [-8, 10],
+      ],
+      [
+        [536, 968, 1369],
+        [-1.1, 0.5, -0.7],
+        [1, 1, 1],
+        [-4, 5],
+      ],
+      [
+        [561, 1067, 1358],
+        [-0.1, -1.9, 0.1],
+        [1, 1, 1],
+        [-4, 5],
+      ],
+    ];
+    for (const [slopes, locations, responses, range] of cases) {
+      const steep: MultidimensionalItem<Parameters>[] = slopes.map((a, j) => ({
+        model: multidimensionalTwoParameterLogistic,
+        parameters: { a: [a], intercept: -a * defined(locations[j]), c: 0, d: 1 },
+      }));
+      const unidimensional = slopes.map((a, j) => ({
+        model: twoParameterLogistic,
+        parameters: { a, b: defined(locations[j]), c: 0, d: 1 },
+      }));
+      const wle = multidimensionalWeightedLikelihoodEstimate(steep, responses, { range });
+      const expected = weightedLikelihoodEstimate(unidimensional, responses, { range });
+      const label = `slopes ${slopes}, responses ${responses}`;
+      expectClose(defined(wle.theta[0]), expected.theta, 1e-6, `WLE ${label}`);
+      expectClose(defined(wle.standardErrors[0]), expected.standardError, 1e-4 * expected.standardError, `se ${label}`);
+    }
+  });
+
+  it("returns a finite estimate within the range, and no NaN standard error, whatever the steepness of the items", () => {
+    // Slopes from 10 to 15,000 on one to three dimensions, intercepts of a few units, and patterns that are all right, all
+    // wrong, alternating or random: where the information underflows at the points a search tries, the search stops at
+    // the best point it has, and a standard error that cannot be computed is infinite, not NaN.
+    const random = createRandom(2026);
+    for (let trial = 0; trial < 600; trial++) {
+      const dimensions = 1 + (trial % 3);
+      const count = dimensions + 2 + Math.floor(random.uniform() * 3);
+      const steepness = [10, 100, 1000, 10_000][Math.floor(random.uniform() * 4)] ?? 10;
+      const items: MultidimensionalItem<Parameters>[] = Array.from({ length: count }, (_, j) => ({
+        model: multidimensionalTwoParameterLogistic,
+        parameters: {
+          a: Array.from({ length: dimensions }, (__, d) =>
+            d === j % dimensions || random.uniform() < 0.5 ? steepness * (0.5 + random.uniform()) : 0,
+          ),
+          intercept: Math.round(random.normal() * 30) / 10,
+          c: 0,
+          d: 1,
+        },
+      }));
+      const kind = trial % 4;
+      const responses = items.map((_, j) => {
+        if (kind < 2) return 1 - kind;
+        return kind === 2 ? 1 - (j % 2) : Math.round(random.uniform());
+      });
+      const range = [-4 - (trial % 3) * 4, 5 + (trial % 3) * 5] as const;
+      for (const estimate of [multidimensionalMaximumLikelihoodEstimate, multidimensionalWeightedLikelihoodEstimate]) {
+        const { theta, standardErrors } = estimate(items, responses, { range });
+        const label = `${estimate.name} on trial ${trial}`;
+        for (const value of theta) {
+          expect(value, label).toBeGreaterThanOrEqual(range[0]);
+          expect(value, label).toBeLessThanOrEqual(range[1]);
+        }
+        for (const error of standardErrors) expect(error >= 0, label).toBe(true);
       }
     }
   });

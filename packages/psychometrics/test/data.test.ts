@@ -191,6 +191,36 @@ describe("buildResponseMatrix", () => {
     expect(() => buildResponseMatrixFromColumns([[1, 0], [1]])).toThrow("Column 2 has 1 responses, column 1 has 2.");
   });
 
+  it("keeps the times of the responses, leaving a time null where an item was not timed", () => {
+    const times = [
+      [12.5, null, 30],
+      [null, 8, null],
+    ];
+    const matrix = buildResponseMatrix(
+      [
+        [1, 0, 2],
+        [null, 1, null],
+      ],
+      { times },
+    );
+    expect(matrix.times).toEqual(times);
+  });
+
+  it("rejects a time that is not positive or not a number, and a time without a response", () => {
+    const responses = [[1, null]];
+    expect(() => buildResponseMatrix(responses, { times: [[0, null]] })).toThrow(
+      'The time of person "person1" on item "item1" must be a positive number or null, found 0.',
+    );
+    expect(() => buildResponseMatrix(responses, { times: [[-3, null]] })).toThrow("found -3.");
+    expect(() => buildResponseMatrix(responses, { times: JSON.parse('[["slow", null]]') })).toThrow('found "slow".');
+    expect(() => buildResponseMatrix(responses, { times: [[Number.POSITIVE_INFINITY, null]] })).toThrow(
+      "found Infinity.",
+    );
+    expect(() => buildResponseMatrix(responses, { times: [[5, 7]] })).toThrow(
+      'The time of person "person1" on item "item2" needs a response, found 7.',
+    );
+  });
+
   it("rejects rows, columns and options of other types from JavaScript", () => {
     expect(() => buildResponseMatrix(JSON.parse("null"))).toThrow(
       "The rows of a response matrix must be an array, found null.",
@@ -242,6 +272,33 @@ describe("buildResponseRecords", () => {
     expect(() => buildResponseRecords(JSON.parse("[null]"))).toThrow(
       "Record 1 must be an object { person, item, response }, found null.",
     );
+  });
+
+  it("keeps the response time of a record, and rejects a time that is not positive", () => {
+    const timed = [
+      { person: "ana", item: "q1", response: 1, time: 12.5 },
+      { person: "ana", item: "q2", response: 0 },
+    ];
+    expect(buildResponseRecords(timed).records).toEqual(timed);
+    for (const time of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() => buildResponseRecords([{ person: "ana", item: "q1", response: 1, time }])).toThrow(
+        `The time of person "ana" on item "q1" must be a positive number, found ${time}.`,
+      );
+    }
+    expect(() =>
+      buildResponseRecords(JSON.parse('[{ "person": "ana", "item": "q1", "response": 1, "time": "fast" }]')),
+    ).toThrow('must be a positive number, found "fast".');
+  });
+
+  it("rejects records that lack the arrays of ids or records, as loaded from JSON", () => {
+    for (const data of [
+      '{ "personIds": ["ana"], "itemIds": ["q1"] }',
+      '{ "personIds": "ana", "itemIds": [], "records": [] }',
+    ]) {
+      expect(() => checkResponseRecords(JSON.parse(data))).toThrow(
+        "Response records need the arrays personIds, itemIds and records.",
+      );
+    }
   });
 
   it("rejects a hole among the records or the ids of records from JavaScript", () => {

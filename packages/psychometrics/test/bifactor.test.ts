@@ -470,6 +470,9 @@ describe("structure", () => {
     );
     expect(() => structureOf(specific, ids, { q1: ["g", "g"] })).toThrow(DataError);
     expect(() => structureOf(specific, ids, { q1: ["g"] })).toThrow(/primary dimensions of item "q2"/);
+    expect(() =>
+      structureOf(specific, ids, { q1: ["g"], q2: ["g"], q3: ["g"], q4: ["g"], q5: ["g"], q9: ["g"] }),
+    ).toThrow('A primary dimension is given for "q9", which is not an item id.');
   });
 });
 

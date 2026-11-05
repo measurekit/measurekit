@@ -147,7 +147,10 @@ interface Answered {
   count: number;
 }
 
-/** Sets the units a person answered, by item, then the unit of the person's group, and the responses to them. */
+/**
+ * Sets the units a person answered, by item, then the unit of the person's group, and the responses to them. A person's
+ * responses come in item order, as `compressResponses` gives them, so that the units are in the order of their slots.
+ */
 function answeredBy(
   person: Answered,
   units: readonly ScoreUnit[],
@@ -158,21 +161,16 @@ function answeredBy(
   person.count = 0;
   for (let r = responses.offsets[index] ?? 0; r < (responses.offsets[index + 1] ?? 0); r++) {
     const item = responses.items[r] ?? 0;
-    if ((units[item]?.size ?? 0) > 0) insertAnswered(person, item, responses.codes[r] ?? 0);
+    if ((units[item]?.size ?? 0) > 0) appendAnswered(person, item, responses.codes[r] ?? 0);
   }
-  if (latentIndex >= 0) insertAnswered(person, latentIndex, 0);
+  if (latentIndex >= 0) appendAnswered(person, latentIndex, 0);
 }
 
-/** Adds a unit and its response to the person's, keeping the units in order: records may list responses in any order. */
-function insertAnswered(person: Answered, unit: number, code: number): void {
-  let at = person.count++;
-  while (at > 0 && (person.answered[at - 1] ?? 0) > unit) {
-    person.answered[at] = person.answered[at - 1] ?? 0;
-    person.codes[at] = person.codes[at - 1] ?? 0;
-    at--;
-  }
-  person.answered[at] = unit;
-  person.codes[at] = code;
+/** Adds a unit and its response to the person's. */
+function appendAnswered(person: Answered, unit: number, code: number): void {
+  person.answered[person.count] = unit;
+  person.codes[person.count] = code;
+  person.count++;
 }
 
 /** Returns the score units of the items, in item order, and then of each group's distribution that has estimated entries. */

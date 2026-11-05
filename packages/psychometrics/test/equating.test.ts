@@ -436,6 +436,48 @@ describe("moment linking", () => {
       DataError,
     );
   });
+
+  describe("of rating-scale items", () => {
+    // A rating-scale item's locations are b + τ_k for each of its steps, which sum to 0: an item of b = 0.2 and steps
+    // -0.5 and 0.5 has the locations -0.3 and 0.7, and one of b = -0.4 and steps -1 and 1 has -1.4 and 0.6.
+    const rating = (a: number, b: number, steps: number[]): IrtItem => ({
+      model: ratingScale,
+      parameters: { a, b, steps },
+    });
+    const from = [rating(1, 0.2, [-0.5, 0.5]), rating(1, -0.4, [-1, 1])];
+
+    it("shifts by the difference of the mean locations when every location moves by the same amount", () => {
+      const shifted = [rating(1, 0.6, [-0.5, 0.5]), rating(1, 0, [-1, 1])];
+      expectTransformation(meanMeanLinking(from, shifted), { slope: 1, intercept: 0.4 }, 1e-12);
+      expectTransformation(meanSigmaLinking(from, shifted), { slope: 1, intercept: 0.4 }, 1e-12);
+    });
+
+    it("finds the slope that doubles every location, from the locations and not from the slopes alone", () => {
+      // θ' = 2 θ + 0.5 gives a' = a / 2, b' = 2 b + 0.5 and τ' = 2 τ: the locations -0.3, 0.7, -1.4, 0.6 become -0.1,
+      // 1.9, -2.3, 1.7.
+      const moved = [rating(0.5, 0.9, [-1, 1]), rating(0.5, -0.3, [-2, 2])];
+      expectTransformation(meanMeanLinking(from, moved), { slope: 2, intercept: 0.5 }, 1e-12);
+      expectTransformation(meanSigmaLinking(from, moved), { slope: 2, intercept: 0.5 }, 1e-12);
+    });
+
+    it("pools every location of the items, the last step included, when the forms differ by more than a transformation", () => {
+      // The locations of the second form are 0.1, 0.5 of the first item and -0.8, 0.6 of the second, against -0.3, 0.7
+      // and -1.4, 0.6 of the first form. The means are 0.1 and -0.1, and the sums of squares about them 1.22 and 2.86,
+      // so that A is √(1.22 / 2.86) by the standard deviations and 1 by the slopes, which are all 1; B follows by the
+      // means.
+      const other = [rating(1, 0.3, [-0.2, 0.2]), rating(1, -0.1, [-0.7, 0.7])];
+      expectTransformation(meanMeanLinking(from, other), { slope: 1, intercept: 0.2 }, 1e-12);
+      const slope = Math.sqrt(1.22 / 2.86);
+      expectTransformation(meanSigmaLinking(from, other), { slope, intercept: 0.1 + 0.1 * slope }, 1e-12);
+    });
+
+    it("recovers the transformation that moved any rating-scale form, from the item the transformation moves", () => {
+      const transformation = { slope: 1.3, intercept: -0.4 };
+      const moved = from.map((item) => transformItem(item, transformation));
+      expectTransformation(meanMeanLinking(from, moved), transformation, 1e-12);
+      expectTransformation(meanSigmaLinking(from, moved), transformation, 1e-12);
+    });
+  });
 });
 
 describe("transformItem and transformTheta", () => {

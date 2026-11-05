@@ -1,4 +1,4 @@
-import { chiSquareUpperTail } from "@measurekit/core";
+import { chiSquareUpperTail, invertPositiveDefinite } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
@@ -688,6 +688,71 @@ describe("calibrateCdm", () => {
     }
   });
 
+  it("scores a missing response 0, so that a person adds to the information the items they answered alone", () => {
+    // One attribute and four items, 300 persons, a fifth missing each of the first four items. The information is
+    // Σ s sᵀ over persons, with s the score of the eight success probabilities: the posterior mass of a latent group
+    // times (x - P) / (P (1 - P)) for an answered item, and 0 for a missing one; the covariance is its inverse, which
+    // is regular with four items, where two leave the latent classes unidentified. The posterior comes from the
+    // profile proportions and the probabilities of the fit.
+    const random = createRandom(20_261_105);
+    const rates = [
+      [0.2, 0.8],
+      [0.3, 0.9],
+      [0.1, 0.7],
+      [0.35, 0.85],
+    ];
+    const rows = Array.from({ length: 300 }, (_, person) => {
+      const mastered = random.uniform() < 0.55 ? 1 : 0;
+      return rates.map((item, j): number | null =>
+        person % 5 === j ? null : random.uniform() < defined(item[mastered]) ? 1 : 0,
+      );
+    });
+    const result = calibrateCdm(
+      buildResponseMatrix(rows),
+      { item1: ["a"], item2: ["a"], item3: ["a"], item4: ["a"] },
+      { standardErrors: "incomplete", tolerance: 1e-10, maxIterations: 10_000 },
+    );
+    const probabilities = result.items.map((item) => item.probabilities);
+    const size = 2 * rates.length;
+    const information = new Float64Array(size * size);
+    for (const row of rows) {
+      const posterior = result.profiles.map(({ profile, proportion }) =>
+        row.reduce<number>((weight, response, j) => {
+          if (response === null) return weight;
+          const p = defined(probabilities[j]?.[defined(profile[0])]);
+          return weight * (response === 1 ? p : 1 - p);
+        }, proportion),
+      );
+      const total = posterior.reduce((sum, weight) => sum + weight, 0);
+      const score = new Float64Array(size);
+      row.forEach((response, j) => {
+        if (response === null) return;
+        for (const group of [0, 1]) {
+          const p = defined(probabilities[j]?.[group]);
+          const mass = result.profiles.reduce(
+            (sum, { profile }, k) => sum + (profile[0] === group ? defined(posterior[k]) / total : 0),
+            0,
+          );
+          score[2 * j + group] = (mass * (response - p)) / (p * (1 - p));
+        }
+      });
+      for (let a = 0; a < size; a++) {
+        for (let b = 0; b < size; b++) {
+          information[a * size + b] = (information[a * size + b] ?? 0) + defined(score[a]) * defined(score[b]);
+        }
+      }
+    }
+    const covariance = defined(invertPositiveDefinite(information, size));
+    result.items.forEach((item, j) => {
+      for (let a = 0; a < 2; a++) {
+        for (let b = 0; b < 2; b++) {
+          const expected = defined(covariance[(2 * j + a) * size + 2 * j + b]);
+          expectClose(defined(item.covariance?.[a]?.[b]), expected, 1e-8 * Math.abs(expected) + 1e-12, `item ${j + 1}`);
+        }
+      }
+    });
+  });
+
   it("rejects incomplete standard errors for items that are not G-DINA, and other values of the option", () => {
     const matrix = buildResponseMatrix([
       [1, 0],
@@ -762,6 +827,12 @@ describe("calibrateCdm", () => {
     );
     expect(() => calibrateCdm(matrix, { item1: ["a", "a"], item2: ["b"] })).toThrow(
       'Item "item1" lists an attribute twice.',
+    );
+    expect(() => calibrateCdm(matrix, JSON.parse('{ "item1": ["a", 5], "item2": ["b"] }'))).toThrow(
+      'Item "item1" has an attribute that is not a non-empty string: 5.',
+    );
+    expect(() => calibrateCdm(matrix, { item1: ["a", ""], item2: ["b"] })).toThrow(
+      'Item "item1" has an attribute that is not a non-empty string: "".',
     );
     expect(() => calibrateCdm(matrix, qMatrix, { model: JSON.parse('"mixture"') })).toThrow(
       'The option model must be "gdina", "dina", "dino", "acdm", "llm" or "rrum", found "mixture".',
@@ -923,6 +994,19 @@ describe("compareItemModels", () => {
     expect(item?.tests.map(({ statistic }) => statistic)).toEqual([0, 0]);
     expect(item?.tests.map(({ pValue }) => pValue)).toEqual([1, 1]);
     expect(item?.selected).toBe("dina");
+  });
+
+  it("gives no statistic or p-value on a link scale where a success probability of 0 is infinite, and tests the others", () => {
+    const [item] = compareItemModels(twoAttributeCalibration([0, 0.3, 0.4, 0.9], 0.05));
+    const byModel = Object.fromEntries((item?.tests ?? []).map((test) => [test.model, test]));
+    for (const model of ["llm", "rrum"]) {
+      expect(byModel[model]).toMatchObject({ statistic: null, pValue: null, degreesOfFreedom: 1 });
+    }
+    for (const model of ["dina", "dino", "acdm"]) {
+      expect(Number.isFinite(defined(byModel[model]?.statistic))).toBe(true);
+      expect(defined(byModel[model]?.pValue)).toBeGreaterThanOrEqual(0);
+    }
+    expect(["dina", "dino", "acdm", "gdina"]).toContain(item?.selected);
   });
 
   it("rejects calibrations that lack G-DINA items with their covariance, and invalid options", () => {
@@ -1396,11 +1480,82 @@ describe("cdmItemFit", () => {
     for (const item of others) expect(Number.isFinite(defined(item.correlationZ))).toBe(true);
   });
 
+  it("expects of a profile with a proportion of 0 nothing, so that one class makes the items independent", () => {
+    // Every person is in the one class with a proportion above 0, where the items succeed with 0.8 and 0.9: the expected
+    // shares are those, the expected correlation of the two items is 0, and the z of their observed correlation r is
+    // |atanh r| √(N - 3) for each of them.
+    const item = (id: string, probabilities: number[]) => ({
+      id,
+      attributes: ["a"],
+      model: "gdina" as const,
+      probabilities,
+      guessing: defined(probabilities[0]),
+      slip: 1 - defined(probabilities[1]),
+      coefficients: [],
+    });
+    const calibration: CdmCalibration = {
+      attributes: ["a"],
+      items: [item("item1", [0.2, 0.8]), item("item2", [0.3, 0.9])],
+      profiles: [
+        { profile: [0], proportion: 0 },
+        { profile: [1], proportion: 1 },
+      ],
+      logLikelihood: 0,
+      aic: 0,
+      bic: 0,
+      converged: true,
+      iterations: 0,
+    };
+    const rows = [
+      [1, 1],
+      [1, 0],
+      [1, 1],
+      [0, 1],
+      [0, 0],
+      [1, 1],
+      [0, 0],
+      [1, 1],
+      [1, 1],
+      [0, 1],
+    ];
+    const fit = cdmItemFit(buildResponseMatrix(rows), calibration);
+    expect(fit.map((entry) => entry.proportion.expected)).toEqual([0.8, 0.9]);
+    const n = rows.length;
+    const share = (test: (row: number[]) => boolean): number => rows.filter(test).length / n;
+    const both = share((row) => row[0] === 1 && row[1] === 1);
+    const first = share((row) => row[0] === 1 && row[1] === 0);
+    const second = share((row) => row[0] === 0 && row[1] === 1);
+    const neither = share((row) => row[0] === 0 && row[1] === 0);
+    const p = both + first;
+    const q = both + second;
+    const r = (both * neither - first * second) / Math.sqrt(p * (1 - p) * q * (1 - q));
+    const z = Math.abs(Math.atanh(r)) * Math.sqrt(n - 3);
+    for (const entry of fit) expectClose(entry.correlationZ, z, 1e-12);
+  });
+
   it("gives no pair z to a single item", () => {
     const data = buildResponseMatrix([[1], [0], [1], [1]]);
     const [item] = cdmItemFit(data, calibrateCdm(data, { item1: ["a"] }));
     expect(item).toMatchObject({ correlationZ: null, logOddsZ: null, significance: null });
     expect(item?.proportion.z).not.toBeNull();
+  });
+
+  it("gives no z of the correlation with fewer than four persons, whose z has N - 3 in its scale", () => {
+    const itemQ = { item1: ["a"], item2: ["b"] };
+    const four = buildResponseMatrix([
+      [1, 0],
+      [0, 1],
+      [1, 1],
+      [0, 0],
+    ]);
+    const three = buildResponseMatrix(four.responses.slice(0, 3));
+    for (const item of cdmItemFit(three, calibrateCdm(three, itemQ))) {
+      expect(item.correlationZ).toBeNull();
+      expect(item.logOddsZ).not.toBeNull();
+    }
+    for (const item of cdmItemFit(four, calibrateCdm(four, itemQ))) {
+      expect(Number.isFinite(defined(item.correlationZ))).toBe(true);
+    }
   });
 
   it("refuses arguments of other types", () => {

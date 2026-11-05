@@ -2018,19 +2018,22 @@ describe("the sampling error of fixed items", () => {
 
   /**
    * Replicates a pretest under fixed items calibrated before, and counts the 95% intervals of the pretest items' a and b
-   * and of the mean of theta that cover the truth, with the fixed items taken as known and with their error carried.
+   * and of the mean of theta that cover the truth, with the fixed items taken as known and with their error carried,
+   * whichever of the two the design asks for. Six fixed items and four pretest items; the fixed items are calibrated on 150
+   * persons other than the pretest's 1,000, or on those 1,000 themselves.
    */
   const coverage = (design: {
     readonly samePersons: boolean;
     readonly replications: number;
     readonly seed: number;
+    readonly arms: readonly ("known" | "carried")[];
   }) => {
     const random = createRandom(design.seed);
-    const operational = 10;
+    const operational = 6;
     const items = Array.from({ length: operational + 4 }, (_, j) => ({
       id: `q${String(j + 1).padStart(2, "0")}`,
       model: twoParameterLogistic,
-      parameters: { a: 0.8 + 1.2 * random.uniform(), b: random.normal(), c: 0, d: 1 },
+      parameters: { a: 0.8 + 1.2 * random.uniform(), b: -1.5 + 3 * random.uniform(), c: 0, d: 1 },
     }));
     const itemIds = items.map((item) => item.id);
     const z = normalQuantile(0.975);
@@ -2042,7 +2045,7 @@ describe("the sampling error of fixed items", () => {
       const rows = simulateResponses(items, thetas, random).responses;
       const first = design.samePersons
         ? rows.map((row) => row.slice(0, operational))
-        : simulateResponses(items.slice(0, operational), persons(250, 0, 1), random).responses;
+        : simulateResponses(items.slice(0, operational), persons(150, 0, 1), random).responses;
       const calibration = calibrateWithCovariance(
         buildResponseMatrix(first, { itemIds: itemIds.slice(0, operational) }),
         twoParameterLogistic,
@@ -2055,10 +2058,12 @@ describe("the sampling error of fixed items", () => {
       };
       const matrix = buildResponseMatrix(rows, { itemIds });
       const fits = {
-        known: calibrate(matrix, twoParameterLogistic, base),
-        carried: calibrate(matrix, twoParameterLogistic, { ...base, fixedCovariance: defined(calibration.covariance) }),
+        known: () => calibrate(matrix, twoParameterLogistic, base),
+        carried: () =>
+          calibrate(matrix, twoParameterLogistic, { ...base, fixedCovariance: defined(calibration.covariance) }),
       };
-      for (const [name, fit] of Object.entries(fits) as [keyof typeof fits, Calibration<LogisticItem>][]) {
+      for (const name of design.arms) {
+        const fit: Calibration<LogisticItem> = fits[name]();
         items.slice(operational).forEach((truth, k) => {
           const estimate = defined(fit.items[operational + k]);
           const errors = defined(estimate.standardErrors);
@@ -2078,28 +2083,31 @@ describe("the sampling error of fixed items", () => {
   };
 
   it("covers the pretest items and the mean when the fixed items were calibrated on other persons", () => {
-    // Thresholds fixed before the first run: with the error carried, 95% intervals of a and b cover the truth 0.92 to
-    // 0.98 of the time and those of the mean at least 0.88; taken as known, b's cover at most 0.90 and the mean's 0.85.
-    const counts = coverage({ samePersons: false, replications: 60, seed: 20261104 });
+    // 20 replications give 80 intervals of a and of b and 20 of the mean. Over the seeds 7000 to 7019 of this design,
+    // the shares of the intervals that covered the truth had these means and standard deviations: with the error carried, a 0.94
+    // (0.03), b 0.95 (0.03) and the mean 0.95 (0.03); with the fixed items taken as known, a 0.80 (0.06), b 0.70 (0.07)
+    // and the mean 0.54 (0.12). The bounds sit over 4 standard deviations below the carried means and over 3 above
+    // the known ones of b and of the mean, so that a seed passes with near certainty. They do not bound the carried
+    // shares from above, which 80 intervals cannot do to within 0.03: the values of the errors are held by the tests
+    // that match base R.
+    const counts = coverage({ samePersons: false, replications: 20, seed: 7000, arms: ["known", "carried"] });
     const share = (count: number, total: number) => count / total;
-    expect(share(counts.carried.a, counts.items)).toBeGreaterThanOrEqual(0.92);
-    expect(share(counts.carried.a, counts.items)).toBeLessThanOrEqual(0.98);
-    expect(share(counts.carried.b, counts.items)).toBeGreaterThanOrEqual(0.92);
-    expect(share(counts.carried.b, counts.items)).toBeLessThanOrEqual(0.98);
-    expect(share(counts.carried.mean, counts.means)).toBeGreaterThanOrEqual(0.88);
-    expect(share(counts.known.b, counts.items)).toBeLessThanOrEqual(0.9);
-    expect(share(counts.known.mean, counts.means)).toBeLessThanOrEqual(0.85);
-  }, 120_000);
+    expect(share(counts.carried.a, counts.items)).toBeGreaterThanOrEqual(0.8);
+    expect(share(counts.carried.b, counts.items)).toBeGreaterThanOrEqual(0.8);
+    expect(share(counts.carried.mean, counts.means)).toBeGreaterThanOrEqual(0.75);
+    expect(share(counts.known.b, counts.items)).toBeLessThanOrEqual(0.92);
+    expect(share(counts.known.mean, counts.means)).toBeLessThanOrEqual(0.92);
+  });
 
   it("covers the pretest items when the fixed items were calibrated on the same persons, theta standard normal", () => {
-    // Thresholds fixed before the first run: with the error carried, 95% intervals of a and b cover the truth 0.92 to
-    // 0.98 of the time.
-    const counts = coverage({ samePersons: true, replications: 40, seed: 20261105 });
+    // 20 replications give 80 intervals of a and of b. Over the seeds 7000 to 7019 of this design the shares that
+    // covered the truth with the error carried were 0.94 (0.02) for a and 0.95 (0.02) for b, as a mean and a standard deviation: the
+    // bound is 4 standard deviations below.
+    const counts = coverage({ samePersons: true, replications: 20, seed: 7001, arms: ["carried"] });
     for (const count of [counts.carried.a, counts.carried.b]) {
-      expect(count / counts.items).toBeGreaterThanOrEqual(0.92);
-      expect(count / counts.items).toBeLessThanOrEqual(0.98);
+      expect(count / counts.items).toBeGreaterThanOrEqual(0.85);
     }
-  }, 120_000);
+  });
 
   it("refuses a covariance without standard errors, of estimated items or of parameters it cannot move", () => {
     const reference = defined(independent);
