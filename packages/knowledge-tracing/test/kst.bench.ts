@@ -1,7 +1,7 @@
 import { test } from "vitest";
 import { SLOW_OPTIONS } from "../../../scripts/bench-harness.js";
+import { buildEventLog } from "../src/data/index.js";
 import {
-  buildEventLog,
   clauseStructure,
   diffTest,
   iita,
@@ -10,7 +10,7 @@ import {
   structureValidity,
   surmiseStructure,
   unionClosure,
-} from "../src/index.js";
+} from "../src/kst/index.js";
 import { benchmark } from "./budgets.js";
 import { readFixture } from "./fixtures.js";
 

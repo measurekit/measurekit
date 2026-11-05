@@ -126,14 +126,9 @@ const DEFAULT_MAX_ITERATIONS = 500;
  *
  * @example
  * ```ts
- * import {
- *   calibrate,
- *   createRandom,
- *   simulateItems,
- *   simulateResponses,
- *   simulateThetas,
- *   twoParameterLogistic,
- * } from "@measurekit/psychometrics";
+ * import { createRandom } from "@measurekit/psychometrics";
+ * import { calibrate, twoParameterLogistic } from "@measurekit/psychometrics/irt";
+ * import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
  *
  * const random = createRandom(7);
  * const items = simulateItems(twoParameterLogistic, 5, random);

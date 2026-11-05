@@ -2,20 +2,17 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   buildEventLog,
-  createRandom,
-  DataError,
   type Event,
   type EventInput,
   type EventLog,
   type FirstAttemptsOptions,
   type Fold,
-  MeasurekitError,
-  type Random,
   selectFirstAttempts,
   splitByItem,
   splitByLearner,
   splitByTime,
-} from "../src/index.js";
+} from "../src/data/index.js";
+import { createRandom, DataError, MeasurekitError, type Random } from "../src/index.js";
 import { defined } from "./assertions.js";
 import { type EloHoldoutFixture, readFixture } from "./fixtures.js";
 

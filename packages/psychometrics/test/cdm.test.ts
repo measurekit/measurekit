@@ -2,15 +2,7 @@ import { chiSquareUpperTail } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
-  additiveMaximizer,
-  type CdmLink,
-  profilesOf,
-  pseudoInverse,
-  saturatedCoefficients,
-} from "../src/cdm/internal.js";
-import {
   attributeProfiles,
-  buildResponseMatrix,
   type CdmCalibration,
   type CdmModel,
   calibrateCdm,
@@ -18,14 +10,21 @@ import {
   cdmItemFit,
   cdmModelFit,
   compareItemModels,
-  createRandom,
-  DataError,
   nonparametricClassification,
   qMatrixIdentifiability,
-  simulateCdmResponses,
   validateQMatrix,
-} from "../src/index.js";
+} from "../src/cdm/index.js";
+import {
+  additiveMaximizer,
+  type CdmLink,
+  profilesOf,
+  pseudoInverse,
+  saturatedCoefficients,
+} from "../src/cdm/internal.js";
+import { buildResponseMatrix } from "../src/data/index.js";
+import { createRandom, DataError } from "../src/index.js";
 import { multiply, transpose } from "../src/math/internal.js";
+import { simulateCdmResponses } from "../src/sim/index.js";
 import { defined, expectClose } from "./assertions.js";
 import { definedEntries } from "./fixture-items.js";
 import { readFixture } from "./fixtures.js";

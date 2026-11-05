@@ -1,5 +1,5 @@
 import { test } from "vitest";
-import { scoreResponses } from "../src/index.js";
+import { scoreResponses } from "../src/data/index.js";
 import { benchmark } from "./budgets.js";
 import { readFixture } from "./fixtures.js";
 

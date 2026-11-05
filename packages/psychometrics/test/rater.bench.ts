@@ -11,7 +11,7 @@ import {
   routingCurve,
   scoreMapping,
   standardizedMeanDifference,
-} from "../src/index.js";
+} from "../src/rater/index.js";
 import { benchmark } from "./budgets.js";
 import { type RaterAutomatedScoringFixture, readFixture } from "./fixtures.js";
 

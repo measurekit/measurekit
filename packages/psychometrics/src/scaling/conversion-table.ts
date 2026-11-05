@@ -98,7 +98,8 @@ const METHODS: readonly ConversionMethod[] = ["eap-sum", "true-score"];
  *
  * @example
  * ```ts
- * import { conversionTable, twoParameterLogistic } from "@measurekit/psychometrics";
+ * import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+ * import { conversionTable } from "@measurekit/psychometrics/scaling";
  *
  * const items = [
  *   { model: twoParameterLogistic, parameters: { a: 1.2, b: -0.8, c: 0, d: 1 } },

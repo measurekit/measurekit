@@ -1,27 +1,19 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { buildEventLog, type Event, type EventInput, type EventLog, splitByLearner } from "../src/data/index.js";
+import { compareModels, crossValidate, learningCurve } from "../src/evaluate/index.js";
+import { createRandom, DataError } from "../src/index.js";
 import {
   afm,
-  buildEventLog,
-  compareModels,
-  createRandom,
-  crossValidate,
-  DataError,
-  type Event,
-  type EventInput,
-  type EventLog,
   type LogisticFeature,
   type LogisticOptions,
   type LogisticParameters,
   type LogisticState,
-  learningCurve,
   logistic,
   type Proficiency,
   pfa,
   searchRates,
-  simulate,
-  splitByLearner,
-} from "../src/index.js";
+} from "../src/logistic/index.js";
 import {
   checkTerms,
   type FeatureSpec,
@@ -30,6 +22,7 @@ import {
   nextHistory,
   type SkillHistory,
 } from "../src/logistic/internal.js";
+import { simulate } from "../src/sim/index.js";
 import { allPredicted, defined, expectAllClose, expectClose } from "./assertions.js";
 import { type LogisticLktFeaturesFixture, type LogisticRatesFixture, readFixture } from "./fixtures.js";
 import { expectUnaffectedByLessons, online } from "./logs.js";

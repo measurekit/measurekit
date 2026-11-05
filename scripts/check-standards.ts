@@ -543,19 +543,29 @@ export function checkReadonlyResults(files: Files): Violation[] {
   return found;
 }
 
-/** A relative re-export of a module's `index.ts`: the path of the file it takes from, and the names it takes. */
+/** A re-export of a source file: the path of the file it takes from, and the names it takes. */
 interface Reexport {
   readonly target: string;
   readonly names: ReadonlySet<string> | "all";
 }
 
-/** The relative re-exports of values in a source file. */
+/**
+ * The source file of a specifier: a relative path from the file, or an entry of a package of the family, such as
+ * `@measurekit/core`, whose re-exports a library's root holds; undefined for any other package.
+ */
+function sourceOf(file: string, specifier: string): string | undefined {
+  if (specifier.startsWith(".")) return posix.normalize(posix.join(dirname(file), specifier.replace(/\.js$/, ".ts")));
+  const [, folder, subpath] = /^@measurekit\/([^/]+)(\/.+)?$/.exec(specifier) ?? [];
+  return folder === undefined ? undefined : `packages/${folder}/src${subpath ?? ""}/index.ts`;
+}
+
+/** The re-exports of values in a source file, relative or from a package of the family. */
 function reexportsOf(file: string, source: ts.SourceFile): Reexport[] {
   return source.statements.flatMap((statement): Reexport[] => {
     if (!ts.isExportDeclaration(statement) || statement.isTypeOnly) return [];
     const specifier = (statement.moduleSpecifier as ts.StringLiteral | undefined)?.text;
-    if (specifier === undefined || !specifier.startsWith(".")) return [];
-    const target = posix.normalize(posix.join(dirname(file), specifier.replace(/\.js$/, ".ts")));
+    const target = specifier === undefined ? undefined : sourceOf(file, specifier);
+    if (target === undefined) return [];
     const { exportClause } = statement;
     if (exportClause === undefined) return [{ target, names: "all" }];
     if (!ts.isNamedExports(exportClause)) return [];

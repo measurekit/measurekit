@@ -1,5 +1,9 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import type { FacetedScore } from "../src/data/index.js";
+import { createRandom, DataError } from "../src/index.js";
+import { maximumLikelihoodEstimate, type PersonEstimate } from "../src/irt/index.js";
+import { standardDeviation } from "../src/math/internal.js";
 import {
   ACCEPTANCE_THRESHOLDS,
   type AutomatedScore,
@@ -7,12 +11,9 @@ import {
   automatedScoreAgreement,
   automatedScoreDrift,
   cohenKappa,
-  createRandom,
-  DataError,
   exactAgreement,
   expectedRating,
   type FacetBias,
-  type FacetedScore,
   fleissKappa,
   intraclassCorrelation,
   type ManyFacetRasch,
@@ -20,8 +21,6 @@ import {
   manyFacetFit,
   manyFacetRasch,
   mappedScore,
-  maximumLikelihoodEstimate,
-  type PersonEstimate,
   ratingCorrelation,
   replayShift,
   routingCurve,
@@ -29,8 +28,7 @@ import {
   scoreMapping,
   standardizedMeanDifference,
   validateAutomatedScores,
-} from "../src/index.js";
-import { standardDeviation } from "../src/math/internal.js";
+} from "../src/rater/index.js";
 import { summarizeFacet } from "../src/rater/internal.js";
 import { defined, expectClose } from "./assertions.js";
 import { type RaterAutomatedScoringFixture, readFixture } from "./fixtures.js";

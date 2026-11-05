@@ -1,20 +1,16 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { buildResponseMatrix, type ResponseMatrix } from "../src/data/index.js";
+import { DataError } from "../src/index.js";
+import { type IrtItem, nominalResponse, threeParameterLogistic, twoParameterLogistic } from "../src/irt/index.js";
 import {
-  buildResponseMatrix,
-  DataError,
   generalizedBinomialTest,
-  type IrtItem,
   kIndex,
   m4Index,
-  nominalResponse,
   omegaIndex,
   type PersonPair,
-  type ResponseMatrix,
   selectPairs,
-  threeParameterLogistic,
-  twoParameterLogistic,
-} from "../src/index.js";
+} from "../src/similarity/index.js";
 import { defined } from "./assertions.js";
 import { readFixture } from "./fixtures.js";
 

@@ -1,5 +1,6 @@
 import { test } from "vitest";
-import { type IrtItem, twoParameterLogistic, writeMirtIrt, writeMirtSlopeIntercept } from "../src/index.js";
+import { type IrtItem, twoParameterLogistic } from "../src/irt/index.js";
+import { writeMirtIrt, writeMirtSlopeIntercept } from "../src/parameterization/index.js";
 import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
 import { type BenchIrtFixture, readFixture } from "./fixtures.js";

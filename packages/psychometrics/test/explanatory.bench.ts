@@ -1,12 +1,7 @@
 import { test } from "vitest";
-import {
-  buildResponseMatrix,
-  type CalibratedItem,
-  itemFeatureRegression,
-  linearChange,
-  lltm,
-  twoParameterLogistic,
-} from "../src/index.js";
+import { buildResponseMatrix } from "../src/data/index.js";
+import { itemFeatureRegression, linearChange, lltm } from "../src/explanatory/index.js";
+import { type CalibratedItem, twoParameterLogistic } from "../src/irt/index.js";
 import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
 import { readFixture } from "./fixtures.js";

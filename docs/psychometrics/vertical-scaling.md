@@ -37,19 +37,12 @@ persons of grade 3 have theta ~ N(0, 1), those of grade 4 N(0.8, 1.2²) and thos
 each. Both designs recover these, and report the growth from the scale of grade 3.
 
 ```ts
-import {
-  buildResponseMatrix,
-  calibrate,
-  chainTransformations,
-  createRandom,
-  normalDistribution,
-  scaleGrowth,
-  simulateItems,
-  simulateResponses,
-  simulateThetas,
-  stockingLordLinking,
-  twoParameterLogistic,
-} from "@measurekit/psychometrics";
+import { createRandom } from "@measurekit/psychometrics";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
+import { chainTransformations, stockingLordLinking } from "@measurekit/psychometrics/equating";
+import { calibrate, twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { scaleGrowth } from "@measurekit/psychometrics/scaling";
+import { normalDistribution, simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
 
 // Three grades take forms of 20 items from a pool of 48; each form shares 6 items with the form of the grade below.
 const FORM = 20;

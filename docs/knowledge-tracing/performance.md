@@ -116,21 +116,20 @@ Each entry point bundled alone, as a host's bundler makes it: minified with esbu
 the entry, core from its sources. The bytes and the modules are those of the entry chunk and the chunks it imports
 statically, which load with it; a module that a dynamic `import()` loads later is a chunk of its own and is not counted.
 The modules each holds are those the import rules of [AGENTS.md](../../AGENTS.md#dependencies) allow it. Every package
-declares `sideEffects: false`, so a named import from the root of the library holds only what that name needs, such as
-`bkt` from `@measurekit/knowledge-tracing`.
+declares `sideEffects: false`, so a named import holds only what that name needs.
 
-| Entry point                              | Minified (bytes) | Gzip (bytes) | Modules it holds besides its own      |
-| ---------------------------------------- | ---------------: | -----------: | ------------------------------------- |
-| `@measurekit/knowledge-tracing`          |          145,441 |       49,337 | every module of the package, and core |
-| `@measurekit/knowledge-tracing/bkt`      |           25,716 |        9,163 | core, data, math                      |
-| `@measurekit/knowledge-tracing/data`     |            6,177 |        2,414 | core, math                            |
-| `@measurekit/knowledge-tracing/elo`      |            7,175 |        2,507 | core, data, math                      |
-| `@measurekit/knowledge-tracing/evaluate` |           17,666 |        6,481 | core, data, math, model               |
-| `@measurekit/knowledge-tracing/irt`      |           14,517 |        5,652 | core, data, math                      |
-| `@measurekit/knowledge-tracing/kst`      |           47,128 |       16,705 | core, data, math                      |
-| `@measurekit/knowledge-tracing/logistic` |           50,060 |       16,496 | core, data, math, model               |
-| `@measurekit/knowledge-tracing/practice` |            6,689 |        2,501 | core, data, model                     |
-| `@measurekit/knowledge-tracing/sim`      |            4,834 |        1,820 | core, data, model                     |
+| Entry point                              | Minified (bytes) | Gzip (bytes) | Modules it holds besides its own |
+| ---------------------------------------- | ---------------: | -----------: | -------------------------------- |
+| `@measurekit/knowledge-tracing`          |            2,572 |        1,348 | core                             |
+| `@measurekit/knowledge-tracing/bkt`      |           25,716 |        9,163 | core, data, math                 |
+| `@measurekit/knowledge-tracing/data`     |            6,177 |        2,414 | core, math                       |
+| `@measurekit/knowledge-tracing/elo`      |            7,175 |        2,507 | core, data, math                 |
+| `@measurekit/knowledge-tracing/evaluate` |           17,666 |        6,481 | core, data, math, model          |
+| `@measurekit/knowledge-tracing/irt`      |           14,517 |        5,652 | core, data, math                 |
+| `@measurekit/knowledge-tracing/kst`      |           47,128 |       16,705 | core, data, math                 |
+| `@measurekit/knowledge-tracing/logistic` |           50,060 |       16,496 | core, data, math, model          |
+| `@measurekit/knowledge-tracing/practice` |            6,689 |        2,501 | core, data, model                |
+| `@measurekit/knowledge-tracing/sim`      |            4,834 |        1,820 | core, data, model                |
 
 `scripts/test/entry-sizes.test.ts`, which `pnpm test --project scripts` runs without a build, bundles each entry point
 and fails when it takes more than its budget after gzip, or holds a module that its budget in `scripts/size-budgets.ts`

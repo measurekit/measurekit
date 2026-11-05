@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import { SLOW_OPTIONS } from "../../../scripts/bench-harness.js";
-import { buildResponseMatrix, calibrateBifactor } from "../src/index.js";
+import { buildResponseMatrix } from "../src/data/index.js";
+import { calibrateBifactor } from "../src/multidimensional/index.js";
 import { benchmark } from "./budgets.js";
 import { readFixture } from "./fixtures.js";
 

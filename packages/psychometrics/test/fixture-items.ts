@@ -11,7 +11,7 @@ import {
   type TestItem,
   threeParameterLogistic,
   twoParameterLogistic,
-} from "../src/index.js";
+} from "../src/irt/index.js";
 import { defined } from "./assertions.js";
 
 /**

@@ -53,8 +53,9 @@ const ADAPTIVE_TEST_OPTIONS: FieldNames<AdaptiveTestOptions> = {
  *
  * @example
  * ```ts
- * import { createRandom, twoParameterLogistic } from "@measurekit/psychometrics";
+ * import { createRandom } from "@measurekit/psychometrics";
  * import { createAdaptiveTest, testLength } from "@measurekit/psychometrics/cat";
+ * import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
  *
  * const pool = [
  *   { id: "q1", model: twoParameterLogistic, parameters: { a: 1, b: -1, c: 0, d: 1 } },

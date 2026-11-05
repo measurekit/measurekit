@@ -68,8 +68,10 @@ and one subpath per module: `@measurekit/knowledge-tracing/data`,
 `@measurekit/knowledge-tracing/evaluate`, `@measurekit/knowledge-tracing/elo`,
 `@measurekit/knowledge-tracing/bkt`, `@measurekit/knowledge-tracing/logistic`,
 `@measurekit/knowledge-tracing/irt`, `@measurekit/knowledge-tracing/kst`, `@measurekit/knowledge-tracing/practice`
-and `@measurekit/knowledge-tracing/sim`. Public names are unique across modules, so `.` re-exports all of them, with
-the model interface. Only the random number generator is public in `math/`.
+and `@measurekit/knowledge-tracing/sim`. Each public name has one entry, its module's subpath. `.` holds the model
+interface, `LearnerModel` and `ModelFit`, which no module owns, and what every module uses and core owns, `createRandom`,
+`Random`, `DataError` and `MeasurekitError`, so that a user does not import core
+([AGENTS.md](../../AGENTS.md#deviations-from-the-standards)). `math/` is not exported.
 
 ## Dependencies between modules
 

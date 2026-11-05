@@ -1,5 +1,5 @@
 import { test } from "vitest";
-import { generalizabilityStudy } from "../src/index.js";
+import { generalizabilityStudy } from "../src/generalizability/index.js";
 import { benchmark } from "./budgets.js";
 import { readFixture } from "./fixtures.js";
 

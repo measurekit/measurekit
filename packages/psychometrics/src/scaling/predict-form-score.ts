@@ -33,7 +33,8 @@ import {
  *
  * @example
  * ```ts
- * import { predictFormScore, thetaPosterior, twoParameterLogistic } from "@measurekit/psychometrics";
+ * import { thetaPosterior, twoParameterLogistic } from "@measurekit/psychometrics/irt";
+ * import { predictFormScore } from "@measurekit/psychometrics/scaling";
  *
  * const item = (b: number) => ({ model: twoParameterLogistic, parameters: { a: 1.1, b, c: 0, d: 1 } });
  * const practice = [item(-1), item(0), item(1)];

@@ -1,6 +1,7 @@
 import { createRandom } from "@measurekit/core";
 import { test } from "vitest";
-import { type IrtItem, simulateResponses, simulateThetas, twoParameterLogistic } from "../src/index.js";
+import { type IrtItem, twoParameterLogistic } from "../src/irt/index.js";
+import { simulateResponses, simulateThetas } from "../src/sim/index.js";
 import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
 import { type BenchIrtFixture, readFixture } from "./fixtures.js";

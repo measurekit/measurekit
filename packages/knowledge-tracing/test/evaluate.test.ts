@@ -1,25 +1,26 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { bkt } from "../src/bkt/index.js";
+import {
+  buildEventLog,
+  type EventLog,
+  type Fold,
+  splitByItem,
+  splitByLearner,
+  splitByTime,
+} from "../src/data/index.js";
+import { elo } from "../src/elo/index.js";
 import {
   accuracy,
-  afm,
   alignPredictions,
   auc,
-  bkt,
-  buildEventLog,
   calibrationCurve,
   categorizeCurve,
   compareByLearner,
   compareModels,
-  createRandom,
   crossValidate,
-  DataError,
-  type EventLog,
-  elo,
-  type Fold,
   fitPowerLaw,
   kappa,
-  type LearnerModel,
   type LearningCurvePoint,
   learningCurve,
   logLoss,
@@ -28,10 +29,9 @@ import {
   metricsByOpportunity,
   rmse,
   rSquared,
-  splitByItem,
-  splitByLearner,
-  splitByTime,
-} from "../src/index.js";
+} from "../src/evaluate/index.js";
+import { createRandom, DataError, type LearnerModel } from "../src/index.js";
+import { afm } from "../src/logistic/index.js";
 import { allPredicted, defined, expectAllClose, expectClose } from "./assertions.js";
 import { type EloHoldoutFixture, readFixture } from "./fixtures.js";
 

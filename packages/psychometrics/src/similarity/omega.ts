@@ -43,7 +43,8 @@ export interface OmegaIndex {
  *
  * @example
  * ```ts
- * import { buildResponseMatrix, nominalResponse } from "@measurekit/psychometrics";
+ * import { buildResponseMatrix } from "@measurekit/psychometrics/data";
+ * import { nominalResponse } from "@measurekit/psychometrics/irt";
  * import { omegaIndex } from "@measurekit/psychometrics/similarity";
  *
  * // Three options per item: the copier's choices repeat the source's on every item.

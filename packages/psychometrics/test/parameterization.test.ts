@@ -1,7 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { DataError } from "../src/index.js";
 import {
-  DataError,
   fourParameterLogistic,
   generalizedGradedUnfolding,
   generalizedPartialCredit,
@@ -9,22 +9,26 @@ import {
   type IrtItem,
   type IrtModel,
   type LogisticItem,
+  nominalResponse,
+  oneParameterLogistic,
+  threeParameterLogistic,
+  twoParameterLogistic,
+} from "../src/irt/index.js";
+import {
   type MultidimensionalItem,
   type MultidimensionalModel,
   multidimensionalGradedResponse,
   multidimensionalThreeParameterLogistic,
   multidimensionalTwoParameterLogistic,
-  nominalResponse,
-  oneParameterLogistic,
+} from "../src/multidimensional/index.js";
+import {
   readMirtIrt,
   readMirtMultidimensional,
   readMirtSlopeIntercept,
-  threeParameterLogistic,
-  twoParameterLogistic,
   writeMirtIrt,
   writeMirtMultidimensional,
   writeMirtSlopeIntercept,
-} from "../src/index.js";
+} from "../src/parameterization/index.js";
 import { arbitraryItem } from "./arbitraries.js";
 import { defined, expectClose, expectParameters } from "./assertions.js";
 import { MODELS } from "./fixture-items.js";

@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { SLOW_OPTIONS } from "../../../scripts/bench-harness.js";
+import { buildResponseMatrix } from "../src/data/index.js";
 import {
-  buildResponseMatrix,
   calibrateLongitudinal,
   calibrateMultidimensional,
   multidimensionalEstimates,
@@ -12,7 +12,7 @@ import {
   multidimensionalTwoParameterLogistic,
   multidimensionalWeightedLikelihoodEstimate,
   rotateLoadings,
-} from "../src/index.js";
+} from "../src/multidimensional/index.js";
 import { benchmark } from "./budgets.js";
 import { readFixture } from "./fixtures.js";
 

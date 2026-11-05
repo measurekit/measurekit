@@ -21,14 +21,15 @@ const PACKAGE_SOURCES = [
 /**
  * Returns the project of the benchmarks of a package. They time its build, as Node.js loads it: Vitest's module runner
  * turns each import of a source file into a getter, which stops the compiler from inlining a call across modules and
- * makes a call of a small function several times as slow as it is for a user. A benchmark imports `../src/index.js`; the
- * project points it at the build, which `pnpm bench` makes first, and keeps Vitest from transforming the build. The
- * files run one after another, so that no benchmark competes with another for the processor.
+ * makes a call of a small function several times as slow as it is for a user. A benchmark imports an entry,
+ * `../src/index.js` or `../src/<module>/index.js`; the project points it at the build, which `pnpm bench` makes first,
+ * and keeps Vitest from transforming the build. The files run one after another, so that no benchmark competes with
+ * another for the processor.
  */
 function benchmarkProject(name: string, test: { readonly timeout?: number }) {
-  const build = new URL(`./packages/${name}/dist/index.js`, import.meta.url).pathname;
+  const build = new URL(`./packages/${name}/dist/`, import.meta.url).pathname;
   return {
-    resolve: { alias: [{ find: /^\.\.\/src\/index\.js$/, replacement: build }] },
+    resolve: { alias: [{ find: /^\.\.\/src\/((?:[^/]+\/)?index\.js)$/, replacement: `${build}$1` }] },
     test: {
       name: `${name}-bench`,
       include: [],

@@ -1,14 +1,14 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
-  DataError,
   differenceReliability,
   normalizedGain,
   reliableChange,
   reliableChangeFromTheta,
   residualGain,
   simpleGain,
-} from "../src/index.js";
+} from "../src/change/index.js";
+import { DataError } from "../src/index.js";
 import { defined, expectClose } from "./assertions.js";
 import { readFixture } from "./fixtures.js";
 

@@ -6,14 +6,10 @@ import {
 } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { buildEventLog, type Event, type EventLog, splitByLearner } from "../src/data/index.js";
+import { compareModels, crossValidate } from "../src/evaluate/index.js";
+import { createRandom, DataError } from "../src/index.js";
 import {
-  buildEventLog,
-  compareModels,
-  createRandom,
-  crossValidate,
-  DataError,
-  type Event,
-  type EventLog,
   type IrtDrift,
   type IrtItem,
   type IrtModel,
@@ -22,9 +18,8 @@ import {
   type IrtState,
   irt,
   type NominalItem,
-  splitByLearner,
   type ThetaDistribution,
-} from "../src/index.js";
+} from "../src/irt/index.js";
 import { categoryCount, categoryTerms, differences, expectedOutcome } from "../src/irt/internal.js";
 import { reflectedWalk } from "../src/math/internal.js";
 import { allPredicted, defined, expectAllClose, expectClose } from "./assertions.js";

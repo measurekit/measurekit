@@ -78,8 +78,10 @@ one subpath per module: `@measurekit/psychometrics/cat`,
 `@measurekit/psychometrics/generalizability`, `@measurekit/psychometrics/irt`, `@measurekit/psychometrics/mokken`,
 `@measurekit/psychometrics/multidimensional`, `@measurekit/psychometrics/parameterization`,
 `@measurekit/psychometrics/rater`, `@measurekit/psychometrics/response-time`, `@measurekit/psychometrics/scaling`,
-`@measurekit/psychometrics/sim`, `@measurekit/psychometrics/similarity` and `@measurekit/psychometrics/standard-setting`. Public names are unique across modules, so `.` re-exports all of them.
-Only the random number generator is public in `math/`.
+`@measurekit/psychometrics/sim`, `@measurekit/psychometrics/similarity` and `@measurekit/psychometrics/standard-setting`.
+Each public name has one entry, its module's subpath. `.` holds only what every module uses and core owns, `createRandom`,
+`Random`, `DataError` and `MeasurekitError`, so that a user does not import core
+([AGENTS.md](../../AGENTS.md#deviations-from-the-standards)). `math/` is not exported.
 
 ## Dependencies between modules
 

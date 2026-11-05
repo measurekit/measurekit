@@ -1,19 +1,27 @@
 import { chiSquareUpperTail, mean, normalCdf } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { buildResponseMatrix } from "../src/data/index.js";
+import { createRandom, DataError } from "../src/index.js";
 import {
-  buildResponseMatrix,
-  type ConversionTableOptions,
   calibrate,
-  conditionalScaleError,
-  conversionTable,
-  createRandom,
-  DataError,
-  drawJointThetas,
-  type EstimateInterval,
   generalizedPartialCredit,
   type IrtItem,
   nominalResponse,
+  summedScoreTable,
+  type TestItem,
+  type TestletEffect,
+  type ThetaDistribution,
+  thetaPosterior,
+  twoParameterLogistic,
+} from "../src/irt/index.js";
+import { covariance, variance } from "../src/math/internal.js";
+import {
+  type ConversionTableOptions,
+  conditionalScaleError,
+  conversionTable,
+  drawJointThetas,
+  type EstimateInterval,
   normStatistics,
   percentileRanks,
   predictFormScore,
@@ -23,14 +31,7 @@ import {
   scaleConversion,
   scaleGrowth,
   scaleScore,
-  summedScoreTable,
-  type TestItem,
-  type TestletEffect,
-  type ThetaDistribution,
-  thetaPosterior,
-  twoParameterLogistic,
-} from "../src/index.js";
-import { covariance, variance } from "../src/math/internal.js";
+} from "../src/scaling/index.js";
 import { correlationFactor, marginOf, quantile, thetasOf } from "../src/scaling/internal.js";
 import { defined, expectClose } from "./assertions.js";
 import { type FixtureItems, type FixtureParameters, fixtureItems, MODELS } from "./fixture-items.js";

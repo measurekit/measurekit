@@ -51,18 +51,22 @@ describe("every entry point alone", () => {
   );
 });
 
-describe("a named import from the root of a library", () => {
-  // sideEffects: false lets a bundler drop what a program does not use, so that the root costs what the subpath does.
+describe("a named import from an entry point", () => {
+  // sideEffects: false lets a bundler drop what a program does not use, so that a name costs only the modules it needs,
+  // fewer than its entry point holds.
   it.each([
-    ["@measurekit/psychometrics", "cronbachAlpha", "@measurekit/psychometrics/ctt"],
-    ["@measurekit/psychometrics", "calibrate", "@measurekit/psychometrics/irt"],
-    ["@measurekit/knowledge-tracing", "bkt", "@measurekit/knowledge-tracing/bkt"],
+    [
+      "@measurekit/psychometrics/cat",
+      "createAdaptiveTest",
+      ["core", "psychometrics/cat", "psychometrics/checks", "psychometrics/irt", "psychometrics/math"],
+    ],
+    ["@measurekit/psychometrics/sim", "simulateThetas", ["core", "psychometrics/checks", "psychometrics/sim"]],
   ])(
-    "holds from %s only the modules that %s needs, those of %s",
-    async (root, name, subpath) => {
-      const { modules } = await bundle(`export { ${name} } from ${JSON.stringify(ENTRIES.get(root))};`);
-      const allowed = [...(ENTRY_BUDGETS[subpath]?.holds ?? []), subpath.replace("@measurekit/", "")];
-      expect(modules.filter((module) => !allowed.includes(module))).toEqual([]);
+    "holds from %s only the modules that %s needs",
+    async (entry, name, needs) => {
+      const { modules } = await bundle(`export { ${name} } from ${JSON.stringify(ENTRIES.get(entry))};`);
+      expect(modules.filter((module) => !needs.includes(module))).toEqual([]);
+      expect(ENTRY_BUDGETS[entry]?.holds.filter((module) => !needs.includes(module))).not.toEqual([]);
     },
     BUNDLE_TIMEOUT,
   );

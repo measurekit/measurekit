@@ -11,6 +11,10 @@ A function takes what it cannot work without as arguments, `irt(parameters, opti
 `movingAverageMastery(log, decay, threshold)`, and its options hold only what has a default, which a strict reader refuses
 to misspell.
 
+Each module is imported from its subpath, such as `@measurekit/knowledge-tracing/bkt`, and each name from one entry. The
+package's name gives only the learner model interface, `LearnerModel` and `ModelFit`, and what every module uses and core
+owns: `createRandom`, `Random`, `DataError` and `MeasurekitError`.
+
 An event may carry no outcome: `outcome: null` is a learning opportunity, such as a lesson or a video, which every model
 accepts. BKT applies the learn and forget rates of the event's `resource` and estimates a lesson's rates from the
 outcomes that follow it, and logistic models count such events as exposures with the features `exposures`,

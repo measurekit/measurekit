@@ -1,26 +1,17 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildResponseMatrix,
-  calibrate,
-  calibrateMultidimensional,
-  createAdaptiveTest,
-  decisionStudy,
-  expectedRating,
-  type FacetedScore,
-  generalizabilityStudy,
-  itemFeatureRegression,
-  linearChange,
-  manyFacetRasch,
-  multidimensionalTwoParameterLogistic,
-  qMatrixIdentifiability,
-  responseTimeEffort,
-  selectPairs,
-  subscoreValue,
-  testLength,
-  transformItem,
-  twoParameterLogistic,
-} from "../src/index.js";
+import { createAdaptiveTest, testLength } from "../src/cat/index.js";
+import { qMatrixIdentifiability } from "../src/cdm/index.js";
+import { subscoreValue } from "../src/ctt/index.js";
+import { buildResponseMatrix, type FacetedScore } from "../src/data/index.js";
+import { transformItem } from "../src/equating/index.js";
+import { itemFeatureRegression, linearChange } from "../src/explanatory/index.js";
+import { decisionStudy, generalizabilityStudy } from "../src/generalizability/index.js";
+import { calibrate, twoParameterLogistic } from "../src/irt/index.js";
+import { calibrateMultidimensional, multidimensionalTwoParameterLogistic } from "../src/multidimensional/index.js";
 import { designOf, structureOf } from "../src/multidimensional/internal.js";
+import { expectedRating, manyFacetRasch } from "../src/rater/index.js";
+import { responseTimeEffort } from "../src/response-time/index.js";
+import { selectPairs } from "../src/similarity/index.js";
 import { defined } from "./assertions.js";
 
 /** The names that reach a member of every object instead of an entry. */

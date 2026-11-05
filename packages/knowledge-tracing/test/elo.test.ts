@@ -1,17 +1,8 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import {
-  buildEventLog,
-  DataError,
-  type EloItem,
-  type EloOptions,
-  type EloParameters,
-  type EloState,
-  type Event,
-  type EventInput,
-  type EventLog,
-  elo,
-} from "../src/index.js";
+import { buildEventLog, type Event, type EventInput, type EventLog } from "../src/data/index.js";
+import { type EloItem, type EloOptions, type EloParameters, type EloState, elo } from "../src/elo/index.js";
+import { DataError } from "../src/index.js";
 import { allPredicted, correlation, defined, expectAllClose, expectClose } from "./assertions.js";
 import { readFixture } from "./fixtures.js";
 import { expectUnaffectedByLessons } from "./logs.js";

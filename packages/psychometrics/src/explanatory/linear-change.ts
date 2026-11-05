@@ -130,13 +130,10 @@ const LIKELIHOOD_ROUNDING = 1e-12;
  *
  * @example
  * ```ts
- * import {
- *   createRandom,
- *   linearChange,
- *   simulateResponses,
- *   simulateThetas,
- *   twoParameterLogistic,
- * } from "@measurekit/psychometrics";
+ * import { createRandom } from "@measurekit/psychometrics";
+ * import { linearChange } from "@measurekit/psychometrics/explanatory";
+ * import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+ * import { simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
  *
  * // 800 persons in two groups answer 4 items twice: the control group gains 0.3 logits, the treated group 0.8.
  * const random = createRandom(5);

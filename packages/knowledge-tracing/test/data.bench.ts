@@ -1,5 +1,5 @@
 import { test } from "vitest";
-import { buildEventLog } from "../src/index.js";
+import { buildEventLog } from "../src/data/index.js";
 import { benchmark } from "./budgets.js";
 import { type BenchEloFixture, readFixture } from "./fixtures.js";
 

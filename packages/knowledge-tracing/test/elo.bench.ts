@@ -1,5 +1,5 @@
 import { test } from "vitest";
-import { elo } from "../src/index.js";
+import { elo } from "../src/elo/index.js";
 import { benchmark } from "./budgets.js";
 import { type BenchEloFixture, readFixture } from "./fixtures.js";
 import { columnsLog, online } from "./logs.js";

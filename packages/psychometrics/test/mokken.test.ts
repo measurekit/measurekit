@@ -1,21 +1,20 @@
 import { createRandom, type Random } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { buildResponseMatrix, type ResponseMatrix } from "../src/data/index.js";
+import { DataError } from "../src/index.js";
 import {
   automatedItemSelection,
-  buildResponseMatrix,
   conditionalAssociation,
-  DataError,
   guttmanErrors,
   type ItemCheck,
   invariantItemOrdering,
   molenaarSijtsmaReliability,
   monotonicity,
   personScalability,
-  type ResponseMatrix,
   scalability,
   twoWayImputation,
-} from "../src/index.js";
+} from "../src/mokken/index.js";
 import { defined, expectClose } from "./assertions.js";
 import { type FitResidualsFixture, readFixture } from "./fixtures.js";
 

@@ -388,13 +388,13 @@ Each entry point bundled alone, as a host's bundler makes it: minified with esbu
 the entry, core from its sources. The bytes and the modules are those of the entry chunk and the chunks it imports
 statically, which load with it; a module that a dynamic `import()` loads later is a chunk of its own and is not counted.
 The modules each holds are those the import rules of [AGENTS.md](../../AGENTS.md#dependencies) allow it. Every package
-declares `sideEffects: false`, so a named import from the root of the library holds only what that name needs:
-`cronbachAlpha` from `@measurekit/psychometrics` bundles to 3.5 KB minified, 1.4 KB after gzip, with `ctt`, `data`,
-`math` and core.
+declares `sideEffects: false`, so a named import holds only what that name needs: `createAdaptiveTest` from
+`@measurekit/psychometrics/cat` bundles to 16.6 KB minified, 5.9 KB after gzip, with `cat`, `checks`, `irt`, `math` and
+core, and none of the `cdm`, `data`, `multidimensional` and `sim` that the subpath's other functions take.
 
 | Entry point                                  | Minified (bytes) | Gzip (bytes) | Modules it holds besides its own                          |
 | -------------------------------------------- | ---------------: | -----------: | --------------------------------------------------------- |
-| `@measurekit/psychometrics`                  |          576,059 |      192,731 | every module of the package, and core                     |
+| `@measurekit/psychometrics`                  |            2,572 |        1,348 | core                                                      |
 | `@measurekit/psychometrics/cat`              |           75,174 |       25,109 | core, cdm, checks, data, irt, math, multidimensional, sim |
 | `@measurekit/psychometrics/cdm`              |           44,456 |       16,262 | core, checks, data, irt, math                             |
 | `@measurekit/psychometrics/change`           |            5,790 |        2,518 | core, checks                                              |

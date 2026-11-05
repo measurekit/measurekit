@@ -1,23 +1,33 @@
 import { cholesky, logistic, mean } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { createMultidimensionalAdaptiveTest, testLength } from "../src/cat/index.js";
+import { buildResponseMatrix, buildResponseRecords, type ResponseMatrix } from "../src/data/index.js";
 import { pearsonMatrix } from "../src/dimensionality/internal.js";
+import { createRandom, DataError } from "../src/index.js";
 import {
   betaPrior,
-  buildResponseMatrix,
-  buildResponseRecords,
   calibrate,
+  generalizedPartialCredit,
+  gradedResponse,
+  logNormalPrior,
+  maximumLikelihoodEstimate,
+  normalPrior,
+  oneParameterLogistic,
+  type ParameterPrior,
+  posteriorMeanEstimate,
+  posteriorModeEstimate,
+  threeParameterLogistic,
+  twoParameterLogistic,
+  weightedLikelihoodEstimate,
+} from "../src/irt/index.js";
+import { compressResponses } from "../src/irt/internal.js";
+import {
   calibrateBifactor,
   calibrateLongitudinal,
   calibrateMultidimensional,
-  createMultidimensionalAdaptiveTest,
-  createRandom,
-  DataError,
-  generalizedPartialCredit,
-  gradedResponse,
   type LoadingPattern,
   type LongitudinalCalibration,
-  logNormalPrior,
   type MultidimensionalCalibration,
   type MultidimensionalCalibrationOptions,
   type MultidimensionalGradedParameters,
@@ -25,7 +35,6 @@ import {
   type MultidimensionalLogisticParameters,
   type MultidimensionalModel,
   type MultidimensionalTestItem,
-  maximumLikelihoodEstimate,
   multidimensionalDifficulty,
   multidimensionalDiscrimination,
   multidimensionalEstimates,
@@ -37,21 +46,9 @@ import {
   multidimensionalThreeParameterLogistic,
   multidimensionalTwoParameterLogistic,
   multidimensionalWeightedLikelihoodEstimate,
-  normalPrior,
-  oneParameterLogistic,
-  type ParameterPrior,
-  posteriorMeanEstimate,
-  posteriorModeEstimate,
-  type ResponseMatrix,
   type RotationOptions,
   rotateLoadings,
-  simulateMultidimensionalResponses,
-  testLength,
-  threeParameterLogistic,
-  twoParameterLogistic,
-  weightedLikelihoodEstimate,
-} from "../src/index.js";
-import { compressResponses } from "../src/irt/internal.js";
+} from "../src/multidimensional/index.js";
 import {
   createChain,
   createCorrelations,
@@ -73,6 +70,7 @@ import {
   secondMoments,
   setUp,
 } from "../src/multidimensional/internal.js";
+import { simulateMultidimensionalResponses } from "../src/sim/index.js";
 import { defined, expectClose, expectParameters } from "./assertions.js";
 import { MODELS as FIXTURE_MODELS } from "./fixture-items.js";
 import { readFixture } from "./fixtures.js";

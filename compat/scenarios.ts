@@ -1,15 +1,11 @@
-import { bkt, buildEventLog, createRandom as createTracingRandom } from "@measurekit/knowledge-tracing";
-import {
-  abilityEstimates,
-  calibrate,
-  createRandom,
-  cronbachAlpha,
-  simulateItems,
-  simulateResponses,
-  simulateThetas,
-  twoParameterLogistic,
-} from "@measurekit/psychometrics";
+import { createRandom as createTracingRandom } from "@measurekit/knowledge-tracing";
+import { bkt } from "@measurekit/knowledge-tracing/bkt";
+import { buildEventLog } from "@measurekit/knowledge-tracing/data";
+import { createRandom } from "@measurekit/psychometrics";
+import { cronbachAlpha } from "@measurekit/psychometrics/ctt";
 import { buildResponseMatrix } from "@measurekit/psychometrics/data";
+import { abilityEstimates, calibrate, twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
 
 /** What every runtime must give: plain data, the same on each. */
 export interface Results {

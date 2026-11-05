@@ -1,15 +1,15 @@
 import { createRandom } from "@measurekit/core";
 import { test } from "vitest";
 import { SLOW_OPTIONS } from "../../../scripts/bench-harness.js";
+import { buildResponseMatrix } from "../src/data/index.js";
 import {
-  buildResponseMatrix,
   exploratoryFactorAnalysis,
   minimumAveragePartial,
   omegaHierarchical,
   parallelAnalysis,
   polychoricCorrelations,
   smoothCorrelations,
-} from "../src/index.js";
+} from "../src/dimensionality/index.js";
 import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
 import { readFixture } from "./fixtures.js";

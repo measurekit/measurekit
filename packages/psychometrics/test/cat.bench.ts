@@ -4,9 +4,6 @@ import { SLOW_OPTIONS } from "../../../scripts/bench-harness.js";
 import {
   anyOf,
   assembleForms,
-  attributeProfiles,
-  buildResponseMatrix,
-  calibrateCdm,
   classificationThreshold,
   closestDifficulty,
   contentBounds,
@@ -21,12 +18,10 @@ import {
   likelihoodWeightedInformation,
   maximumInformation,
   maximumPriorityIndex,
-  multidimensionalTwoParameterLogistic,
   multistageCuts,
   type PoolItem,
   posteriorDiscriminationIndex,
   posteriorKullbackLeibler,
-  posteriorMeanEstimate,
   posteriorWeightedInformation,
   progressive,
   proportional,
@@ -35,10 +30,12 @@ import {
   simulateAdaptiveTest,
   simulateDiagnosticTest,
   simulateMultidimensionalAdaptiveTest,
-  type TestItem,
   testLength,
-  threeParameterLogistic,
-} from "../src/index.js";
+} from "../src/cat/index.js";
+import { attributeProfiles, calibrateCdm } from "../src/cdm/index.js";
+import { buildResponseMatrix } from "../src/data/index.js";
+import { posteriorMeanEstimate, type TestItem, threeParameterLogistic } from "../src/irt/index.js";
+import { multidimensionalTwoParameterLogistic } from "../src/multidimensional/index.js";
 import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
 import { type BenchCdmFixture, readFixture } from "./fixtures.js";

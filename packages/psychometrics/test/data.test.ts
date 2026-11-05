@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { checkFacetedScores, checkResponseRecords } from "../src/data/internal.js";
+import { itemStatistics } from "../src/ctt/index.js";
 import {
   buildResponseMatrix,
   buildResponseMatrixFromColumns,
   buildResponseRecords,
-  DataError,
   type FacetedScore,
-  itemStatistics,
   type ResponseMatrix,
   scoreResponses,
-} from "../src/index.js";
+} from "../src/data/index.js";
+import { checkFacetedScores, checkResponseRecords } from "../src/data/internal.js";
+import { DataError } from "../src/index.js";
 
 describe("checkFacetedScores", () => {
   const scores: FacetedScore[] = [

@@ -2,25 +2,21 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   augmentedSubscores,
-  buildResponseMatrix,
   classifyDifficulty,
   classifyDiscrimination,
-  createRandom,
   cronbachAlpha,
-  DataError,
   DIFFICULTY_THRESHOLDS,
   distractorAnalysis,
   itemStatistics,
   kr20,
   kr21,
   mcdonaldOmega,
-  type ResponseMatrix,
-  type ScoredResponses,
-  scoreResponses,
   splitHalf,
   standardErrorOfMeasurement,
   subscoreValue,
-} from "../src/index.js";
+} from "../src/ctt/index.js";
+import { buildResponseMatrix, type ResponseMatrix, type ScoredResponses, scoreResponses } from "../src/data/index.js";
+import { createRandom, DataError } from "../src/index.js";
 import { defined, expectClose } from "./assertions.js";
 import { readFixture } from "./fixtures.js";
 

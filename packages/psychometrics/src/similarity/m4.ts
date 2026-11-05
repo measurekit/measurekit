@@ -68,7 +68,8 @@ export interface M4Index {
  *
  * @example
  * ```ts
- * import { buildResponseMatrix, twoParameterLogistic } from "@measurekit/psychometrics";
+ * import { buildResponseMatrix } from "@measurekit/psychometrics/data";
+ * import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
  * import { m4Index } from "@measurekit/psychometrics/similarity";
  *
  * const items = [-1, -0.5, 0, 0.5, 1, 1.5].map((b) => ({ model: twoParameterLogistic, parameters: { a: 1.2, b, c: 0, d: 1 } }));

@@ -287,6 +287,20 @@ describe("module examples", () => {
     expect(checkModuleExamples(files)).toStrictEqual([]);
   });
 
+  it("follows a root's re-export of another package of the family to that package's entry", () => {
+    const files = repository({
+      "packages/a/src/index.ts": 'export { add, type Sum } from "@measurekit/core";\n',
+      "packages/core/src/index.ts": 'export * from "./add.js";\n',
+      "packages/core/src/add.ts": documented,
+      "packages/b/src/index.ts": 'export { subtract } from "@measurekit/core";\n',
+      "packages/c/src/index.ts": 'export { add } from "other";\n',
+    });
+    expect(checkModuleExamples(files).map(({ file }) => file)).toStrictEqual([
+      "packages/b/src/index.ts",
+      "packages/c/src/index.ts",
+    ]);
+  });
+
   it("reports an entry whose exported functions have no example, even when another function of the file has one", () => {
     const files = repository({
       "packages/a/src/m/index.ts": 'export { subtract } from "./ops.js";\n',

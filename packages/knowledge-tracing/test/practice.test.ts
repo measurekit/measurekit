@@ -1,23 +1,20 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { bkt } from "../src/bkt/index.js";
+import { type Attempt, buildEventLog, type Event } from "../src/data/index.js";
+import { elo } from "../src/elo/index.js";
+import { DataError, type LearnerModel } from "../src/index.js";
+import { pfa } from "../src/logistic/index.js";
 import {
-  type Attempt,
-  bkt,
-  buildEventLog,
-  DataError,
-  type Event,
-  elo,
-  type LearnerModel,
   type MasteryTable,
   movingAverageMastery,
   opportunitiesToStreak,
-  pfa,
   predictedMastery,
   recommend,
   streakMastery,
   thresholdMastery,
   windowMastery,
-} from "../src/index.js";
+} from "../src/practice/index.js";
 import { readFixture } from "./fixtures.js";
 
 interface PracticeMasteryFixture {

@@ -4,18 +4,12 @@
 // update it; finally ranks the items of the skills BKT does not count as mastered, and finds when each learner first
 // answered three in a row.
 // Run after `pnpm build`: node examples/knowledge-tracing/practice-session.ts
-import {
-  bkt,
-  buildEventLog,
-  compareModels,
-  createRandom,
-  type EloState,
-  elo,
-  learningCurve,
-  recommend,
-  splitByLearner,
-  streakMastery,
-} from "@measurekit/knowledge-tracing";
+import { createRandom } from "@measurekit/knowledge-tracing";
+import { bkt } from "@measurekit/knowledge-tracing/bkt";
+import { buildEventLog, splitByLearner } from "@measurekit/knowledge-tracing/data";
+import { type EloState, elo } from "@measurekit/knowledge-tracing/elo";
+import { compareModels, learningCurve } from "@measurekit/knowledge-tracing/evaluate";
+import { recommend, streakMastery } from "@measurekit/knowledge-tracing/practice";
 
 const random = createRandom(20261029);
 const skills = ["fractions", "decimals", "percentages"];

@@ -1,14 +1,14 @@
 import { mean } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { buildResponseMatrix, buildResponseRecords, type ResponseMatrix } from "../src/data/index.js";
+import { createRandom, DataError } from "../src/index.js";
+import { normalPrior, type ParameterPrior } from "../src/irt/index.js";
+import { compressResponses } from "../src/irt/internal.js";
 import {
   type BifactorOptions,
-  buildResponseMatrix,
-  buildResponseRecords,
   calibrateBifactor,
   calibrateMultidimensional,
-  createRandom,
-  DataError,
   type LoadingPattern,
   type MultidimensionalCalibration,
   type MultidimensionalGradedParameters,
@@ -19,13 +19,9 @@ import {
   multidimensionalPosteriorModeEstimate,
   multidimensionalThreeParameterLogistic,
   multidimensionalTwoParameterLogistic,
-  normalPrior,
-  type ParameterPrior,
-  type ResponseMatrix,
-  simulateMultidimensionalResponses,
-} from "../src/index.js";
-import { compressResponses } from "../src/irt/internal.js";
+} from "../src/multidimensional/index.js";
 import { createWalk, patternsOf, structureOf } from "../src/multidimensional/internal.js";
+import { simulateMultidimensionalResponses } from "../src/sim/index.js";
 import { defined, expectClose } from "./assertions.js";
 import { readFixture } from "./fixtures.js";
 

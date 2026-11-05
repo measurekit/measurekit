@@ -25,8 +25,8 @@ learn and forget rates of a lesson.
 Simulate 500 learners at given BKT rates, and fit the rates back:
 
 ```ts
-import { bkt } from "@measurekit/knowledge-tracing/bkt";
 import { createRandom } from "@measurekit/knowledge-tracing";
+import { bkt } from "@measurekit/knowledge-tracing/bkt";
 import { simulate } from "@measurekit/knowledge-tracing/sim";
 
 const truth = { fractions: { prior: 0.3, learn: 0.15, forget: 0, guess: 0.2, slip: 0.1 } };

@@ -1,12 +1,14 @@
 import { chiSquareUpperTail, normalQuantile } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { createAdaptiveTest, simulateAdaptiveTest, testLength } from "../src/cat/index.js";
+import { buildResponseMatrix, buildResponseRecords } from "../src/data/index.js";
+import { itemFit } from "../src/fit/index.js";
+import { createRandom, DataError } from "../src/index.js";
 import {
   type AbilityEstimate,
   abilityEstimates,
   betaPrior,
-  buildResponseMatrix,
-  buildResponseRecords,
   type Calibration,
   type CalibrationOptions,
   type ConditionalCalibration,
@@ -15,9 +17,6 @@ import {
   calibrateWithCovariance,
   conditionalMaximumLikelihood,
   conditionalStandardError,
-  createAdaptiveTest,
-  createRandom,
-  DataError,
   empiricalReliability,
   fourParameterLogistic,
   generalizedGradedUnfolding,
@@ -25,7 +24,6 @@ import {
   gradedResponse,
   type IrtItem,
   type IrtModel,
-  itemFit,
   itemInformation,
   jointMaximumLikelihood,
   type LatentDistribution,
@@ -34,7 +32,6 @@ import {
   marginalReliability,
   maximumLikelihoodEstimate,
   nominalResponse,
-  normalDistribution,
   normalPrior,
   oneParameterLogistic,
   type ParameterCovariance,
@@ -45,22 +42,17 @@ import {
   type RatingScaleParameters,
   ratingScale,
   type StandardErrorMethod,
-  simulateAdaptiveTest,
-  simulateItems,
-  simulateResponses,
-  simulateThetas,
   summedScoreTable,
   type ThetaDistribution,
   type ThresholdItem,
   testInformation,
-  testLength,
   thetaPosterior,
   threeParameterLogistic,
   twoParameterLogistic,
   type UnfoldingCalibration,
   type UnfoldingParameters,
   weightedLikelihoodEstimate,
-} from "../src/index.js";
+} from "../src/irt/index.js";
 import {
   categoryTallies,
   checkCategories,
@@ -82,6 +74,7 @@ import {
   unfoldingStarts,
 } from "../src/irt/internal.js";
 import { rectangular } from "../src/math/internal.js";
+import { normalDistribution, simulateItems, simulateResponses, simulateThetas } from "../src/sim/index.js";
 import {
   arbitraryItem,
   arbitraryLocation,

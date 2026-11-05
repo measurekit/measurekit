@@ -1,13 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { buildResponseMatrix, buildResponseRecords, type ResponseMatrix } from "../src/data/index.js";
 import {
-  buildResponseMatrix,
-  buildResponseRecords,
-  type CalibratedItem,
-  calibrate,
-  createRandom,
-  DataError,
-  generalizedPartialCredit,
   type ItemFeatureRegression,
   type ItemFeatures,
   itemFeatureRegression,
@@ -17,18 +11,21 @@ import {
   type LltmOptions,
   linearChange,
   lltm,
+  predictItemParameter,
+} from "../src/explanatory/index.js";
+import { createRandom, DataError, type Random } from "../src/index.js";
+import {
+  type CalibratedItem,
+  calibrate,
+  generalizedPartialCredit,
   logNormalPrior,
   normalPrior,
   oneParameterLogistic,
   partialCredit,
-  predictItemParameter,
-  type Random,
-  type ResponseMatrix,
-  simulateResponses,
-  simulateThetas,
   type ThresholdItem,
   twoParameterLogistic,
-} from "../src/index.js";
+} from "../src/irt/index.js";
+import { simulateResponses, simulateThetas } from "../src/sim/index.js";
 import { defined, expectClose } from "./assertions.js";
 import { readFixture } from "./fixtures.js";
 

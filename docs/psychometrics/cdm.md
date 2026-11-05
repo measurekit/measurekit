@@ -219,8 +219,8 @@ flowchart LR
 ```
 
 ```ts
-import { calibrateCdm, compareItemModels } from "@measurekit/psychometrics/cdm";
 import { createRandom } from "@measurekit/psychometrics";
+import { calibrateCdm, compareItemModels } from "@measurekit/psychometrics/cdm";
 import { simulateCdmResponses } from "@measurekit/psychometrics/sim";
 
 // 1,000 persons on two attributes: item3 is a DINA item, item4 an additive one.
@@ -292,8 +292,8 @@ profiles. M2 is the limited-information statistic of [fit](fit.md#limited-inform
 item parameter on its model's scale and one for each proportion of a profile but the last.
 
 ```ts
-import { calibrateCdm, cdmItemFit, cdmModelFit } from "@measurekit/psychometrics/cdm";
 import { createRandom } from "@measurekit/psychometrics";
+import { calibrateCdm, cdmItemFit, cdmModelFit } from "@measurekit/psychometrics/cdm";
 import { simulateCdmResponses } from "@measurekit/psychometrics/sim";
 
 // 1,000 persons on three attributes, from a DINA model with guessing 0.15 and slip 0.15.

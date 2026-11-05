@@ -1,30 +1,11 @@
 import { describe, expect, it } from "vitest";
-import {
-  type Attempt,
-  type BktOptions,
-  type BktParameters,
-  type BktState,
-  bkt,
-  type EloOptions,
-  type EloParameters,
-  type EloState,
-  type Event,
-  elo,
-  type IrtOptions,
-  type IrtParameters,
-  type IrtState,
-  irt,
-  type KnowledgeStructure,
-  type KstOptions,
-  type KstParameters,
-  type KstState,
-  kst,
-  type LearnerModel,
-  type LogisticOptions,
-  type LogisticParameters,
-  type LogisticState,
-  logistic,
-} from "../src/index.js";
+import { type BktOptions, type BktParameters, type BktState, bkt } from "../src/bkt/index.js";
+import type { Attempt, Event } from "../src/data/index.js";
+import { type EloOptions, type EloParameters, type EloState, elo } from "../src/elo/index.js";
+import type { LearnerModel } from "../src/index.js";
+import { type IrtOptions, type IrtParameters, type IrtState, irt } from "../src/irt/index.js";
+import { type KnowledgeStructure, type KstOptions, type KstParameters, type KstState, kst } from "../src/kst/index.js";
+import { type LogisticOptions, type LogisticParameters, type LogisticState, logistic } from "../src/logistic/index.js";
 import { defined } from "./assertions.js";
 import { readFixture, type StoredStateFixture } from "./fixtures.js";
 

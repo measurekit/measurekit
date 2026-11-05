@@ -90,7 +90,7 @@ const HIGHEST_RATE = 0.999;
  *
  * @example
  * ```ts
- * import { buildResponseMatrix } from "@measurekit/psychometrics";
+ * import { buildResponseMatrix } from "@measurekit/psychometrics/data";
  * import { kIndex } from "@measurekit/psychometrics/similarity";
  *
  * // Option numbers of 8 persons on 6 items, whose keyed options are 0; the first person shares the second's 4 errors.

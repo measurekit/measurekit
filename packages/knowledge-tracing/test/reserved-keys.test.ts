@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { bkt, buildEventLog, type Event, elo, irt, kst, type LearnerModel, logistic } from "../src/index.js";
+import { bkt } from "../src/bkt/index.js";
+import { buildEventLog, type Event } from "../src/data/index.js";
+import { elo } from "../src/elo/index.js";
+import type { LearnerModel } from "../src/index.js";
+import { irt } from "../src/irt/index.js";
+import { kst } from "../src/kst/index.js";
+import { logistic } from "../src/logistic/index.js";
 import { defined } from "./assertions.js";
 
 /** The names that reach a member of every object instead of an entry. */

@@ -2,7 +2,6 @@ import { expect, test } from "vitest";
 import { SLOW_OPTIONS } from "../../../scripts/bench-harness.js";
 import {
   attributeProfiles,
-  buildResponseMatrix,
   type CdmModel,
   calibrateCdm,
   cdmClassificationAccuracy,
@@ -11,7 +10,8 @@ import {
   compareItemModels,
   nonparametricClassification,
   validateQMatrix,
-} from "../src/index.js";
+} from "../src/cdm/index.js";
+import { buildResponseMatrix } from "../src/data/index.js";
 import { benchmark } from "./budgets.js";
 import { type BenchCdmFixture, readFixture } from "./fixtures.js";
 

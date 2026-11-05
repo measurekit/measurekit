@@ -1,23 +1,15 @@
 import { chiSquareUpperTail, mean } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, expectTypeOf, it } from "vitest";
-import { purified } from "../src/dif/internal.js";
+import { buildResponseMatrix, type ResponseMatrix } from "../src/data/index.js";
 import {
-  buildResponseMatrix,
-  createRandom,
-  DataError,
   type DifGroup,
   type DifPurification,
   differentialFunctioning,
-  fourParameterLogistic,
-  generalizedPartialCredit,
-  gradedResponse,
   type IrtDifOptions,
   type IrtDifTest,
-  type IrtModel,
   irtLikelihoodRatioDif,
   type LinkedDifOptions,
-  type LogisticItem,
   type LogisticRegressionDif,
   logisticDiscriminantDif,
   logisticRegressionDif,
@@ -27,21 +19,27 @@ import {
   mantelHaenszel,
   mantelTest,
   type OrdinalLogisticDif,
-  oneParameterLogistic,
   ordinalLogisticRegressionDif,
   type PurificationOptions,
   type RajuArea,
-  type ResponseMatrix,
   rajuAreaDif,
   type Sibtest,
   sibtest,
-  simulateItems,
-  simulateResponses,
-  simulateThetas,
+} from "../src/dif/index.js";
+import { purified } from "../src/dif/internal.js";
+import { createRandom, DataError } from "../src/index.js";
+import {
+  fourParameterLogistic,
+  generalizedPartialCredit,
+  gradedResponse,
+  type IrtModel,
+  type LogisticItem,
+  oneParameterLogistic,
   type TestItem,
   threeParameterLogistic,
   twoParameterLogistic,
-} from "../src/index.js";
+} from "../src/irt/index.js";
+import { simulateItems, simulateResponses, simulateThetas } from "../src/sim/index.js";
 import { arbitraryItem } from "./arbitraries.js";
 import { defined, expectClose } from "./assertions.js";
 import { readFixture } from "./fixtures.js";

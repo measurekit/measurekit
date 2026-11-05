@@ -1,11 +1,10 @@
 import { test } from "vitest";
+import { type TestItem, twoParameterLogistic } from "../src/irt/index.js";
 import {
   bookmarkCutScore,
   classificationAccuracy,
   livingstonLewisClassification,
-  type TestItem,
-  twoParameterLogistic,
-} from "../src/index.js";
+} from "../src/standard-setting/index.js";
 import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
 import { type BenchIrtFixture, readFixture } from "./fixtures.js";

@@ -1,5 +1,6 @@
 import { test } from "vitest";
-import { buildResponseMatrix, cronbachAlpha, itemStatistics, mcdonaldOmega, subscoreValue } from "../src/index.js";
+import { cronbachAlpha, itemStatistics, mcdonaldOmega, subscoreValue } from "../src/ctt/index.js";
+import { buildResponseMatrix } from "../src/data/index.js";
 import { benchmark } from "./budgets.js";
 import { readFixture } from "./fixtures.js";
 

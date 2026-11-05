@@ -1,6 +1,7 @@
 import fc from "fast-check";
 import { expect } from "vitest";
-import { buildEventLog, type EventLog, type LearnerModel } from "../src/index.js";
+import { buildEventLog, type EventLog } from "../src/data/index.js";
+import type { LearnerModel } from "../src/index.js";
 import { defined } from "./assertions.js";
 
 /** Runs a log through a model online, returning each event's prediction and the learners' final states. */

@@ -1,12 +1,7 @@
 import { test } from "vitest";
-import {
-  conversionTable,
-  createRandom,
-  drawJointThetas,
-  type IrtItem,
-  normStatistics,
-  twoParameterLogistic,
-} from "../src/index.js";
+import { createRandom } from "../src/index.js";
+import { type IrtItem, twoParameterLogistic } from "../src/irt/index.js";
+import { conversionTable, drawJointThetas, normStatistics } from "../src/scaling/index.js";
 import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
 import { type BenchIrtFixture, readFixture } from "./fixtures.js";

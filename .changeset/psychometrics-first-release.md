@@ -18,6 +18,10 @@ A function takes what it needs as arguments, `calibrate(data, model, options)`, 
 `assembleForms(pool, length, options)`, and its options hold only what has a default, which a strict reader refuses to
 misspell.
 
+Each module is imported from its subpath, such as `@measurekit/psychometrics/irt`, and each name from one entry. The
+package's name gives only what every module uses and core owns: `createRandom`, `Random`, `DataError` and
+`MeasurekitError`.
+
 The EM calibrations of the multidimensional models, the many-facet Rasch model and the linear logistic test model
 accelerate EM with SQUAREM, and the posterior means of a data set tabulate the log probabilities of each item once. At the
 default tolerance the estimates stop closer to the maximum than plain EM would, by up to about 1e-3, and the iterations

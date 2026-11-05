@@ -9,7 +9,7 @@ import {
   partialCredit,
   ratingScale,
   type UnfoldingParameters,
-} from "../src/index.js";
+} from "../src/irt/index.js";
 
 /** A slope of any sign, including 0. */
 export const arbitrarySlope = fc.double({ min: -3, max: 4, noNaN: true });

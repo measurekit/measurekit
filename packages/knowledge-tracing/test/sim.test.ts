@@ -1,23 +1,13 @@
 import { shuffle } from "@measurekit/core";
 import { describe, expect, it } from "vitest";
-import {
-  type Attempt,
-  afm,
-  bkt,
-  createRandom,
-  DataError,
-  elo,
-  type IrtItem,
-  irt,
-  type KstState,
-  kst,
-  type LearnerModel,
-  logistic,
-  type Random,
-  type SimulatedAttempt,
-  simulate,
-  surmiseStructure,
-} from "../src/index.js";
+import { bkt } from "../src/bkt/index.js";
+import type { Attempt } from "../src/data/index.js";
+import { elo } from "../src/elo/index.js";
+import { createRandom, DataError, type LearnerModel, type Random } from "../src/index.js";
+import { type IrtItem, irt } from "../src/irt/index.js";
+import { type KstState, kst, surmiseStructure } from "../src/kst/index.js";
+import { afm, logistic } from "../src/logistic/index.js";
+import { type SimulatedAttempt, simulate } from "../src/sim/index.js";
 import { correlation, defined } from "./assertions.js";
 
 // Recovery thresholds, fixed before the simulations were first run.

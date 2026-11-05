@@ -1,5 +1,6 @@
 import { test } from "vitest";
-import { elo, recommend } from "../src/index.js";
+import { elo } from "../src/elo/index.js";
+import { recommend } from "../src/practice/index.js";
 import { benchmark } from "./budgets.js";
 
 const CANDIDATES = 500;

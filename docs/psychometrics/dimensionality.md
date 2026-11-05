@@ -25,8 +25,8 @@ Simulate 800 persons on two independent traits, and read their polychoric correl
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
-import { parallelAnalysis, polychoricCorrelations } from "@measurekit/psychometrics/dimensionality";
 import { buildResponseMatrix } from "@measurekit/psychometrics/data";
+import { parallelAnalysis, polychoricCorrelations } from "@measurekit/psychometrics/dimensionality";
 
 // 800 persons answer 12 items: items 1 to 6 measure one trait and items 7 to 12 another, independent of the first.
 const random = createRandom(31);
@@ -288,8 +288,9 @@ always oblimin, as the general factor comes from the correlations of oblique fac
 | `converged`    | Whether the factor analysis, its rotation and the general factor's fit converged                                     |
 
 ```ts
-import { buildResponseMatrix, createRandom } from "@measurekit/psychometrics";
+import { createRandom } from "@measurekit/psychometrics";
 import { cronbachAlpha } from "@measurekit/psychometrics/ctt";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { omegaHierarchical } from "@measurekit/psychometrics/dimensionality";
 
 // 1,000 persons answer 9 items scored 0 to 4: a general trait, and three group traits of three items each.

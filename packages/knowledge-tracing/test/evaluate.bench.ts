@@ -1,5 +1,5 @@
 import { test } from "vitest";
-import { auc, metrics, metricsByOpportunity } from "../src/index.js";
+import { auc, metrics, metricsByOpportunity } from "../src/evaluate/index.js";
 import { benchmark } from "./budgets.js";
 import { readFixture } from "./fixtures.js";
 import { columnsLog } from "./logs.js";

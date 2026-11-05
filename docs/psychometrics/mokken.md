@@ -86,7 +86,8 @@ imputation with a random error, as mokken's `twoway`:
 | `highest` | The highest response of the matrix | The highest imputed score, an integer at least the highest response and at most 2³¹ - 1 |
 
 ```ts
-import { buildResponseMatrix, createRandom } from "@measurekit/psychometrics";
+import { createRandom } from "@measurekit/psychometrics";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { twoWayImputation } from "@measurekit/psychometrics/mokken";
 
 const matrix = buildResponseMatrix([
@@ -123,7 +124,8 @@ step 3 of the analysis of Sijtsma and van der Ark (2017):
 | `outliers`   | The indices of the persons above the fence                                            |
 
 ```ts
-import { buildResponseMatrix, createRandom } from "@measurekit/psychometrics";
+import { createRandom } from "@measurekit/psychometrics";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
 import { guttmanErrors } from "@measurekit/psychometrics/mokken";
 import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
@@ -185,7 +187,8 @@ Standard errors come from the delta method over the numbers of persons with each
 and Croon, 2013).
 
 ```ts
-import { buildResponseMatrix, createRandom } from "@measurekit/psychometrics";
+import { createRandom } from "@measurekit/psychometrics";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
 import { scalability } from "@measurekit/psychometrics/mokken";
 import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
@@ -236,7 +239,8 @@ The result lists `scales`, each the ids of its items in the order of the matrix,
 and the `unscalable` items, including those without variance. Raising `lowerBound` makes scales smaller and stronger.
 
 ```ts
-import { buildResponseMatrix, createRandom } from "@measurekit/psychometrics";
+import { createRandom } from "@measurekit/psychometrics";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
 import { automatedItemSelection } from "@measurekit/psychometrics/mokken";
 import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
@@ -286,7 +290,8 @@ b. An index flags each value above Q3 + 3 (Q3 - median) of all of its values.
 | `flagged.w3` | The pairs [a, b], a before b in the matrix, whose W3 is flagged                    |
 
 ```ts
-import { buildResponseMatrix, createRandom } from "@measurekit/psychometrics";
+import { createRandom } from "@measurekit/psychometrics";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
 import { conditionalAssociation } from "@measurekit/psychometrics/mokken";
 import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
@@ -350,7 +355,8 @@ The criterion is 50 (0.3 - H_i) + √#vi + 100 #vi / #ac + 100 maxvi + 10 √sum
 be inspected.
 
 ```ts
-import { buildResponseMatrix, createRandom } from "@measurekit/psychometrics";
+import { createRandom } from "@measurekit/psychometrics";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
 import { monotonicity } from "@measurekit/psychometrics/mokken";
 import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
@@ -409,7 +415,8 @@ items that remain: the scalability of the persons over the items, which is high 
 about the order of the items; `null` when fewer than two items remain. The check needs at least three items.
 
 ```ts
-import { buildResponseMatrix, createRandom } from "@measurekit/psychometrics";
+import { createRandom } from "@measurekit/psychometrics";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
 import { invariantItemOrdering } from "@measurekit/psychometrics/mokken";
 import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
@@ -451,8 +458,9 @@ proportions and the smaller of them. Steps that every person or no person passes
 every pair of the steps left, so it takes at most 1,000 of them, as 111 items of 10 categories have.
 
 ```ts
-import { buildResponseMatrix, createRandom } from "@measurekit/psychometrics";
+import { createRandom } from "@measurekit/psychometrics";
 import { cronbachAlpha } from "@measurekit/psychometrics/ctt";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
 import { molenaarSijtsmaReliability } from "@measurekit/psychometrics/mokken";
 import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";

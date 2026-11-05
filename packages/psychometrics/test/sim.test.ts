@@ -1,12 +1,9 @@
 import { cholesky, mean } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { createRandom, DataError } from "../src/index.js";
 import {
   calibrate,
-  calibrateMultidimensional,
-  createRandom,
-  DataError,
-  type Distribution,
   fourParameterLogistic,
   generalizedGradedUnfolding,
   generalizedPartialCredit,
@@ -14,29 +11,35 @@ import {
   type IrtItem,
   type IrtModel,
   type LogisticItem,
-  logNormalDistribution,
+  type NominalParameters,
+  nominalResponse,
+  oneParameterLogistic,
+  partialCredit,
+  type RatingScaleParameters,
+  ratingScale,
+  type ThresholdItem,
+  threeParameterLogistic,
+  twoParameterLogistic,
+} from "../src/irt/index.js";
+import {
+  calibrateMultidimensional,
   type MultidimensionalItem,
   type MultidimensionalLogisticParameters,
   multidimensionalGradedResponse,
   multidimensionalThreeParameterLogistic,
   multidimensionalTwoParameterLogistic,
-  type NominalParameters,
-  nominalResponse,
+} from "../src/multidimensional/index.js";
+import {
+  type Distribution,
+  logNormalDistribution,
   normalDistribution,
-  oneParameterLogistic,
-  partialCredit,
-  type RatingScaleParameters,
-  ratingScale,
   simulateCdmResponses,
   simulateItems,
   simulateMultidimensionalResponses,
   simulateResponses,
   simulateThetas,
-  type ThresholdItem,
-  threeParameterLogistic,
-  twoParameterLogistic,
   uniformDistribution,
-} from "../src/index.js";
+} from "../src/sim/index.js";
 import { defined } from "./assertions.js";
 import { MODELS } from "./fixture-items.js";
 

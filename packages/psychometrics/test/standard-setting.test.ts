@@ -1,30 +1,30 @@
 import { shuffle } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { cronbachAlpha } from "../src/ctt/index.js";
+import { buildResponseMatrix } from "../src/data/index.js";
+import { createRandom, DataError, type Random } from "../src/index.js";
+import {
+  fourParameterLogistic,
+  generalizedPartialCredit,
+  gradedResponse,
+  nominalResponse,
+  oneParameterLogistic,
+  type TestItem,
+  threeParameterLogistic,
+} from "../src/irt/index.js";
 import {
   angoffCutScore,
   beukCutScore,
   bookmarkCutScore,
   borderlineGroupCutScores,
   borderlineRegressionCutScores,
-  buildResponseMatrix,
   classificationAccuracy,
   contrastingGroupsCutScores,
-  createRandom,
-  cronbachAlpha,
-  DataError,
-  fourParameterLogistic,
-  generalizedPartialCredit,
-  gradedResponse,
   hofsteeCutScore,
   livingstonLewisClassification,
-  nominalResponse,
-  oneParameterLogistic,
   orderedItemBooklet,
-  type Random,
-  type TestItem,
-  threeParameterLogistic,
-} from "../src/index.js";
+} from "../src/standard-setting/index.js";
 import { adaptiveIntegral } from "../src/standard-setting/internal.js";
 import { defined, expectClose } from "./assertions.js";
 import { type FixtureParameters, item2pl, MODELS } from "./fixture-items.js";

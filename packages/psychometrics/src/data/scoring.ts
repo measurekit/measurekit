@@ -36,7 +36,7 @@ const SCORING_OPTIONS: FieldNames<ScoringOptions> = { optionLabels: true, person
  *
  * @example
  * ```ts
- * import { scoreResponses } from "@measurekit/psychometrics";
+ * import { scoreResponses } from "@measurekit/psychometrics/data";
  *
  * const matrix = scoreResponses(
  *   [

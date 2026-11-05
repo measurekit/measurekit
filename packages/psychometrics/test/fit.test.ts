@@ -1,21 +1,10 @@
 import { chiSquareUpperTail, normalQuantile } from "@measurekit/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { buildResponseMatrix, type ResponseMatrix } from "../src/data/index.js";
 import {
-  abilityEstimates,
   andersenTest,
-  buildResponseMatrix,
-  type CalibratedItem,
-  type Calibration,
-  type ConditionalCalibrationOptions,
-  calibrate,
   correctedPersonFit,
-  createRandom,
-  DataError,
-  generalizedPartialCredit,
-  gradedResponse,
-  type IrtItem,
-  type IrtModel,
   type ItemSplit,
   itemFit,
   kernelItemCurves,
@@ -23,26 +12,34 @@ import {
   limitedInformationFit,
   localDependenceChiSquare,
   martinLofTest,
+  personFit,
+  type RaschSplit,
+  raschWaldTest,
+  rootMeanSquareDeviation,
+  summedScoreFit,
+  yenQ3,
+  yenQ3CriticalValue,
+} from "../src/fit/index.js";
+import { createRandom, DataError } from "../src/index.js";
+import {
+  abilityEstimates,
+  type CalibratedItem,
+  type Calibration,
+  type ConditionalCalibrationOptions,
+  calibrate,
+  generalizedPartialCredit,
+  gradedResponse,
+  type IrtItem,
+  type IrtModel,
   maximumLikelihoodEstimate,
   nominalResponse,
   oneParameterLogistic,
-  personFit,
-  type RaschSplit,
-  type ResponseMatrix,
-  raschWaldTest,
-  rootMeanSquareDeviation,
-  simulateItems,
-  simulateResponses,
-  simulateThetas,
-  summedScoreFit,
   threeParameterLogistic,
   twoParameterLogistic,
-  uniformDistribution,
   weightedLikelihoodEstimate,
-  yenQ3,
-  yenQ3CriticalValue,
-} from "../src/index.js";
+} from "../src/irt/index.js";
 import { sampleQuantile } from "../src/math/internal.js";
+import { simulateItems, simulateResponses, simulateThetas, uniformDistribution } from "../src/sim/index.js";
 import { defined, expectClose } from "./assertions.js";
 import { definedEntries, type FixtureParameters, fixtureItems, MODELS } from "./fixture-items.js";
 import {

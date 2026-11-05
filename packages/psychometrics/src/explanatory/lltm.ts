@@ -161,13 +161,10 @@ const RASCH_MODEL_NAME = "The Rasch model of an LLTM's comparison";
  *
  * @example
  * ```ts
- * import {
- *   createRandom,
- *   lltm,
- *   simulateResponses,
- *   simulateThetas,
- *   twoParameterLogistic,
- * } from "@measurekit/psychometrics";
+ * import { createRandom } from "@measurekit/psychometrics";
+ * import { lltm } from "@measurekit/psychometrics/explanatory";
+ * import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+ * import { simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
  *
  * // Six items whose difficulty is -1.5 + 0.5 per step, answered by 500 simulated persons.
  * const random = createRandom(3);

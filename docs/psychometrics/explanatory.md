@@ -34,7 +34,10 @@ regression against base R and metafor, the change against glm and base R with eR
 Fit the linear logistic test model to six items whose difficulty grows with the steps they take:
 
 ```ts
-import { createRandom, lltm, simulateResponses, simulateThetas, twoParameterLogistic } from "@measurekit/psychometrics";
+import { createRandom } from "@measurekit/psychometrics";
+import { lltm } from "@measurekit/psychometrics/explanatory";
+import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
 
 // Six items whose difficulty is -1.5 + 0.5 per step, answered by 500 simulated persons.
 const random = createRandom(3);
@@ -137,7 +140,10 @@ flowchart LR
 | `"rating-scale"`   | One set, shared by all items | The same for every item                    |
 
 ```ts
-import { createRandom, lltm, partialCredit, simulateResponses, simulateThetas } from "@measurekit/psychometrics";
+import { createRandom } from "@measurekit/psychometrics";
+import { lltm } from "@measurekit/psychometrics/explanatory";
+import { partialCredit } from "@measurekit/psychometrics/irt";
+import { simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
 
 // Six items of three categories: the mean step of item i is -1 + 0.5 per step, and its thresholds are -0.5 and 0.5.
 const random = createRandom(7);
@@ -180,13 +186,10 @@ flowchart LR
 ```
 
 ```ts
-import {
-  createRandom,
-  linearChange,
-  simulateResponses,
-  simulateThetas,
-  twoParameterLogistic,
-} from "@measurekit/psychometrics";
+import { createRandom } from "@measurekit/psychometrics";
+import { linearChange } from "@measurekit/psychometrics/explanatory";
+import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
 
 // 800 persons in two groups answer 4 items twice. At the second occasion the control group has gained 0.3 logits and the
 // treated group 0.8.
@@ -255,14 +258,11 @@ estimate for all items: stack the occasions as items, one for each item and occa
 one, `time2`, for the later occasion. The effect of `time2` is a change of difficulty, so the negative of a gain.
 
 ```ts
-import {
-  buildResponseMatrix,
-  createRandom,
-  lltm,
-  simulateResponses,
-  simulateThetas,
-  twoParameterLogistic,
-} from "@measurekit/psychometrics";
+import { createRandom } from "@measurekit/psychometrics";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
+import { lltm } from "@measurekit/psychometrics/explanatory";
+import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
 
 // 600 persons answer 6 items twice, and gain 0.5 logits.
 const random = createRandom(9);
@@ -319,16 +319,11 @@ given the common scale.
 features by item id.
 
 ```ts
-import {
-  buildResponseMatrix,
-  calibrate,
-  createRandom,
-  logNormalPrior,
-  normalPrior,
-  simulateResponses,
-  twoParameterLogistic,
-} from "@measurekit/psychometrics";
+import { createRandom } from "@measurekit/psychometrics";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { itemFeatureRegression, predictItemParameter } from "@measurekit/psychometrics/explanatory";
+import { calibrate, logNormalPrior, normalPrior, twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateResponses } from "@measurekit/psychometrics/sim";
 
 // A bank of 16 items with two features each: the difficulty is -1.5 + 0.5 steps + 0.4 open + noise.
 const rows = [

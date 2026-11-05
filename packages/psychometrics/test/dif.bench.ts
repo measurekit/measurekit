@@ -1,7 +1,7 @@
 import { test } from "vitest";
 import { SLOW_OPTIONS } from "../../../scripts/bench-harness.js";
+import { buildResponseMatrix } from "../src/data/index.js";
 import {
-  buildResponseMatrix,
   type DifGroup,
   irtLikelihoodRatioDif,
   logisticRegressionDif,
@@ -10,8 +10,8 @@ import {
   ordinalLogisticRegressionDif,
   rajuAreaDif,
   sibtest,
-  twoParameterLogistic,
-} from "../src/index.js";
+} from "../src/dif/index.js";
+import { twoParameterLogistic } from "../src/irt/index.js";
 import { benchmark } from "./budgets.js";
 import { readFixture } from "./fixtures.js";
 

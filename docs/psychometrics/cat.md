@@ -631,6 +631,7 @@ below for one at `upper`. Cuts increase, and the SPRT's regions do not overlap. 
 maximum with `anyOf`, as a person near a cut may stay undecided.
 
 ```ts
+import { createRandom } from "@measurekit/psychometrics";
 import {
   allOf,
   anyOf,
@@ -639,7 +640,8 @@ import {
   simulateAdaptiveTest,
   testLength,
 } from "@measurekit/psychometrics/cat";
-import { createRandom, simulateItems, twoParameterLogistic } from "@measurekit/psychometrics";
+import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateItems } from "@measurekit/psychometrics/sim";
 
 const random = createRandom(5);
 const pool = simulateItems(twoParameterLogistic, 100, random).map((item, i) => ({ id: `item${i + 1}`, ...item }));
@@ -669,14 +671,16 @@ A rule that stops once the last response moved the estimate by less than a thres
 response again, with the test's estimator:
 
 ```ts
+import { createRandom } from "@measurekit/psychometrics";
 import {
   anyOf,
   createAdaptiveTest,
-  simulateAdaptiveTest,
   type StoppingRule,
+  simulateAdaptiveTest,
   testLength,
 } from "@measurekit/psychometrics/cat";
-import { createRandom, posteriorMeanEstimate, simulateItems, twoParameterLogistic } from "@measurekit/psychometrics";
+import { posteriorMeanEstimate, twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateItems } from "@measurekit/psychometrics/sim";
 
 /** Stops once the last response moved the EAP estimate by less than `threshold`. */
 function thetaChangeBelow(threshold: number): StoppingRule {

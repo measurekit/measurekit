@@ -7,7 +7,6 @@ import {
   equipercentileEquating,
   frequencyEstimationEquating,
   haebaraLinking,
-  type IrtItem,
   irtObservedScoreEquating,
   kernelEquating,
   linearEquating,
@@ -15,12 +14,11 @@ import {
   linkedEquatingErrors,
   logLinearPresmoothing,
   stockingLordLinking,
-  threeParameterLogistic,
   transformItem,
   trueScoreEquating,
   tuckerEquating,
-  twoParameterLogistic,
-} from "../src/index.js";
+} from "../src/equating/index.js";
+import { type IrtItem, threeParameterLogistic, twoParameterLogistic } from "../src/irt/index.js";
 import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
 import { readFixture } from "./fixtures.js";

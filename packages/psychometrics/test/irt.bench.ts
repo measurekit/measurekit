@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
 import { SLOW_OPTIONS } from "../../../scripts/bench-harness.js";
+import { buildResponseMatrix } from "../src/data/index.js";
 import {
   abilityEstimates,
-  buildResponseMatrix,
   calibrate,
   calibrateUnfolding,
   conditionalMaximumLikelihood,
@@ -19,7 +19,7 @@ import {
   threeParameterLogistic,
   twoParameterLogistic,
   weightedLikelihoodEstimate,
-} from "../src/index.js";
+} from "../src/irt/index.js";
 import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
 import { type BenchIrtConditionalFixture, type BenchIrtFixture, readFixture } from "./fixtures.js";

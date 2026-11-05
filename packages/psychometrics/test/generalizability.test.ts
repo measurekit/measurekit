@@ -1,16 +1,15 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import type { FacetedScore } from "../src/data/index.js";
 import {
-  createRandom,
-  DataError,
   type DecisionStudy,
   type DecisionStudyOptions,
   decisionStudy,
-  type FacetedScore,
   type GeneralizabilityDesign,
   type GeneralizabilityStudy,
   generalizabilityStudy,
-} from "../src/index.js";
+} from "../src/generalizability/index.js";
+import { createRandom, DataError } from "../src/index.js";
 import { defined, expectClose } from "./assertions.js";
 import { readFixture } from "./fixtures.js";
 

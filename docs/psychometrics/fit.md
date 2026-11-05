@@ -154,16 +154,10 @@ deviation is signed: positive when the persons score higher than the item's curv
 no person answered.
 
 ```ts
-import {
-  calibrate,
-  createRandom,
-  localDependenceChiSquare,
-  rootMeanSquareDeviation,
-  simulateItems,
-  simulateResponses,
-  simulateThetas,
-  twoParameterLogistic,
-} from "@measurekit/psychometrics";
+import { createRandom } from "@measurekit/psychometrics";
+import { localDependenceChiSquare, rootMeanSquareDeviation } from "@measurekit/psychometrics/fit";
+import { calibrate, twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
 
 const random = createRandom(11);
 const items = simulateItems(twoParameterLogistic, 6, random);
@@ -209,15 +203,10 @@ w = ln(P / Q) and r = P' / (P Q), over the answered items:
 - lz* = (W + c r₀) / √(Σ w̃² P Q), `null` for an extreme score or without variance.
 
 ```ts
+import { createRandom } from "@measurekit/psychometrics";
 import { correctedPersonFit } from "@measurekit/psychometrics/fit";
-import {
-  createRandom,
-  simulateItems,
-  simulateResponses,
-  simulateThetas,
-  twoParameterLogistic,
-  weightedLikelihoodEstimate,
-} from "@measurekit/psychometrics";
+import { twoParameterLogistic, weightedLikelihoodEstimate } from "@measurekit/psychometrics/irt";
+import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
 
 // The simulation of the Mokken guide's Guttman errors: 8 2PL items, 400 persons, at Warm's estimates.
 const random = createRandom(11);
@@ -400,15 +389,10 @@ trait. Its χ²₀ is N Σ_(i<j) r_ij², the form the statistic takes there, on 
 χ²₀ is not above χ², as mirt leaves them.
 
 ```ts
-import {
-  calibrate,
-  createRandom,
-  limitedInformationFit,
-  simulateItems,
-  simulateResponses,
-  simulateThetas,
-  twoParameterLogistic,
-} from "@measurekit/psychometrics";
+import { createRandom } from "@measurekit/psychometrics";
+import { limitedInformationFit } from "@measurekit/psychometrics/fit";
+import { calibrate, twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
 
 const random = createRandom(7);
 const items = simulateItems(twoParameterLogistic, 12, random);
@@ -497,8 +481,10 @@ infinite parameter in that group, as an item every person of the upper group ans
 the persons are counted again until no such item is left.
 
 ```ts
+import { createRandom } from "@measurekit/psychometrics";
 import { andersenTest, martinLofTest, raschWaldTest } from "@measurekit/psychometrics/fit";
-import { createRandom, oneParameterLogistic, simulateResponses, simulateThetas } from "@measurekit/psychometrics";
+import { oneParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
 
 const random = createRandom(7);
 const items = [-1.5, -1, -0.5, 0, 0.5, 1, 1.5].map((b) => ({
@@ -548,14 +534,10 @@ category has one curve of 1. Where a narrow bandwidth would underflow every weig
 the nearest person's, so that a node takes its nearest persons' responses.
 
 ```ts
+import { createRandom } from "@measurekit/psychometrics";
 import { kernelItemCurves } from "@measurekit/psychometrics/fit";
-import {
-  createRandom,
-  simulateItems,
-  simulateResponses,
-  simulateThetas,
-  twoParameterLogistic,
-} from "@measurekit/psychometrics";
+import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
 
 const random = createRandom(13);
 const items = simulateItems(twoParameterLogistic, 10, random); // => [{ parameters: { a: 1.44, b: 1.28, c: 0, d: 1 }, ... }, ...]

@@ -1,28 +1,30 @@
 import { test } from "vitest";
 import { SLOW_OPTIONS } from "../../../scripts/bench-harness.js";
+import { buildResponseMatrix } from "../src/data/index.js";
 import {
-  abilityEstimates,
   andersenTest,
-  buildResponseMatrix,
-  calibrate,
   correctedPersonFit,
-  createRandom,
   itemFit,
   kernelItemCurves,
   limitedInformationFit,
   localDependenceChiSquare,
   martinLofTest,
   personFit,
-  posteriorMeanEstimate,
-  posteriorModeEstimate,
   raschWaldTest,
   rootMeanSquareDeviation,
   summedScoreFit,
-  type TestItem,
-  twoParameterLogistic,
   yenQ3,
   yenQ3CriticalValue,
-} from "../src/index.js";
+} from "../src/fit/index.js";
+import { createRandom } from "../src/index.js";
+import {
+  abilityEstimates,
+  calibrate,
+  posteriorMeanEstimate,
+  posteriorModeEstimate,
+  type TestItem,
+  twoParameterLogistic,
+} from "../src/irt/index.js";
 import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
 import { type BenchIrtConditionalFixture, type BenchIrtFixture, readFixture } from "./fixtures.js";

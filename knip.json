@@ -1,6 +1,12 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
+    "packages/psychometrics": {
+      "entry": ["src/index.ts", "src/*/index.ts"]
+    },
+    "packages/knowledge-tracing": {
+      "entry": ["src/index.ts", "src/*/index.ts"]
+    },
     "examples": {
       "entry": ["**/*.ts"]
     },

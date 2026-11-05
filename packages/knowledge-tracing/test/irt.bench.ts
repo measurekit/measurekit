@@ -1,5 +1,6 @@
 import { test } from "vitest";
-import { buildEventLog, irt } from "../src/index.js";
+import { buildEventLog } from "../src/data/index.js";
+import { irt } from "../src/irt/index.js";
 import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
 import { readFixture } from "./fixtures.js";

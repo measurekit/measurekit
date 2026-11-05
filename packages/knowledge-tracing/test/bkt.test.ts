@@ -1,23 +1,11 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import {
-  type BktOptions,
-  type BktParameters,
-  type BktSkill,
-  type BktState,
-  bkt,
-  buildEventLog,
-  compareModels,
-  createRandom,
-  crossValidate,
-  DataError,
-  type Event,
-  type EventLog,
-  elo,
-  learningCurve,
-  simulate,
-  splitByLearner,
-} from "../src/index.js";
+import { type BktOptions, type BktParameters, type BktSkill, type BktState, bkt } from "../src/bkt/index.js";
+import { buildEventLog, type Event, type EventLog, splitByLearner } from "../src/data/index.js";
+import { elo } from "../src/elo/index.js";
+import { compareModels, crossValidate, learningCurve } from "../src/evaluate/index.js";
+import { createRandom, DataError } from "../src/index.js";
+import { simulate } from "../src/sim/index.js";
 import { allPredicted, defined, expectClose } from "./assertions.js";
 import { readFixture } from "./fixtures.js";
 import { online } from "./logs.js";

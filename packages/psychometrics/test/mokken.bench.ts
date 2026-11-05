@@ -1,9 +1,9 @@
 import { createRandom } from "@measurekit/core";
 import { test } from "vitest";
 import { SLOW_OPTIONS } from "../../../scripts/bench-harness.js";
+import { buildResponseMatrix } from "../src/data/index.js";
 import {
   automatedItemSelection,
-  buildResponseMatrix,
   conditionalAssociation,
   guttmanErrors,
   invariantItemOrdering,
@@ -11,7 +11,7 @@ import {
   personScalability,
   scalability,
   twoWayImputation,
-} from "../src/index.js";
+} from "../src/mokken/index.js";
 import { benchmark } from "./budgets.js";
 import { type BenchIrtFixture, readFixture } from "./fixtures.js";
 

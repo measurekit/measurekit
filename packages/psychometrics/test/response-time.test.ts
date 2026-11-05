@@ -1,31 +1,28 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { buildResponseMatrix, buildResponseRecords, type ResponseMatrix } from "../src/data/index.js";
+import { createRandom, DataError } from "../src/index.js";
 import {
-  buildResponseMatrix,
-  buildResponseRecords,
   calibrate,
-  calibrateResponseTimes,
-  calibrateSpeedAccuracy,
-  createRandom,
-  DataError,
-  effortModeratedEstimates,
   gradedResponse,
   type IrtModel,
   type LogisticItem,
   logNormalPrior,
-  normativeThresholds,
   posteriorMeanEstimate,
-  type ResponseMatrix,
+  twoParameterLogistic,
+} from "../src/irt/index.js";
+import {
+  calibrateResponseTimes,
+  calibrateSpeedAccuracy,
+  effortModeratedEstimates,
+  normativeThresholds,
   responseTimeEffort,
   responseTimeFit,
   type SpeedAccuracyCalibration,
-  simulateItems,
-  simulateResponses,
-  simulateThetas,
   speedAccuracyEstimates,
   speedEstimates,
-  twoParameterLogistic,
-} from "../src/index.js";
+} from "../src/response-time/index.js";
+import { simulateItems, simulateResponses, simulateThetas } from "../src/sim/index.js";
 import { defined, expectClose } from "./assertions.js";
 import { readFixture } from "./fixtures.js";
 

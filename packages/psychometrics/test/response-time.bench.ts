@@ -1,12 +1,8 @@
 import { expect, test } from "vitest";
 import { SLOW_OPTIONS } from "../../../scripts/bench-harness.js";
-import {
-  buildResponseMatrix,
-  calibrateResponseTimes,
-  calibrateSpeedAccuracy,
-  speedEstimates,
-  twoParameterLogistic,
-} from "../src/index.js";
+import { buildResponseMatrix } from "../src/data/index.js";
+import { twoParameterLogistic } from "../src/irt/index.js";
+import { calibrateResponseTimes, calibrateSpeedAccuracy, speedEstimates } from "../src/response-time/index.js";
 import { benchmark } from "./budgets.js";
 import { readFixture } from "./fixtures.js";
 

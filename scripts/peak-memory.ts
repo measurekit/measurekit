@@ -7,11 +7,12 @@
 // scripts/peak-memory.ts --heap` the least heap in which each reading ends, from which `heap` is chosen.
 
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { build } from "esbuild";
+import { entrySources } from "./entry-sizes.ts";
 
 const PACKAGES = resolve(import.meta.dirname, "../packages");
 const LIBRARIES = ["psychometrics", "knowledge-tracing"] as const;
@@ -373,10 +374,22 @@ export const READERS: readonly ReaderCase[] = [
   },
 ];
 
-/** Bundles each library from its sources, with core from its sources, into `directory`. */
+/**
+ * Bundles each library from its sources, with core from its sources, into `directory`: one bundle of every entry point
+ * of the library, so that a case reaches any public name.
+ */
 export async function bundleLibraries(directory: string): Promise<void> {
+  const sources = [...entrySources()];
+  const entries = LIBRARIES.map((name) => {
+    const entry = join(directory, `${name}.entries.ts`);
+    const program = sources
+      .filter(([specifier]) => specifier === `@measurekit/${name}` || specifier.startsWith(`@measurekit/${name}/`))
+      .map(([, source]) => `export * from ${JSON.stringify(source)};\n`);
+    writeFileSync(entry, program.join(""));
+    return [name, entry] as const;
+  });
   await build({
-    entryPoints: Object.fromEntries(LIBRARIES.map((name) => [name, resolve(PACKAGES, name, "src/index.ts")])),
+    entryPoints: Object.fromEntries(entries),
     bundle: true,
     format: "esm",
     platform: "node",

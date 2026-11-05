@@ -1,18 +1,14 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { type Attempt, buildEventLog, type Event, type EventLog, splitByLearner } from "../src/data/index.js";
+import { compareModels, crossValidate } from "../src/evaluate/index.js";
+import { createRandom } from "../src/index.js";
 import {
-  type Attempt,
   backwardGraded,
-  buildEventLog,
   clauseStructure,
   compareFits,
-  compareModels,
-  createRandom,
-  crossValidate,
   delineate,
   diffTest,
-  type Event,
-  type EventLog,
   forwardGraded,
   fringes,
   iita,
@@ -25,14 +21,13 @@ import {
   learningPaths,
   neighbourhood,
   notions,
-  splitByLearner,
   structureAtoms,
   structureBase,
   structureTrace,
   structureValidity,
   surmiseStructure,
   unionClosure,
-} from "../src/index.js";
+} from "../src/kst/index.js";
 import { defined, expectAllClose, expectClose } from "./assertions.js";
 import { readFixture } from "./fixtures.js";
 import { expectUnaffectedByLessons, online, withLessons } from "./logs.js";

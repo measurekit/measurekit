@@ -168,8 +168,8 @@ section's own few items.
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
-import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { subscoreValue } from "@measurekit/psychometrics/ctt";
+import { buildResponseMatrix } from "@measurekit/psychometrics/data";
 import { twoParameterLogistic } from "@measurekit/psychometrics/irt";
 import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
 

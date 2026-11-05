@@ -2,22 +2,14 @@
 // item statistics and reliability, a 2PL calibration with the fit of its items, ability estimates, a check for items that
 // function differently for the groups, and an adaptive test run on the calibrated items.
 // Run after `pnpm build`: node examples/psychometrics/item-analysis.ts
-import {
-  abilityEstimates,
-  calibrate,
-  createRandom,
-  cronbachAlpha,
-  type DifGroup,
-  itemFit,
-  itemStatistics,
-  mantelHaenszel,
-  simulateItems,
-  simulateResponses,
-  simulateThetas,
-  twoParameterLogistic,
-} from "@measurekit/psychometrics";
+import { createRandom } from "@measurekit/psychometrics";
 import { anyOf, createAdaptiveTest, standardErrorThreshold, testLength } from "@measurekit/psychometrics/cat";
+import { cronbachAlpha, itemStatistics } from "@measurekit/psychometrics/ctt";
 import { buildResponseMatrix } from "@measurekit/psychometrics/data";
+import { type DifGroup, mantelHaenszel } from "@measurekit/psychometrics/dif";
+import { itemFit } from "@measurekit/psychometrics/fit";
+import { abilityEstimates, calibrate, twoParameterLogistic } from "@measurekit/psychometrics/irt";
+import { simulateItems, simulateResponses, simulateThetas } from "@measurekit/psychometrics/sim";
 
 // The data: item 7 is one point harder for the second group.
 const random = createRandom(2026);

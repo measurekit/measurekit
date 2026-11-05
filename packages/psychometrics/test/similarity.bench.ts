@@ -1,15 +1,14 @@
 import { expect, test } from "vitest";
+import { buildResponseMatrix } from "../src/data/index.js";
+import { type IrtItem, nominalResponse } from "../src/irt/index.js";
 import {
-  buildResponseMatrix,
   generalizedBinomialTest,
-  type IrtItem,
   kIndex,
   m4Index,
-  nominalResponse,
   omegaIndex,
   type PersonPair,
   selectPairs,
-} from "../src/index.js";
+} from "../src/similarity/index.js";
 import { defined } from "./assertions.js";
 import { benchmark } from "./budgets.js";
 import { readFixture } from "./fixtures.js";
