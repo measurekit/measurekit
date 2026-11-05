@@ -186,26 +186,28 @@ function thresholdsOf(given: Partial<AcceptanceThresholds> | undefined): Accepta
   if (given === undefined) return ACCEPTANCE_THRESHOLDS;
   checkRecord(given, "The option thresholds must be an object of thresholds by rule");
   checkFields(given, THRESHOLD_FIELDS, "The option thresholds");
+  // Every threshold given, `undefined` included, is checked: one taken as absent would leave a rule without a value.
   for (const [name, value] of Object.entries(given)) {
-    if (name === "sdRatio") continue;
-    if (!(value === null || (typeof value === "number" && Number.isFinite(value)))) {
+    if (name !== "sdRatio" && !isStatistic(value)) {
       throw new DataError(`The threshold ${name} must be a finite number or null, found ${describe(value)}.`);
     }
-  }
-  const { sdRatio } = given;
-  if (sdRatio !== undefined && sdRatio !== null) {
-    const valid =
-      Array.isArray(sdRatio) &&
-      sdRatio.length === 2 &&
-      sdRatio.every((end) => typeof end === "number" && Number.isFinite(end) && end > 0) &&
-      sdRatio[0] <= sdRatio[1];
-    if (!valid) {
+    if (name === "sdRatio" && !(value === null || isRatioRange(value))) {
       throw new DataError(
-        `The threshold sdRatio must be two positive numbers in order, or null, found ${describe(sdRatio)}.`,
+        `The threshold sdRatio must be two positive numbers in order, or null, found ${describe(value)}.`,
       );
     }
   }
   return { ...ACCEPTANCE_THRESHOLDS, ...given };
+}
+
+/** Returns whether a value is the two ends of an SD ratio: positive finite numbers, the lower first. */
+function isRatioRange(value: unknown): boolean {
+  return (
+    Array.isArray(value) &&
+    value.length === 2 &&
+    value.every((end) => typeof end === "number" && Number.isFinite(end) && end > 0) &&
+    value[0] <= value[1]
+  );
 }
 
 /** Returns whether a value is a finite number or `null`. */

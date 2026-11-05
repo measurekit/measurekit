@@ -860,6 +860,12 @@ describe("validateAutomatedScores", () => {
     expect(() => validateAutomatedScores(agreement, { thresholds: { sdRatio: [1.5, 0.5] } })).toThrow(
       "The threshold sdRatio must be two positive numbers in order, or null, found an array.",
     );
+    expect(() => validateAutomatedScores(agreement, { thresholds: { sdRatio: undefined } })).toThrow(
+      "The threshold sdRatio must be two positive numbers in order, or null, found undefined.",
+    );
+    expect(() => validateAutomatedScores(agreement, { thresholds: { smd: undefined } })).toThrow(
+      "The threshold smd must be a finite number or null, found undefined.",
+    );
     expect(() => validateAutomatedScores(JSON.parse('{"machineHuman":{}}'))).toThrow(
       "The agreement must be one that automatedScoreAgreement returns",
     );
