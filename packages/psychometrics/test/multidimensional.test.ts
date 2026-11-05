@@ -3018,7 +3018,7 @@ describe("longitudinal calibration", () => {
       });
 
     it("matches mirt's Oakes errors by the observed information, which the Hessian of the gradient gives", () => {
-      const errors = defined(run("hessian").standardErrors);
+      const errors = errorVector(run("hessian"));
       // Ten items' slopes and difficulties, then the correlation, the standard deviation and the mean of the second occasion.
       expect(errors).toHaveLength(23);
       two.standardErrors.forEach((se, k) => {
@@ -3027,7 +3027,7 @@ describe("longitudinal calibration", () => {
     }, 120_000);
 
     it("matches mirt's cross-product errors by the persons' scores", () => {
-      const errors = defined(run("cross-product").standardErrors);
+      const errors = errorVector(run("cross-product"));
       two.crossProductStandardErrors.forEach((se, k) => {
         expectClose(defined(errors[k]), se, 1e-5, `standard error ${k}`);
       });
@@ -3164,6 +3164,22 @@ describe("longitudinal recovery", () => {
   }, 900_000);
 });
 
+/**
+ * Returns the standard errors of a longitudinal calibration in the order of mirt's: each item's by its parameters, the
+ * correlations of the pairs (1, 0), (2, 0), (2, 1) of occasions, then the standard deviations and the means of the
+ * occasions after the first.
+ */
+function errorVector({ items, correlationStandardErrors, occasions }: LongitudinalCalibration): number[] {
+  const correlations = defined(correlationStandardErrors).flatMap((row, i) => row.slice(0, i));
+  const later = occasions.slice(1).map(({ standardErrors }) => defined(standardErrors));
+  return [
+    ...items.flatMap(({ standardErrors }) => Object.values(defined(standardErrors))),
+    ...correlations,
+    ...later.map(({ sd }) => sd),
+    ...later.map(({ mean }) => mean),
+  ];
+}
+
 describe("longitudinal calibration data", () => {
   const occasions = simulateOccasions(1, 300, 6, SMALL);
   const base = { points: 21, tolerance: 1e-8 } as const;
@@ -3171,11 +3187,13 @@ describe("longitudinal calibration data", () => {
 
   it("converges and fixes the first occasion at N(0, 1)", () => {
     expect(fit.converged).toBe(true);
-    expect(fit.occasions[0]).toEqual({ mean: 0, sd: 1 });
+    expect(fit.occasions[0]).toEqual({ mean: 0, sd: 1, standardErrors: null });
     expect(fit.correlations[0]?.[0]).toBe(1);
     expect(fit.correlations[0]?.[1]).toBe(fit.correlations[1]?.[0]);
     expect(fit.items.map(({ id }) => id)).toEqual(["q1", "q2", "q3", "q4", "q5", "q6"]);
-    expect(fit.standardErrors).toBeNull();
+    expect(fit.items.every(({ standardErrors }) => standardErrors === null)).toBe(true);
+    expect(fit.occasions.map(({ standardErrors }) => standardErrors)).toEqual([null, null]);
+    expect(fit.correlationStandardErrors).toBeNull();
   });
 
   it("reports the change from the moments of the two occasions", () => {
@@ -3263,24 +3281,34 @@ describe("longitudinal calibration data", () => {
     expect(chain.correlations).toHaveLength(3);
   });
 
-  it("lists the slope that the 1PL's items share once among the standard errors", () => {
+  it("gives the slope that the 1PL's items share at each item, and each item's errors by name", () => {
     const shared = calibrateLongitudinal(occasions, {
       model: oneParameterLogistic,
       points: 21,
       standardErrors: "hessian",
     });
-    // The slope, six difficulties, one correlation, one standard deviation and one mean.
-    expect(shared.standardErrors).toHaveLength(10);
     const separate = calibrateLongitudinal(occasions, { points: 21, standardErrors: "hessian" });
-    // Two parameters for each of six items, and the three of the distribution.
-    expect(separate.standardErrors).toHaveLength(15);
+    for (const fitted of [shared, separate]) {
+      expect(fitted.items.map(({ standardErrors }) => Object.keys(defined(standardErrors)))).toEqual(
+        Array.from({ length: 6 }, () => ["a", "b"]),
+      );
+      const [first, second] = fitted.occasions;
+      expect(first?.standardErrors).toBeNull();
+      expect(defined(second?.standardErrors).mean).toBeGreaterThan(0);
+      expect(defined(second?.standardErrors).sd).toBeGreaterThan(0);
+      const [[diagonal, below] = [], [above] = []] = defined(fitted.correlationStandardErrors);
+      expect(diagonal).toBe(0);
+      expect(above).toBeGreaterThan(0);
+      expect(above).toBe(below);
+    }
+    const slopes = (fitted: LongitudinalCalibration) => fitted.items.map(({ standardErrors }) => standardErrors?.a);
+    expect(new Set(slopes(shared)).size).toBe(1);
+    expect(new Set(slopes(separate)).size).toBe(6);
   });
 
   it("gives Hessian and cross-product standard errors of one size, all positive", () => {
-    const hessian = defined(calibrateLongitudinal(occasions, { points: 21, standardErrors: "hessian" }).standardErrors);
-    const product = defined(
-      calibrateLongitudinal(occasions, { points: 21, standardErrors: "cross-product" }).standardErrors,
-    );
+    const hessian = errorVector(calibrateLongitudinal(occasions, { points: 21, standardErrors: "hessian" }));
+    const product = errorVector(calibrateLongitudinal(occasions, { points: 21, standardErrors: "cross-product" }));
     expect(product).toHaveLength(hessian.length);
     hessian.forEach((error, k) => {
       expect(error).toBeGreaterThan(0);

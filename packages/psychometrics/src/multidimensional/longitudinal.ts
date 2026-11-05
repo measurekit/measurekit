@@ -9,20 +9,21 @@ import {
 } from "@measurekit/core";
 import type { ResponseMatrix } from "../data/internal.js";
 import {
+  type CalibratedItem,
   checkStandardErrorSize,
   gradedResponse,
   type IrtModel,
   maximization,
   oneParameterLogistic,
+  type Setup,
   STANDARD_ERROR_METHODS,
   type StandardErrorMethod,
   setUp,
-  type TestItem,
   twoParameterLogistic,
 } from "../irt/internal.js";
 import { rectangular } from "../math/internal.js";
 import { EM_MAX_ITERATIONS, EM_TOLERANCE } from "./calibration.js";
-import { latentDistribution } from "./correlation.js";
+import { type Latent, latentDistribution } from "./correlation.js";
 import { productGrid } from "./grid.js";
 import { arrangeOccasions } from "./longitudinal-data.js";
 import { expectationMaximization, type LongitudinalFit } from "./longitudinal-em.js";
@@ -78,6 +79,16 @@ export interface OccasionMoments {
   readonly mean: number;
   /** The standard deviation of the trait. */
   readonly sd: number;
+  /**
+   * The standard errors of `mean` and `sd`; `null` on the first occasion, which fixes them, and where the items have
+   * none.
+   */
+  readonly standardErrors: {
+    /** The standard error of the mean. */
+    readonly mean: number;
+    /** The standard error of the standard deviation. */
+    readonly sd: number;
+  } | null;
 }
 
 /** The change of the trait between two consecutive occasions. */
@@ -96,22 +107,21 @@ export interface OccasionChange {
 
 /** Items and the distribution of one trait per occasion, estimated together from the occasions' responses. */
 export interface LongitudinalCalibration {
-  /** The items, in order of first appearance across the occasions, with the parameters they have on every occasion. */
-  readonly items: readonly TestItem[];
-  /** The mean and standard deviation of each occasion; the first is 0 and 1. */
+  /**
+   * The items, in order of first appearance across the occasions, with the parameters they have on every occasion and
+   * the standard errors of those parameters by name, on their own scale: a parameter that the items share, the 1PL's
+   * slope, has its error at each item. The errors are `null` without the option `standardErrors`, and for every item
+   * when the information cannot be inverted or gives a variance that is not positive.
+   */
+  readonly items: readonly CalibratedItem<unknown>[];
+  /** The mean and standard deviation of each occasion, with their standard errors; the first is 0 and 1. */
   readonly occasions: readonly OccasionMoments[];
   /** The correlations between the occasions, by rows. */
   readonly correlations: readonly (readonly number[])[];
+  /** The standard errors of the correlations, by rows with 0 on the diagonal; `null` where the items have none. */
+  readonly correlationStandardErrors: readonly (readonly number[])[] | null;
   /** The change between each pair of consecutive occasions: its mean, its standard deviation and its correlation with the start. */
   readonly changes: readonly OccasionChange[];
-  /**
-   * The standard errors of the estimated parameters on their own scale: the items' parameters in item order, in the
-   * order of their model's parameters and with a parameter that the items share once, at its first item; then the
-   * correlations of the pairs (1, 0), (2, 0), (2, 1) of occasions, the standard deviations of the occasions after the
-   * first and their means. `null` without the option `standardErrors`, and when the information cannot be inverted or
-   * gives a variance that is not positive.
-   */
-  readonly standardErrors: Float64Array | null;
   /** The marginal log-likelihood at the estimates. */
   readonly logLikelihood: number;
   /** Whether the calibration reached `tolerance` within `maxIterations`, with every occasion's distribution on the grid. */
@@ -189,10 +199,20 @@ export function calibrateLongitudinal(
   };
   const { converged, iterations } = expectationMaximization(fit, tolerance, maxIterations);
   const logLikelihood = fit.eStep.run();
+  const errors = standardErrorsOf(standardErrors, fit);
+  const latentErrors = errors?.subarray(setup.values.length) ?? null;
+  const { occasions: moments, correlations, changes } = momentsOf(latent.mean, latent.matrix);
   return {
-    items: setup.items.map(({ id, model: itemModel, parameters }) => ({ id, model: itemModel, parameters })),
-    ...momentsOf(latent.mean, latent.matrix),
-    standardErrors: standardErrorsOf(standardErrors, fit),
+    items: setup.items.map((item) => ({
+      id: item.id,
+      model: item.model,
+      parameters: item.parameters,
+      standardErrors: errors === null ? null : itemErrors(item, errors),
+    })),
+    occasions: moments.map((moment, t) => ({ ...moment, standardErrors: occasionErrors(latent, latentErrors, t) })),
+    correlations,
+    correlationStandardErrors: latentErrors === null ? null : correlationErrors(latent, latentErrors),
+    changes,
     logLikelihood,
     converged,
     iterations,
@@ -212,11 +232,48 @@ function checkModel(model: unknown): void {
   }
 }
 
+/** Returns the standard errors of an item's estimated parameters by name, from those of every estimated parameter. */
+function itemErrors(item: Setup<unknown>["items"][number], errors: Float64Array): Readonly<Record<string, number>> {
+  return Object.fromEntries(
+    Array.from(item.freeEntries, (p) => [item.names[p] ?? "", errors[item.slots[p] ?? 0] ?? 0]),
+  );
+}
+
+/**
+ * Returns the standard errors of the mean and standard deviation of occasion `t`, from those of the distribution's
+ * entries: the correlations, then the standard deviations and the means of the occasions after the first, which is
+ * pinned.
+ */
+function occasionErrors(
+  { pairs, dimensions }: Latent,
+  errors: Float64Array | null,
+  t: number,
+): OccasionMoments["standardErrors"] {
+  if (errors === null || t === 0) return null;
+  const sd = pairs.length + t - 1;
+  return { mean: errors[sd + dimensions - 1] ?? 0, sd: errors[sd] ?? 0 };
+}
+
+/** Returns the standard errors of the correlations by rows, with 0 on the diagonal, from those of the distribution. */
+function correlationErrors({ pairs, dimensions }: Latent, errors: Float64Array): number[][] {
+  const rows = Array.from({ length: dimensions }, () => new Array<number>(dimensions).fill(0));
+  pairs.forEach(([i, j], p) => {
+    const error = errors[p] ?? 0;
+    (rows[i] ?? [])[j] = error;
+    (rows[j] ?? [])[i] = error;
+  });
+  return rows;
+}
+
 /** Returns the means, standard deviations, correlations and changes of consecutive occasions of a distribution. */
 function momentsOf(
   mean: Float64Array,
   covariance: Float64Array,
-): Pick<LongitudinalCalibration, "occasions" | "correlations" | "changes"> {
+): {
+  readonly occasions: readonly Omit<OccasionMoments, "standardErrors">[];
+  readonly correlations: readonly (readonly number[])[];
+  readonly changes: readonly OccasionChange[];
+} {
   const size = mean.length;
   const sd = Array.from(mean, (_, t) => Math.sqrt(covariance[t * size + t] ?? 1));
   const at = (i: number, j: number): number => covariance[i * size + j] ?? 0;

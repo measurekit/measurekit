@@ -346,15 +346,15 @@ scale: the other means and standard deviations are on it.
 | Linked occasions | Every occasion must share an item with the first, directly or through the others, or its mean has no scale: a `DataError`    |
 | Categories       | Pooled over the occasions: an item needs responses in every category up to its highest, as in `calibrate`                    |
 
-| Result           | Meaning                                                                                                                                    |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `items`          | Each item's `id`, `model` and `parameters`, as `calibrate` gives them; they serve `abilityEstimates` and the other functions of items      |
-| `occasions`      | The `mean` and `sd` of each occasion's trait; the first is 0 and 1                                                                         |
-| `correlations`   | The correlations between the occasions, by rows                                                                                            |
-| `changes`        | For each pair of consecutive occasions, `from` and `to` (indexes from 0): the `mean` and `sd` of the change and its `correlationWithStart` |
-| `standardErrors` | `null` without the option. Otherwise the standard errors of the estimates on their own scale: see below                                    |
-| `logLikelihood`  | The marginal log-likelihood at the estimates                                                                                               |
-| `converged`      | Whether EM reached `tolerance` within `maxIterations`, with every later occasion's distribution on the grid; `iterations` counts them      |
+| Result                      | Meaning                                                                                                                                                 |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `items`                     | Each item's `id`, `model`, `parameters` and `standardErrors`, as `calibrate` gives them; they serve `abilityEstimates` and the other functions of items |
+| `occasions`                 | The `mean` and `sd` of each occasion's trait, with their `standardErrors`; the first is 0 and 1                                                         |
+| `correlations`              | The correlations between the occasions, by rows                                                                                                         |
+| `correlationStandardErrors` | Their standard errors, by rows with 0 on the diagonal                                                                                                   |
+| `changes`                   | For each pair of consecutive occasions, `from` and `to` (indexes from 0): the `mean` and `sd` of the change and its `correlationWithStart`              |
+| `logLikelihood`             | The marginal log-likelihood at the estimates                                                                                                            |
+| `converged`                 | Whether EM reached `tolerance` within `maxIterations`, with every later occasion's distribution on the grid; `iterations` counts them                   |
 
 `changes` carries the change in the trait that growth models use: the later trait less the earlier, with the mean and
 standard deviation of the difference from the covariance matrix, and its correlation with the earlier trait, which is
@@ -375,11 +375,11 @@ const after = before.map((theta) => 0.4 + 1.2 * (0.8 * theta + 0.6 * random.norm
 const fit = calibrateLongitudinal([simulateResponses(items, before, random), simulateResponses(items, after, random)], {
   standardErrors: "hessian",
 });
-fit.occasions; // => [{ mean: 0, sd: 1 }, { mean: 0.43, sd: 1.22 }]
+fit.occasions[1]; // => { mean: 0.43, sd: 1.22, standardErrors: { mean: 0.042, sd: 0.051 } }
 fit.correlations; // => [[1, 0.84], [0.84, 1]]
 fit.changes[0]; // => { from: 0, to: 1, mean: 0.43, sd: 0.66, correlationWithStart: 0.03 }
 fit.items[0]?.parameters; // => { a: 0.81, b: -0.15, c: 0, d: 1 }
-fit.standardErrors?.slice(-3); // => [0.024, 0.051, 0.042]: the correlation, SD and mean of the second occasion
+fit.correlationStandardErrors?.[1]?.[0]; // => 0.024
 fit.converged; // => true
 ```
 
@@ -389,11 +389,10 @@ deviation below the spacing of its nodes or above its range, leaves `converged` 
 
 **Standard errors.** `"hessian"` is the observed information, the Hessian of the marginal log-likelihood by central
 differences of its exact gradient, which two E-steps per parameter give; `"cross-product"` is the sum over persons of the
-outer products of their scores, one pass. The array lists the estimated parameters on their own scale: each item's
-parameters in item order and the order of its model's parameters, with a parameter that the items share, the 1PL's slope,
-once at its first item; then the correlations of the pairs (1, 0), (2, 0), (2, 1) of occasions, the standard deviations of
-the occasions after the first and their means. It is `null` where the information cannot be inverted or gives a variance
-that is not positive.
+outer products of their scores, one pass. The errors are on the estimates' own scale and named as the estimates are: each
+item's by the names of its parameters, a parameter that the items share, the 1PL's slope, at each item; each later
+occasion's `mean` and `sd`, the first occasion's being `null`, as it fixes them; and the correlations' by rows. They are
+`null` without the option and where the information cannot be inverted or gives a variance that is not positive.
 
 **Time.** CPU time of one calibration at the default `tolerance`, on an Apple M5 with Node.js 26, simulated data:
 

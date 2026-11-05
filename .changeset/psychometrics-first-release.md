@@ -126,7 +126,8 @@ test for the number of factors, and `smoothCorrelations` makes a correlation mat
 `calibrateLongitudinal` calibrates the same persons answering the same items on two or three occasions. The trait of each
 occasion is a dimension of a normal distribution whose means, standard deviations and correlations are estimated, with
 the first occasion N(0, 1); items have one set of parameters across the occasions, and the result reports the moments of
-each occasion and of the change between consecutive ones, as `mirt` with constrained items does.
+each occasion and of the change between consecutive ones, as `mirt` with constrained items does. Its standard errors are
+named as its estimates are: each item's by parameter, each occasion's mean and standard deviation, and the correlations by rows.
 
 Adaptive tests keep to a blueprint. An item is in several content areas (`contentAreas`), `contentBounds` holds a minimum
 and a maximum number of items in each area for any selection rule, `maximumPriorityIndex` orders the items by how near their
