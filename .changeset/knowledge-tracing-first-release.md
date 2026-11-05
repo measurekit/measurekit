@@ -5,7 +5,10 @@
 Knowledge tracing for JavaScript and TypeScript, validated against pyBKT and R: Bayesian knowledge tracing, logistic
 models, Elo, online IRT and knowledge space theory, including structures from alternative prerequisites, closure under union, bases,
 atoms, traces, learning paths and neighbourhoods, with serializable learner state, practice recommendations and
-evaluation by cross-validation and learning curves.
+evaluation by cross-validation and learning curves. A learner's state is plain data that JSON serializes, and a model
+checks what a call reads of a stored state, so that `predict` and `mastery` take the same time at any number of skills.
+Elo's skill abilities, with `skills: true`, are updated by the uncertainty function of the global ability, the hierarchical Elo model of
+Nižnan, Pelánek and Řihák.
 
 A function takes what it cannot work without as arguments, `irt(parameters, options)`, `kst(structure, options)` and
 `movingAverageMastery(log, decay, threshold)`, and its options hold only what has a default, which a strict reader refuses
@@ -83,11 +86,8 @@ likely state in `mostLikelyStates`, and their posteriors in `states` only with `
 Every array that a function returns, such as the folds of `splitByTime` and the evaluations of `compareModels`, is
 `readonly`, as those inside its results are: a caller who sorts one in place copies it first.
 
-`buildEventLog` builds a log from events, `selectFirstAttempts` keeps each learner's first attempts, `alignPredictions`
-pairs the predictions with the outcomes of a log, `calibrationCurve` tabulates calibration in bins and `fitPowerLaw`
-fits the power law of practice.
-
-Every function documents each parameter and its result.
+`buildEventLog` builds a log from events, `alignPredictions` pairs the predictions with the outcomes of a log and
+`calibrationCurve` tabulates calibration in bins.
 
 The main function of every module has an example in its documentation, which a test runs against the values its
 comments state.
@@ -99,5 +99,5 @@ a logistic term.
 `diffTest` takes incomplete response patterns, as an adaptive test, a placement or a booklet design leaves them: each
 pair of items counts the learners who answered both, each item's solution rate those who answered it, a pair that no
 learner answered both of leaves the fit measure, and the standard error is the delta method of the same estimate over
-each learner's answers. Complete patterns give the estimate and variance as before. One edge of a quasi order is tested
-by the order without it as the alternative, with `tail: "greater"`.
+each learner's answers. One edge of a quasi order is tested by the order without it as the alternative, with
+`tail: "greater"`.

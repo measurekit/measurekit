@@ -13,8 +13,8 @@ knows, and `checkRecordById` takes a record whose keys are the user's identifier
 `checkArray` refuses an array with a hole, such as `new Array(3)` or `[1, , 2]`, which `forEach`, `map` and `every`
 would skip, so that every check of a list reads each of its entries. `chiSquareUpperTail` is 0 at an infinite
 statistic.
-`kappaOfPairs` takes the chance agreement in time that grows with the categories that occur rather than with their
-pairs: 20,000 categories took seconds. It takes its weights as the option `weights`.
+`kappaOfPairs` takes the chance agreement in time that grows with the categories that occur, not with their pairs, and
+its weights as the option `weights`.
 `softmax` turns contiguous logits into probabilities, and `stridedSoftmax` the logits of a column at a stride.
 `NominalParameters` and `nominalProbabilities` give the nominal response item, which both packages read.
 `hasOrderedThresholds` and `hasValidAsymptotes` test the thresholds of a graded item and the asymptotes of a logistic
@@ -25,7 +25,7 @@ item.
 `bfgs` and `stepAlong` take a function as its value and, apart, its gradient (`ValueAndGradient`), as R's `optim` takes
 `fn` and `gr`: the line search evaluates the value alone at each length it tries and the gradient at the length it
 accepts, so that a gradient by finite differences is computed once a step. A length where that gradient is not finite
-is refused and the step halved again, as `backtrack` refuses a length its new option `accept` refuses.
+is refused and the step halved again, as `backtrack` refuses a length that its option `accept` refuses.
 
 `checkOptions` takes the names of a function's options, a `FieldNames` constant that the type checker holds complete,
 and refuses an option the function does not take, naming it; `checkFields` does the same for a record of settings inside
