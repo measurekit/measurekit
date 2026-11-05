@@ -109,9 +109,10 @@ export interface OccasionChange {
 export interface LongitudinalCalibration {
   /**
    * The items, in order of first appearance across the occasions, with the parameters they have on every occasion, the
-   * names of those the calibration estimated, and their standard errors by name, on their own scale: a parameter that the items share, the 1PL's
-   * slope, has its error at each item. The errors are `null` without the option `standardErrors`, and for every item
-   * when the information cannot be inverted or gives a variance that is not positive.
+   * names of those the calibration estimated, and their standard errors by name, on their own scale: a parameter that
+   * the items share, the 1PL's slope, has its error at each item. The errors are `null` without the option
+   * `standardErrors`, and for every item when the information cannot be inverted or gives a variance that is not
+   * positive.
    */
   readonly items: readonly CalibratedItem<unknown>[];
   /** The mean and standard deviation of each occasion, with their standard errors; the first is 0 and 1. */

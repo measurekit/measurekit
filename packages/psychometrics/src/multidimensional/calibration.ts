@@ -20,9 +20,8 @@ export interface CalibratedMultidimensionalItem<TParameters> extends Multidimens
   /**
    * Standard errors of the estimated parameters by name: `a1` to `aD`, `intercept` or `intercept1` upward, and `c`.
    * Slopes fixed at 0 by the pattern of loadings and parameters that `fixedParameters` holds are not listed. `null`
-   * without standard errors: with the option
-   * `standardErrors` `"none"`, and when the information matrix cannot be inverted or gives a variance that is not
-   * positive.
+   * without standard errors: with the option `standardErrors` `"none"`, and when the information matrix cannot be
+   * inverted or gives a variance that is not positive.
    */
   readonly standardErrors: Readonly<Record<string, number>> | null;
 }
