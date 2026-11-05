@@ -21,7 +21,7 @@ QUADRATURE_POINTS <- 61
 # The separate calibrations run to the optimum, so that their Richardson standard errors are exact to about 1e-6.
 CALIBRATION_TOLERANCE <- 1e-10
 # The likelihood-ratio fits stop at the tolerance of dif-irt.R, so that the chi-squares are exact to about 1e-4.
-LIKELIHOOD_RATIO_TOLERANCE <- 1e-7
+LIKELIHOOD_RATIO_TOLERANCE <- 1e-9
 
 set.seed(SEED)
 a <- round(runif(ITEMS, 0.8, 2), 2)
@@ -40,11 +40,11 @@ colnames(data) <- paste0("item", seq_len(ITEMS))
 focal <- rep(0:1, each = PERSONS)
 held <- setNames(lapply(guessing, function(g) list(c = g)), colnames(data))
 
-# Sets g of every item to its held value with est = FALSE in a table of mirt's parameters.
-hold_guessing <- function(values) {
-  for (j in seq_len(ITEMS)) {
-    rows <- values$item == colnames(data)[j] & values$name == "g"
-    values$value[rows] <- guessing[j]
+# Sets g of the items `ids` to their held values with est = FALSE in a table of mirt's parameters.
+hold_guessing <- function(values, ids = colnames(data), held_values = guessing) {
+  for (j in seq_along(ids)) {
+    rows <- values$item == ids[j] & values$name == "g"
+    values$value[rows] <- held_values[j]
     values$est[rows] <- FALSE
   }
   values
@@ -110,27 +110,33 @@ stopifnot(max(abs(abs(unsigned[, "H"]) - areas)) < 1e-6)
 
 # --- Likelihood ratio --------------------------------------------------------------------------------------------
 
-groups <- factor(ifelse(focal == 1, "focal", "reference"), levels = c("reference", "focal"))
+# The tests of every item take as many fits as the case has items, each as long as its persons and items, so they take
+# every LR_EVERY-th person, which keeps both groups, and the first LR_ITEMS items: seconds in the tests.
+LR_EVERY <- 4
+LR_ITEMS <- 8
+kept <- seq(1, nrow(data), by = LR_EVERY)
+lr_data <- data[kept, seq_len(LR_ITEMS)]
+groups <- factor(ifelse(focal[kept] == 1, "focal", "reference"), levels = c("reference", "focal"))
 
 # The multiple-group model with g held in both groups, a1 and d of the items `anchors` equal across groups and the
 # others free. Naming the anchors in `invariance` would constrain their held g as well, which mirt refuses.
 fit_groups <- function(anchors) {
   items <- paste(anchors, collapse = ",")
-  syntax <- mirt.model(sprintf("F = 1-%d\nCONSTRAINB = (%s, a1), (%s, d)", ITEMS, items, items))
+  syntax <- mirt.model(sprintf("F = 1-%d\nCONSTRAINB = (%s, a1), (%s, d)", LR_ITEMS, items, items))
   invariance <- c("free_means", "free_var")
-  values <- hold_guessing(multipleGroup(data, syntax, group = groups, itemtype = "3PL", invariance = invariance,
-                                        pars = "values"))
-  model <- multipleGroup(data, syntax, group = groups, itemtype = "3PL", invariance = invariance, pars = values,
-                         quadpts = QUADRATURE_POINTS, TOL = LIKELIHOOD_RATIO_TOLERANCE,
+  values <- hold_guessing(multipleGroup(lr_data, syntax, group = groups, itemtype = "3PL", invariance = invariance,
+                                        pars = "values"), colnames(lr_data), guessing[seq_len(LR_ITEMS)])
+  model <- multipleGroup(lr_data, syntax, group = groups, itemtype = "3PL", invariance = invariance, pars = values,
+                         quadpts = QUADRATURE_POINTS, TOL = LIKELIHOOD_RATIO_TOLERANCE, optimizer = "NR",
                          technical = list(NCYCLES = 20000), verbose = FALSE)
   list(logLik = extract.mirt(model, "logLik"), converged = extract.mirt(model, "converged"), model = model)
 }
 
-constrained <- fit_groups(seq_len(ITEMS))
+constrained <- fit_groups(seq_len(LR_ITEMS))
 stopifnot(constrained$converged)
-tests <- t(sapply(seq_len(ITEMS), function(item) {
+tests <- t(sapply(seq_len(LR_ITEMS), function(item) {
   degrees <- sum(extract.item(extract.group(constrained$model, 1), item)@est)
-  other <- fit_groups(setdiff(seq_len(ITEMS), item))
+  other <- fit_groups(setdiff(seq_len(LR_ITEMS), item))
   stopifnot(other$converged)
   chi <- max(0, 2 * (other$logLik - constrained$logLik))
   c(chiSquare = chi, degreesOfFreedom = degrees, significance = pchisq(chi, degrees, lower.tail = FALSE))
@@ -143,7 +149,8 @@ group_parameters <- coef(constrained$model)$focal$GroupPars
 write_fixture("dif-fixed-parameters", list(
   source = paste("A 3PL simulation of 12 items with c held at 0.2 and 0.25, set.seed(20261104): difLord and difRaju",
                  "with c on mirt 1.48 calibrations of each group with est = FALSE on g, optimizer NR, TOL = 1e-10, 61",
-                 "points, SE.type Richardson; mirt's multipleGroup likelihood ratios with g held, TOL = 1e-7."),
+                 "points, SE.type Richardson; mirt's multipleGroup likelihood ratios with g held, TOL = 1e-9, of every 4th",
+                 "person and the first 8 items."),
   itemIds = colnames(data),
   responses = unname(lapply(seq_len(nrow(data)), function(i) unname(data[i, ]))),
   focal = focal,
@@ -167,6 +174,8 @@ write_fixture("dif-fixed-parameters", list(
   ),
   likelihoodRatioTolerance = LIKELIHOOD_RATIO_TOLERANCE,
   likelihoodRatio = list(
+    input = list(every = LR_EVERY, items = LR_ITEMS),
+    fixedParameters = held[seq_len(LR_ITEMS)],
     chiSquare = unname(tests[, "chiSquare"]),
     degreesOfFreedom = unname(tests[, "degreesOfFreedom"]),
     significance = unname(tests[, "significance"]),

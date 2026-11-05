@@ -15,8 +15,9 @@ suppressPackageStartupMessages({
 ALPHA <- 0.05
 # mirt's default rectangular rule, which measurekit's default quadrature reproduces.
 QUADRATURE_POINTS <- 61
-# EM is run well past mirt's default 1e-4, so that the chi-squares are exact to about 1e-4.
-TOLERANCE <- 1e-7
+# EM is run well past mirt's default 1e-4, so that the chi-squares are exact to about 1e-5: on the few hundred persons of the
+# reduced cases the likelihood is flat enough that 1e-7 leaves the two EM runs 4e-4 apart in a chi-square.
+TOLERANCE <- 1e-9
 MAX_ROUNDS <- 10
 # Each anchor is tested against the other anchors, of which one links the focal group's mean and variance.
 MINIMUM_ANCHORS <- 2
@@ -34,8 +35,8 @@ matrix_of <- function(rows) {
 fit_groups <- function(data, groups, itemtype, anchors) {
   invariance <- c(colnames(data)[anchors], "free_means", "free_var")
   model <- multipleGroup(data, 1, group = groups, itemtype = itemtype, invariance = invariance,
-                         quadpts = QUADRATURE_POINTS, TOL = TOLERANCE, technical = list(NCYCLES = 20000),
-                         verbose = FALSE)
+                         quadpts = QUADRATURE_POINTS, TOL = TOLERANCE, optimizer = "NR",
+                         technical = list(NCYCLES = 20000), verbose = FALSE)
   list(logLik = extract.mirt(model, "logLik"), converged = extract.mirt(model, "converged"), model = model)
 }
 
@@ -92,11 +93,17 @@ focal_distribution <- function(model) {
   list(mean = parameters["par", "MEAN_1"], sd = sqrt(parameters["par", "COV_11"]))
 }
 
-# The case `name` of a fixture with its complete or sparse responses, tested under `model`, measurekit's name.
-lr_case <- function(fixture, name, sparse, model, purify) {
+# The case `name` of a fixture with its complete or sparse responses, tested under `model`, measurekit's name. The tests
+# of every item take as many fits of the multiple-group model as the case has items, each as long as its persons and items,
+# so a case is reduced to every `every`-th person, which keeps both groups and the pattern of the missing responses, and to
+# the `items` at these positions, by seconds in the tests: each case records what it keeps.
+lr_case <- function(fixture, name, sparse, model, purify, every, items) {
   case <- case_named(if (fixture == "dif") dichotomous else polytomous, name)
   data <- matrix_of(if (sparse) case$sparse$responses else case$responses)
   focal <- unlist(case$focal)
+  kept <- seq(1, nrow(data), by = every)
+  data <- data[kept, items, drop = FALSE]
+  focal <- focal[kept]
   groups <- factor(ifelse(focal == 1, "focal", "reference"), levels = c("reference", "focal"))
   itemtype <- switch(model, "2pl" = "2PL", grm = "graded", gpcm = "gpcm")
   default <- lr_items(data, focal, groups, itemtype, seq_len(ncol(data)))
@@ -106,7 +113,7 @@ lr_case <- function(fixture, name, sparse, model, purify) {
                technical = list(NCYCLES = 20000), TOL = TOLERANCE)
   stopifnot(max(abs(check$X2 - default$tests$chiSquare), na.rm = TRUE) < 1e-2)
   entry <- list(
-    input = list(fixture = fixture, case = name, sparse = sparse),
+    input = list(fixture = fixture, case = name, sparse = sparse, every = every, items = I(items)),
     model = model,
     default = default$tests,
     logLikelihood = default$constrained$logLik,
@@ -205,10 +212,11 @@ write_fixture("dif-irt", list(
                  "ltm calibrations run to convergence, checked against integrate; DFIT's Ncdif, Cdif and Dtf."),
   tolerance = TOLERANCE,
   likelihoodRatio = list(
-    "verbal, 2PL" = lr_case("dif", "verbal", FALSE, "2pl", TRUE),
-    "simulated, sparse, 2PL" = lr_case("dif", "simulated", TRUE, "2pl", FALSE),
-    "bfi, graded" = lr_case("dif-polytomous", "bfi", FALSE, "grm", TRUE),
-    "graded, sparse, generalized partial credit" = lr_case("dif-polytomous", "simulated", TRUE, "gpcm", FALSE)
+    "verbal, 2PL" = lr_case("dif", "verbal", FALSE, "2pl", TRUE, 1, c(4, 6, 9, 16, 19, 20)),
+    "simulated, sparse, 2PL" = lr_case("dif", "simulated", TRUE, "2pl", FALSE, 8, c(1, 2, 3, 5, 8, 12, 15, 20)),
+    "bfi, graded" = lr_case("dif-polytomous", "bfi", FALSE, "grm", TRUE, 10, 1:5),
+    "graded, sparse, generalized partial credit" = lr_case("dif-polytomous", "simulated", TRUE, "gpcm", FALSE, 8,
+                                                           c(1, 2, 3, 4, 7, 10, 11, 12))
   ),
   raju = list(verbal = raju_case("verbal"), simulated = raju_case("simulated")),
   population = list(nodes = focal_thetas, weights = rep(1 / DFIT_PERSONS, DFIT_PERSONS)),

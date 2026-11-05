@@ -133,7 +133,7 @@ interface DifIrtFixture {
   tolerance: number;
   likelihoodRatio: {
     "verbal, 2PL": {
-      input: { fixture: string; case: string; sparse: boolean };
+      input: FixtureInput;
       model: string;
       default: { chiSquare: number[]; degreesOfFreedom: number[]; significance: number[] };
       logLikelihood: number;
@@ -149,7 +149,7 @@ interface DifIrtFixture {
       };
     };
     "bfi, graded": {
-      input: { fixture: string; case: string; sparse: boolean };
+      input: FixtureInput;
       model: string;
       default: { chiSquare: number[]; degreesOfFreedom: number[]; significance: number[] };
       logLikelihood: number;
@@ -268,6 +268,9 @@ interface DifFixedParametersFixture {
   raju: RajuFixture;
   likelihoodRatioTolerance: number;
   likelihoodRatio: {
+    /** The persons and items the tests keep: every `every`-th person and the first `items`. */
+    input: { every: number; items: number };
+    fixedParameters: Record<string, { c: number }>;
     chiSquare: number[];
     degreesOfFreedom: number[];
     significance: number[];
@@ -1313,11 +1316,27 @@ describe("lordChiSquare", () => {
   });
 });
 
-/** The cases of dif.json and dif-polytomous.json that the fixtures of the other units key by name. */
+/**
+ * The cases of dif.json and dif-polytomous.json that the fixtures of the other units key by name. A case reduced for a
+ * test of every item keeps every `every`-th person and the `items` at these positions, counted from 1.
+ */
 interface FixtureInput {
   readonly fixture: string;
   readonly case: string;
   readonly sparse: boolean;
+  readonly every?: number;
+  readonly items?: readonly number[];
+}
+
+/** The persons of a response matrix, every `every`-th from the first, and its items at the positions `items`. */
+function reduced(
+  rows: readonly (readonly (number | null)[])[],
+  every: number,
+  items?: readonly number[],
+): (number | null)[][] {
+  return rows
+    .filter((_, person) => person % every === 0)
+    .map((row) => (items === undefined ? [...row] : items.map((position) => row[position - 1] ?? null)));
 }
 
 /** The responses and groups of a case of dif.json or dif-polytomous.json. */
@@ -1329,9 +1348,12 @@ function fixtureCase(input: FixtureInput): { matrix: ResponseMatrix; groups: Dif
     sparse: { responses: (number | null)[][] };
   }[] = input.fixture === "dif" ? fixture.cases : polytomous.cases;
   const dataset = defined(cases.find((candidate) => candidate.name === input.case));
+  const every = input.every ?? 1;
   return {
-    matrix: buildResponseMatrix(input.sparse ? dataset.sparse.responses : dataset.responses),
-    groups: groups(dataset.focal),
+    matrix: buildResponseMatrix(
+      reduced(input.sparse ? dataset.sparse.responses : dataset.responses, every, input.items),
+    ),
+    groups: groups(dataset.focal.filter((_, person) => person % every === 0)),
   };
 }
 
@@ -1505,10 +1527,16 @@ describe("irtLikelihoodRatioDif", () => {
 
   it("matches mirt's multiple-group likelihood ratios with the lower asymptotes of 3PL items held in both groups", () => {
     const { likelihoodRatio } = heldFixture;
-    const result = irtLikelihoodRatioDif(heldCase.matrix, heldCase.groups, heldCase.model, {
-      ...heldCase.options,
-      tolerance: heldFixture.likelihoodRatioTolerance,
-    });
+    const { fixedParameters, input } = likelihoodRatio;
+    const { every } = input;
+    // The tests of every item take a fit of the two groups for each item: every 4th person and the first 8 items.
+    const first = Array.from({ length: input.items }, (_, item) => item + 1);
+    const result = irtLikelihoodRatioDif(
+      buildResponseMatrix(reduced(heldFixture.responses, every, first)),
+      groups(heldFixture.focal.filter((_, person) => person % every === 0)),
+      heldCase.model,
+      { ...heldCase.options, fixedParameters, tolerance: heldFixture.likelihoodRatioTolerance },
+    );
     expectLikelihoodRatio(result.items, likelihoodRatio);
     const { constrained } = result;
     expect(constrained.converged).toBe(true);
@@ -1516,7 +1544,7 @@ describe("irtLikelihoodRatioDif", () => {
     const focal = constrained.groups.find((group) => group.group === "focal");
     expectClose(focal?.mean ?? null, likelihoodRatio.focal.mean, LATENT_TOLERANCE);
     expectClose(focal?.sd ?? null, likelihoodRatio.focal.sd, LATENT_TOLERANCE);
-    for (const item of constrained.items) expect(item.parameters.c).toBe(heldFixture.fixedParameters[item.id]?.c);
+    for (const item of constrained.items) expect(item.parameters.c).toBe(fixedParameters[item.id]?.c);
   });
 
   it("leaves a held parameter out of the degrees of freedom, and refuses held parameters of other ids or models", () => {
@@ -2740,8 +2768,8 @@ describe("the recipe for power by focal group size", () => {
 
 describe("properties", () => {
   it("IRT likelihood-ratio chi-squares do not change when the groups swap", () => {
-    const { matrix, groups: caseGroups } = fixtureCase(irtFixture.likelihoodRatio["verbal, 2PL"].input);
-    const subset = buildResponseMatrix(matrix.responses.map((row) => row.slice(0, 6)));
+    const { matrix, groups: caseGroups } = fixtureCase({ fixture: "dif", case: "verbal", sparse: false });
+    const subset = buildResponseMatrix(matrix.responses.map((row) => row.slice(0, 5)));
     const swapped = caseGroups.map((group): DifGroup => (group === "focal" ? "reference" : "focal"));
     const options = { tolerance: 1e-8, maxIterations: 20_000 };
     const forward = irtLikelihoodRatioDif(subset, caseGroups, twoParameterLogistic, options).items;
