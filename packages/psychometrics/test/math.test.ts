@@ -323,6 +323,19 @@ describe("symmetricEigen", () => {
     expect(result).toMatchObject({ converged: false, iterations: 30 });
   });
 
+  it("takes no off-diagonal entry for negligible because the sum of its diagonal neighbors passes the largest double", () => {
+    // The eigenvalues are 2e308, past the largest double, and 0, of the vectors (1, 1) and (1, -1) over √2; the sum of
+    // the diagonal, past it too, once took the matrix for diagonal, with 1e308 twice.
+    const ones = symmetricEigen(Float64Array.of(1e308, 1e308, 1e308, 1e308), 2);
+    expect(ones.values[0]).toBe(Number.POSITIVE_INFINITY);
+    expect(Math.abs(defined(ones.values[1]))).toBeLessThan(1e308 * 1e-15);
+    expectClose(defined(ones.vectors[0]), Math.SQRT1_2, 1e-15);
+    expectClose(defined(ones.vectors[1]), Math.SQRT1_2, 1e-15);
+    const diagonal = symmetricEigen(Float64Array.of(1e308, 0, 0, 1e308), 2);
+    expect(diagonal).toMatchObject({ converged: true, iterations: 0 });
+    expect([...diagonal.values]).toEqual([1e308, 1e308]);
+  });
+
   it("decomposes the correlations of 1,000 items, the most a matrix of items takes", () => {
     // Five factors of seeded loadings: five leading eigenvalues and the rest spread between the uniquenesses.
     const random = createRandom(29);

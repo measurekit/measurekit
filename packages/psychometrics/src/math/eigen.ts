@@ -11,7 +11,8 @@ export interface SymmetricEigen {
   readonly iterations: number;
   /**
    * Whether each eigenvalue was found within `MAX_ITERATIONS` QL iterations; false for an entry that is not finite, or so
-   * near the largest double that the arithmetic overflows.
+   * near the largest double that the arithmetic overflows. An eigenvalue that is found past the largest double is
+   * infinite.
    */
   readonly converged: boolean;
 }
@@ -214,13 +215,14 @@ function diagonalize(
 
 /**
  * Returns the end of the unreduced block that starts at `start`: the first m from it whose off-diagonal entry is
- * negligible beside its two diagonal neighbors, EISPACK's test, or the last index.
+ * negligible beside its two diagonal neighbors, EISPACK's test, or the last index. Each neighbor is scaled before they
+ * are added, exactly, as ε is a power of two, so that a sum past the largest double does not make every entry negligible.
  */
 function blockEnd(diagonal: Float64Array, offDiagonal: Float64Array, start: number): number {
   const last = diagonal.length - 1;
   for (let m = start; m < last; m++) {
-    const neighbors = Math.abs(diagonal[m] ?? 0) + Math.abs(diagonal[m + 1] ?? 0);
-    if (Math.abs(offDiagonal[m] ?? 0) <= Number.EPSILON * neighbors) return m;
+    const neighbors = Number.EPSILON * Math.abs(diagonal[m] ?? 0) + Number.EPSILON * Math.abs(diagonal[m + 1] ?? 0);
+    if (Math.abs(offDiagonal[m] ?? 0) <= neighbors) return m;
   }
   return last;
 }
