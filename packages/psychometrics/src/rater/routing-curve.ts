@@ -72,65 +72,75 @@ export function routingCurve(
     if (Number.isNaN(value)) throw new DataError(`Subject ${subject + 1} needs a confidence for the routing curve.`);
   });
   const order = Uint32Array.from(confidence.keys()).sort((x, y) => (confidence[y] ?? 0) - (confidence[x] ?? 0));
-  const sums = new RunningSums();
+  const sums: RunningSums = {
+    n: 0,
+    machine: 0,
+    human: 0,
+    machineSquares: 0,
+    humanSquares: 0,
+    products: 0,
+    exact: 0,
+    adjacent: 0,
+  };
   const points: RoutingPoint[] = [];
   for (let k = 0; k < order.length; k++) {
     const subject = order[k] ?? 0;
-    sums.add(machine[subject] ?? 0, human[subject] ?? 0);
+    addPair(sums, machine[subject] ?? 0, human[subject] ?? 0);
     const next = order[k + 1];
     if (next !== undefined && confidence[next] === confidence[subject]) continue;
-    points.push({ minConfidence: confidence[subject] ?? 0, coverage: sums.n / order.length, ...sums.statistics() });
+    points.push({ minConfidence: confidence[subject] ?? 0, coverage: sums.n / order.length, ...statistics(sums) });
   }
   return points;
 }
 
 /** The sums of the pairs of scores added so far, from which their agreement follows. */
-class RunningSums {
-  n = 0;
-  private machine = 0;
-  private human = 0;
-  private machineSquares = 0;
-  private humanSquares = 0;
-  private products = 0;
-  private exact = 0;
-  private adjacent = 0;
+interface RunningSums {
+  n: number;
+  machine: number;
+  human: number;
+  machineSquares: number;
+  humanSquares: number;
+  products: number;
+  exact: number;
+  adjacent: number;
+}
 
-  add(machine: number, human: number): void {
-    this.n++;
-    this.machine += machine;
-    this.human += human;
-    this.machineSquares += machine * machine;
-    this.humanSquares += human * human;
-    this.products += machine * human;
-    const difference = Math.abs(machine - human);
-    if (difference === 0) this.exact++;
-    if (difference <= 1) this.adjacent++;
-  }
+/** Adds a pair of scores to the sums. */
+function addPair(sums: RunningSums, machine: number, human: number): void {
+  sums.n++;
+  sums.machine += machine;
+  sums.human += human;
+  sums.machineSquares += machine * machine;
+  sums.humanSquares += human * human;
+  sums.products += machine * human;
+  const difference = Math.abs(machine - human);
+  if (difference === 0) sums.exact++;
+  if (difference <= 1) sums.adjacent++;
+}
 
-  /**
-   * Returns the statistics of the pairs. The sums of squares and products about the means, times n, are differences of
-   * sums: exact for integer scores.
-   */
-  statistics(): Omit<RoutingPoint, "minConfidence" | "coverage"> {
-    const { n } = this;
-    const machineSpread = n * this.machineSquares - this.machine * this.machine;
-    const humanSpread = n * this.humanSquares - this.human * this.human;
-    const covariance = n * this.products - this.machine * this.human;
-    const shift = (this.machine - this.human) ** 2;
-    const kappaDenominator = machineSpread + humanSpread + shift;
-    const squares = this.machineSquares - 2 * this.products + this.humanSquares;
-    const pooled = (machineSpread + humanSpread) / (2 * n * (n - 1));
-    return {
-      subjects: n,
-      exactAgreement: this.exact / n,
-      adjacentAgreement: this.adjacent / n,
-      quadraticKappa: kappaDenominator > 0 ? (2 * covariance) / kappaDenominator : null,
-      correlation:
-        n > 1 && machineSpread > 0 && humanSpread > 0
-          ? Math.min(1, Math.max(-1, covariance / Math.sqrt(machineSpread * humanSpread)))
-          : null,
-      smd: n > 1 && pooled > 0 ? (this.machine - this.human) / n / Math.sqrt(pooled) : null,
-      rmse: Math.sqrt(Math.max(squares, 0) / n),
-    };
-  }
+/**
+ * Returns the statistics of the pairs. The sums of squares and products about the means, times n, are differences of
+ * sums: exact for integer scores.
+ */
+function statistics(sums: RunningSums): Omit<RoutingPoint, "minConfidence" | "coverage"> {
+  const { n } = sums;
+  const machineSpread = n * sums.machineSquares - sums.machine * sums.machine;
+  const humanSpread = n * sums.humanSquares - sums.human * sums.human;
+  const covariance = n * sums.products - sums.machine * sums.human;
+  const shift = (sums.machine - sums.human) ** 2;
+  const kappaDenominator = machineSpread + humanSpread + shift;
+  const squares = sums.machineSquares - 2 * sums.products + sums.humanSquares;
+  const pooled = (machineSpread + humanSpread) / (2 * n * (n - 1));
+  return {
+    subjects: n,
+    exactAgreement: sums.exact / n,
+    adjacentAgreement: sums.adjacent / n,
+    quadraticKappa: kappaDenominator > 0 ? (2 * covariance) / kappaDenominator : null,
+    correlation:
+      n > 1 && machineSpread > 0 && humanSpread > 0
+        ? Math.min(1, Math.max(-1, covariance / Math.sqrt(machineSpread * humanSpread)))
+        : null,
+    smd: n > 1 && pooled > 0 ? (sums.machine - sums.human) / n / Math.sqrt(pooled) : null,
+    rmse: Math.sqrt(Math.max(squares, 0) / n),
+  };
 }

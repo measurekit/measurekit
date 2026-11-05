@@ -1,5 +1,5 @@
 import { DataError, describe, isRecord } from "@measurekit/core";
-import { minres } from "../math/internal.js";
+import { checkCorrelationMatrix, minres } from "../math/internal.js";
 import type { ExploratoryFactors } from "./exploratory-factors.js";
 
 /** The loadings of items on a general factor and on group factors orthogonal to it, by the Schmid-Leiman transformation. */
@@ -23,8 +23,6 @@ export const MIN_GROUP_FACTORS = 3;
  * Newton's method reaches rounding in a few more steps.
  */
 const GENERAL_TOLERANCE = 1e-12;
-/** How far from 1 the diagonal of the factors' correlations, and how far from symmetric, may be. */
-const MATRIX_TOLERANCE = 1e-8;
 
 /**
  * Returns the Schmid-Leiman transformation of an oblique factor solution: a general factor and group factors orthogonal
@@ -85,31 +83,12 @@ function checkFactors(factors: unknown): asserts factors is ExploratoryFactors {
       `The Schmid-Leiman transformation needs at least ${MIN_GROUP_FACTORS} group factors, as two do not identify the general factor, found ${count}.`,
     );
   }
-  checkRows(correlations, count, "correlations");
-  checkCorrelations(correlations as readonly (readonly number[])[]);
+  checkCorrelationMatrix(correlations, "the factors' correlations", count);
   if (!(Array.isArray(communalities) && communalities.length === items && communalities.every(Number.isFinite))) {
     throw new DataError(
       `The factors' communalities must be ${items} finite numbers, one per item, found ${describe(communalities)}.`,
     );
   }
-}
-
-/**
- * Checks that a square matrix of finite numbers is a matrix of correlations: symmetric, with 1 on the diagonal.
- *
- * @throws `DataError` naming the first entry that is not.
- */
-function checkCorrelations(phi: readonly (readonly number[])[]): void {
-  phi.forEach((row, j) => {
-    row.forEach((value, k) => {
-      const expected = j === k ? 1 : (phi[k]?.[j] ?? Number.NaN);
-      if (Math.abs(value) > 1 + MATRIX_TOLERANCE || Math.abs(value - expected) > MATRIX_TOLERANCE) {
-        throw new DataError(
-          `The factors' correlations must be symmetric, from -1 to 1, with 1 on the diagonal, found ${value} at row ${j + 1}, column ${k + 1}.`,
-        );
-      }
-    });
-  });
 }
 
 /**

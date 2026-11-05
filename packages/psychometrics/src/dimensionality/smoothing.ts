@@ -1,5 +1,5 @@
-import { checkOptions, checkPositive, checkPositiveInteger, DataError, type FieldNames } from "@measurekit/core";
-import { symmetricEigen } from "../math/internal.js";
+import { checkOptions, checkPositive, type FieldNames } from "@measurekit/core";
+import { checkCorrelationMatrix, symmetricEigen } from "../math/internal.js";
 
 /** Options of {@link smoothCorrelations}. */
 export interface SmoothingOptions {
@@ -17,8 +17,6 @@ const SMOOTHING_OPTIONS: FieldNames<SmoothingOptions> = { tolerance: true };
 const DEFAULT_TOLERANCE = 1e-12;
 /** How much the tolerance is multiplied to raise an eigenvalue below it: psych's. */
 const RAISE = 100;
-/** The asymmetry or distance of a diagonal entry from 1 that a correlation matrix may have. */
-const MATRIX_TOLERANCE = 1e-8;
 
 /**
  * Returns a correlation matrix that is positive definite: the matrix itself when it is, and otherwise its eigenvalues
@@ -30,28 +28,28 @@ const MATRIX_TOLERANCE = 1e-8;
  * correlations come from pairs of items estimated apart and can fail to be positive definite, which factor analysis
  * and the minimum average partial test need.
  *
- * @param correlations - The symmetric matrix by rows, 1 on its diagonal, with `size` rows.
- * @param size - The number of rows and columns.
+ * @param correlations - The symmetric matrix by rows, 1 on its diagonal, as `polychoricCorrelations` returns it.
  * @param options - The smallest eigenvalue that is kept.
  * @returns The smoothed matrix, by rows.
- * @throws `DataError` when `size` is not a positive integer, `correlations` is not a `Float64Array` of `size` squared
- * finite numbers, symmetric with 1 on the diagonal, or `tolerance` is not positive.
+ * @throws `DataError` when `correlations` is not a square array of finite numbers from -1 to 1, symmetric with 1 on
+ * the diagonal, or `tolerance` is not positive.
  * @see {@link https://doi.org/10.1177/014662168801200305 | Bock, Gibbons and Muraki (1988)}
  */
 export function smoothCorrelations(
-  correlations: Float64Array,
-  size: number,
+  correlations: readonly (readonly number[])[],
   options: SmoothingOptions = {},
-): Float64Array {
+): readonly (readonly number[])[] {
   checkOptions(options, SMOOTHING_OPTIONS);
   const { tolerance = DEFAULT_TOLERANCE } = options;
   checkPositive(tolerance, "The option tolerance");
-  checkMatrix(correlations, size);
-  return smooth(correlations, size, tolerance).correlations;
+  checkCorrelationMatrix(correlations, "the correlations");
+  const size = correlations.length;
+  const smoothed = smooth(Float64Array.from(correlations.flat()), size, tolerance).correlations;
+  return Array.from({ length: size }, (_, i) => Array.from(smoothed.subarray(i * size, (i + 1) * size)));
 }
 
 /**
- * Smooths a correlation matrix as {@link smoothCorrelations} does and reports whether it had to, for the functions that
+ * Smooths a flat correlation matrix as {@link smoothCorrelations} does and reports whether it had to, for the functions that
  * need a matrix that is positive definite. The matrix is valid.
  */
 export function smooth(
@@ -93,31 +91,4 @@ function toCorrelations(covariance: Float64Array, size: number): Float64Array {
     }
   }
   return result;
-}
-
-/**
- * Checks the matrix of correlations.
- *
- * @throws `DataError` when it is not what {@link smoothCorrelations} takes.
- */
-function checkMatrix(correlations: unknown, size: unknown): asserts correlations is Float64Array {
-  checkPositiveInteger(size, "The size of the correlation matrix");
-  if (!(correlations instanceof Float64Array) || correlations.length !== size * size) {
-    throw new DataError(`The correlations must be a Float64Array of ${size * size} numbers, ${size} rows of ${size}.`);
-  }
-  for (let i = 0; i < size; i++) {
-    for (let j = i; j < size; j++) {
-      const value = correlations[i * size + j] ?? Number.NaN;
-      const mirror = correlations[j * size + i] ?? Number.NaN;
-      const valid =
-        Number.isFinite(value) &&
-        Math.abs(value - mirror) <= MATRIX_TOLERANCE &&
-        (i !== j || Math.abs(value - 1) <= MATRIX_TOLERANCE);
-      if (!valid) {
-        throw new DataError(
-          `The correlations must be finite, symmetric and 1 on the diagonal; row ${i + 1}, column ${j + 1} is ${value} and its mirror is ${mirror}.`,
-        );
-      }
-    }
-  }
 }

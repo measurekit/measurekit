@@ -24,30 +24,35 @@ export interface CoefficientErrors {
 }
 
 /** A coefficient as a ratio 1 - F / E of the Guttman errors observed to those expected, with its derivatives. */
-class ErrorRatio {
-  observed = 0;
-  expected = 0;
+interface ErrorRatio {
+  observed: number;
+  expected: number;
   /** The derivatives of the observed and the expected errors with respect to the number of persons of each pattern. */
   readonly observedDerivative: Float64Array;
   readonly expectedDerivative: Float64Array;
+}
 
-  constructor(patterns: number) {
-    this.observedDerivative = new Float64Array(patterns);
-    this.expectedDerivative = new Float64Array(patterns);
-  }
+/** Returns a ratio without errors, for `patterns` patterns. */
+function emptyRatio(patterns: number): ErrorRatio {
+  return {
+    observed: 0,
+    expected: 0,
+    observedDerivative: new Float64Array(patterns),
+    expectedDerivative: new Float64Array(patterns),
+  };
+}
 
-  /** Returns the standard error of 1 - F / E, or `null` when no error is expected. */
-  standardError(patterns: Patterns): number | null {
-    if (!(this.expected > 0)) return null;
-    const ratio = this.observed / this.expected;
-    let variance = 0;
-    for (let k = 0; k < patterns.count; k++) {
-      const derivative =
-        -((this.observedDerivative[k] ?? 0) - ratio * (this.expectedDerivative[k] ?? 0)) / this.expected;
-      variance += (patterns.persons[k] ?? 0) * derivative * derivative;
-    }
-    return Math.sqrt(variance);
+/** Returns the standard error of 1 - F / E, or `null` when no error is expected. */
+function standardError(ratio: ErrorRatio, patterns: Patterns): number | null {
+  if (!(ratio.expected > 0)) return null;
+  const value = ratio.observed / ratio.expected;
+  let variance = 0;
+  for (let k = 0; k < patterns.count; k++) {
+    const derivative =
+      -((ratio.observedDerivative[k] ?? 0) - value * (ratio.expectedDerivative[k] ?? 0)) / ratio.expected;
+    variance += (patterns.persons[k] ?? 0) * derivative * derivative;
   }
+  return Math.sqrt(variance);
 }
 
 /** Returns the distinct patterns of the persons' scores. */
@@ -103,15 +108,15 @@ export function coefficientErrors(data: MokkenData, usable: readonly boolean[]):
   const counts = Array.from({ length: items }, (_, item) => scoreCounts(data, item));
   // The standard error of each pair i < j, by i, then j; NaN where undefined.
   const pairErrors = new Float64Array(items * items).fill(Number.NaN);
-  const itemRatios = Array.from({ length: items }, () => new ErrorRatio(patterns.count));
-  const scaleRatio = new ErrorRatio(patterns.count);
+  const itemRatios = Array.from({ length: items }, () => emptyRatio(patterns.count));
+  const scaleRatio = emptyRatio(patterns.count);
   // One ratio serves every pair in turn: a pair keeps its standard error, and its derivatives go into the sums.
-  const pair = new ErrorRatio(patterns.count);
+  const pair = emptyRatio(patterns.count);
   for (let i = 0; i < items - 1; i++) {
     for (let j = i + 1; j < items; j++) {
       if (!(usable[i] && usable[j])) continue;
       pairContribution(pair, patterns, counts, categories, total, i, j);
-      pairErrors[i * items + j] = pair.standardError(patterns) ?? Number.NaN;
+      pairErrors[i * items + j] = standardError(pair, patterns) ?? Number.NaN;
       for (const ratio of [itemRatios[i], itemRatios[j], scaleRatio]) addPair(ratio, pair);
     }
   }
@@ -123,8 +128,8 @@ export function coefficientErrors(data: MokkenData, usable: readonly boolean[]):
   );
   return {
     pairs,
-    items: itemRatios.map((ratio, item) => (usable[item] ? ratio.standardError(patterns) : null)),
-    scale: scaleRatio.standardError(patterns),
+    items: itemRatios.map((ratio, item) => (usable[item] ? standardError(ratio, patterns) : null)),
+    scale: standardError(scaleRatio, patterns),
   };
 }
 

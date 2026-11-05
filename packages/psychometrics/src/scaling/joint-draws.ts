@@ -9,12 +9,10 @@ import {
   type ThetaDistribution,
 } from "@measurekit/core";
 import { checkThetaDistribution } from "../irt/internal.js";
-import { symmetricEigen } from "../math/internal.js";
+import { checkCorrelationMatrix, symmetricEigen } from "../math/internal.js";
 
 /** An eigenvalue of the correlation with an absolute value below this is 0, so that rounding does not part correlation 1. */
 const EIGENVALUE_TOLERANCE = 1e-10;
-/** The asymmetry or distance of a diagonal entry from 1 that a correlation matrix may have. */
-const MATRIX_TOLERANCE = 1e-8;
 
 /** A posterior as a distribution function that is linear within the cell of each node. */
 export interface Margin {
@@ -89,55 +87,20 @@ export function thetasOf(margins: readonly Margin[], scores: Float64Array): numb
 }
 
 /**
- * Returns the upper-triangle entry (`i`, `j`) of the correlation, checked against its mirror.
- *
- * @throws `DataError` when it is not a number from -1 to 1, is not within 1e-8 of 1 on the diagonal, or is not within
- * 1e-8 of its mirror entry.
- */
-function checkedEntry(correlation: readonly (readonly number[])[], i: number, j: number): number {
-  const value: unknown = correlation[i]?.[j];
-  const mirror: unknown = correlation[j]?.[i];
-  if (!(typeof value === "number" && Math.abs(value) <= 1)) {
-    throw new DataError(
-      `Entry (${i + 1}, ${j + 1}) of the correlation must be a number from -1 to 1, found ${describe(value)}.`,
-    );
-  }
-  if (i === j && !(Math.abs(value - 1) <= MATRIX_TOLERANCE)) {
-    throw new DataError(`Entry (${i + 1}, ${i + 1}) of the correlation must be 1, found ${value}.`);
-  }
-  if (!(typeof mirror === "number" && Math.abs(value - mirror) <= MATRIX_TOLERANCE)) {
-    throw new DataError(
-      `The correlation must be symmetric, but entry (${i + 1}, ${j + 1}) is ${value} and entry (${j + 1}, ${i + 1}) is ${describe(mirror)}.`,
-    );
-  }
-  return value;
-}
-
-/**
- * Returns the correlation as a symmetric matrix by rows, from the upper triangle.
+ * Returns the correlation as a symmetric matrix by rows.
  *
  * @throws `DataError` when it is not an array of `size` arrays of `size` numbers from -1 to 1, symmetric within 1e-8,
  * with 1 on the diagonal within 1e-8.
  */
 function symmetricMatrix(correlation: readonly (readonly number[])[], size: number): Float64Array {
-  checkArray(correlation, "The correlation must be an array of rows");
-  if (correlation.length !== size) {
-    throw new DataError(`The correlation needs ${size} rows, one for each posterior, found ${correlation.length}.`);
-  }
+  checkCorrelationMatrix(correlation, "the correlation", size);
+  const matrix = new Float64Array(size * size);
   correlation.forEach((row, i) => {
-    checkArray(row, `Row ${i + 1} of the correlation must be an array`);
-    if (row.length !== size) {
-      throw new DataError(`Row ${i + 1} of the correlation needs ${size} entries, found ${row.length}.`);
+    for (let j = i; j < size; j++) {
+      matrix[i * size + j] = row[j] ?? 0;
+      matrix[j * size + i] = row[j] ?? 0;
     }
   });
-  const matrix = new Float64Array(size * size);
-  for (let i = 0; i < size; i++) {
-    for (let j = i; j < size; j++) {
-      const value = checkedEntry(correlation, i, j);
-      matrix[i * size + j] = value;
-      matrix[j * size + i] = value;
-    }
-  }
   return matrix;
 }
 

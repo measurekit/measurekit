@@ -32,16 +32,14 @@ const smoothing = readFixture<BenchSmoothingFixture>("bench-dimensionality-smoot
  * Returns the correlations of the first `items` items of the five-factor loadings of the fixture, by rows: the sums of
  * the products of their loadings, which are exact, as R builds them, with 1 on the diagonal.
  */
-function factorCorrelations(items: number): Float64Array {
-  const r = new Float64Array(items * items);
-  for (let i = 0; i < items; i++) {
-    for (let j = 0; j < items; j++) {
+function factorCorrelations(items: number): number[][] {
+  return Array.from({ length: items }, (_, i) =>
+    Array.from({ length: items }, (__, j) => {
       const row = defined(smoothing.loadings[i]);
       const column = defined(smoothing.loadings[j]);
-      r[i * items + j] = i === j ? 1 : row.reduce((sum, loading, k) => sum + loading * defined(column[k]), 0);
-    }
-  }
-  return r;
+      return i === j ? 1 : row.reduce((sum, loading, k) => sum + loading * defined(column[k]), 0);
+    }),
+  );
 }
 
 test("correlates 25 items of 6 categories answered by 2,800 persons", async (context) => {
@@ -80,6 +78,6 @@ test("smooths positive definite correlations of 25, 50, 100, 200 and 1,000 items
   ] as const;
   for (const [items, name] of sizes) {
     const r = factorCorrelations(items);
-    await benchmark(context, name, () => smoothCorrelations(r, items), items === 1000 ? SLOW_OPTIONS : undefined);
+    await benchmark(context, name, () => smoothCorrelations(r), items === 1000 ? SLOW_OPTIONS : undefined);
   }
 });

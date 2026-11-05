@@ -1515,7 +1515,7 @@ describe("schmidLeiman", () => {
           [0, 0, 1],
         ],
       }),
-    ).toThrow("found 0.2 at row 1, column 2");
+    ).toThrow("The factors' correlations must be symmetric, but entry (1, 2) is 0.2 and entry (2, 1) is 0.3.");
     expect(() =>
       schmidLeiman({
         ...fit,
@@ -1525,7 +1525,7 @@ describe("schmidLeiman", () => {
           [0, 0, 1],
         ],
       }),
-    ).toThrow("with 1 on the diagonal, found 2 at row 1, column 1");
+    ).toThrow("Entry (1, 1) of the factors' correlations must be a number from -1 to 1, found 2.");
     expect(() => schmidLeiman({ ...fit, communalities: [0.5] })).toThrow(
       "The factors' communalities must be 25 finite numbers",
     );
@@ -1685,45 +1685,67 @@ describe("smoothCorrelations", () => {
   for (const reference of factorFixture.smoothing) {
     it(`matches psych's cor.smooth for ${reference.name}`, () => {
       const size = reference.raw.length;
-      const smoothed = smoothCorrelations(Float64Array.from(reference.raw.flat()), size);
+      const smoothed = smoothCorrelations(reference.raw);
       reference.smoothed.forEach((row, i) => {
         row.forEach((value, j) => {
-          expectClose(defined(smoothed[i * size + j]), value, 1e-9, `entry ${i + 1},${j + 1}`);
+          expectClose(defined(smoothed[i]?.[j]), value, 1e-9, `entry ${i + 1},${j + 1}`);
         });
       });
-      const { values } = symmetricEigen(smoothed, size);
+      const { values } = symmetricEigen(Float64Array.from(smoothed.flat()), size);
       expect(defined(values[size - 1])).toBeGreaterThan(0);
     });
   }
 
   it("returns a matrix that is already positive definite as it is, in a copy", () => {
-    const r = Float64Array.from(defined(factorFixture.cases[3]).matrix.flat());
-    const smoothed = smoothCorrelations(r, 25);
+    const r = defined(factorFixture.cases[3]).matrix;
+    const smoothed = smoothCorrelations(r);
     expect(smoothed).toEqual(r);
     expect(smoothed).not.toBe(r);
   });
 
   it("raises eigenvalues below the tolerance, so that a larger tolerance changes the result", () => {
-    const reference = defined(factorFixture.smoothing[1]);
-    const raw = Float64Array.from(reference.raw.flat());
-    const small = smoothCorrelations(raw, 3, { tolerance: 1e-12 });
-    const large = smoothCorrelations(raw, 3, { tolerance: 1e-3 });
-    expect(Math.abs(defined(small[1]) - defined(large[1]))).toBeGreaterThan(1e-6);
-    expect(defined(symmetricEigen(large, 3).values[2])).toBeGreaterThan(1e-4);
+    const raw = defined(factorFixture.smoothing[1]).raw;
+    const small = smoothCorrelations(raw, { tolerance: 1e-12 });
+    const large = smoothCorrelations(raw, { tolerance: 1e-3 });
+    expect(Math.abs(defined(small[0]?.[1]) - defined(large[0]?.[1]))).toBeGreaterThan(1e-6);
+    expect(defined(symmetricEigen(Float64Array.from(large.flat()), 3).values[2])).toBeGreaterThan(1e-4);
   });
 
   it("rejects what is not a correlation matrix and options of other types", () => {
-    const r = Float64Array.of(1, 0.5, 0.5, 1);
-    expect(() => smoothCorrelations(r, 0)).toThrow("The size of the correlation matrix");
-    expect(() => smoothCorrelations(r, 1.5)).toThrow("The size of the correlation matrix");
-    expect(() => smoothCorrelations(r, 3)).toThrow("must be a Float64Array of 9 numbers");
-    expect(() => smoothCorrelations(JSON.parse("[1, 0.5, 0.5, 1]"), 2)).toThrow("must be a Float64Array");
-    expect(() => smoothCorrelations(Float64Array.of(1, 0.5, 0.4, 1), 2)).toThrow("symmetric");
-    expect(() => smoothCorrelations(Float64Array.of(1, 0.5, 0.5, 0.9), 2)).toThrow("1 on the diagonal");
-    expect(() => smoothCorrelations(Float64Array.of(1, Number.NaN, Number.NaN, 1), 2)).toThrow("finite");
-    expect(() => smoothCorrelations(r, 2, JSON.parse("null"))).toThrow(DataError);
-    expect(() => smoothCorrelations(r, 2, JSON.parse('{"tolerance": 0}'))).toThrow("The option tolerance");
-    expect(() => smoothCorrelations(r, JSON.parse('"2"'))).toThrow("The size of the correlation matrix");
+    const r = [
+      [1, 0.5],
+      [0.5, 1],
+    ];
+    expect(() => smoothCorrelations([])).toThrow("The correlations needs at least one row, found 0.");
+    expect(() => smoothCorrelations(JSON.parse("0.5"))).toThrow("The correlations must be an array of rows");
+    expect(() => smoothCorrelations([[1, 0.5, 0.5], [0.5]])).toThrow("Row 1 of the correlations needs 2 entries");
+    expect(() => smoothCorrelations(JSON.parse("[[1, 0.5], 1]"))).toThrow("Row 2 of the correlations must be an array");
+    expect(() =>
+      smoothCorrelations([
+        [1, 0.5],
+        [0.4, 1],
+      ]),
+    ).toThrow("The correlations must be symmetric");
+    expect(() =>
+      smoothCorrelations([
+        [1, 0.5],
+        [0.5, 0.9],
+      ]),
+    ).toThrow("Entry (2, 2) of the correlations must be 1, found 0.9.");
+    expect(() =>
+      smoothCorrelations([
+        [1, 1.5],
+        [1.5, 1],
+      ]),
+    ).toThrow("Entry (1, 2) of the correlations must be a number from -1 to 1, found 1.5.");
+    expect(() =>
+      smoothCorrelations([
+        [1, Number.NaN],
+        [Number.NaN, 1],
+      ]),
+    ).toThrow("must be a number from -1 to 1, found NaN");
+    expect(() => smoothCorrelations(r, JSON.parse("null"))).toThrow(DataError);
+    expect(() => smoothCorrelations(r, JSON.parse('{"tolerance": 0}'))).toThrow("The option tolerance");
   });
 });
 
