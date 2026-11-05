@@ -1,10 +1,16 @@
 {
-  "source": "calibrateMultidimensional by MH-RM with Hessian standard errors, on the 25 graded items of psych::bfi, the first 800 complete cases, 5 correlated dimensions, against the mean of mirt's MH-RM over seeds 1 to 4.",
+  "source": "calibrateMultidimensional by MH-RM with Hessian standard errors, on the 25 graded items of psych::bfi, the first 800 complete cases, 5 correlated dimensions, against mirt's MH-RM on the same seeds 1 to 10: the parameters of each seed against mirt's mean, and each standard error averaged over the seeds of each program.",
   "seeds": [
     1,
     2,
     3,
-    4
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10
   ],
   "sizes": {
     "persons": 800,
@@ -19,68 +25,173 @@
     "largestRatio": 1.6
   },
   "worst": {
-    "parameters": 0.16551715116204235,
-    "correlations": 0.02470965755297644,
-    "medianRatio": 0.03641487480766448,
-    "smallestRatio": 0.7252908662467579,
-    "largestRatio": 1.6219908171158017
+    "parameters": 0.20076649720913853,
+    "correlations": 0.03372225865816003
   },
   "fits": [
     {
       "seed": 1,
-      "parameters": 0.16551715116204235,
-      "correlations": 0.02470965755297644,
+      "reflected": [],
+      "parameters": 0.20076649720913853,
+      "correlations": 0.025283398516811162,
       "ratio": {
-        "count": 145,
-        "median": 1.0318254857322757,
-        "smallest": 0.7505022129444652,
-        "largest": 1.423108133460891
+        "count": 113,
+        "median": 1.1237455420142286,
+        "smallest": 0.9638400494742583,
+        "largest": 1.4455082128979713
       },
       "within": true,
       "iterations": 96,
-      "seconds": 22.3
-    },
-    {
-      "seed": 2,
-      "parameters": 0.1281595444604542,
-      "correlations": 0.013986107571517026,
-      "ratio": {
-        "count": 145,
-        "median": 1.0325309899536366,
-        "smallest": 0.7323454767708194,
-        "largest": 1.5844058268981778
-      },
-      "within": true,
-      "iterations": 110,
       "seconds": 21.2
     },
     {
-      "seed": 3,
-      "parameters": 0.14447073675633204,
-      "correlations": 0.012322528753198725,
+      "seed": 2,
+      "reflected": [],
+      "parameters": 0.10957804358818724,
+      "correlations": 0.014899461415637194,
       "ratio": {
-        "count": 145,
-        "median": 1.0364148748076645,
-        "smallest": 0.7496946829703,
-        "largest": 1.6219908171158017
+        "count": 113,
+        "median": 1.1244898649224153,
+        "smallest": 0.9405220776014787,
+        "largest": 1.4142486408637482
       },
-      "within": false,
+      "within": true,
+      "iterations": 110,
+      "seconds": 22.6
+    },
+    {
+      "seed": 3,
+      "reflected": [],
+      "parameters": 0.1151544326087679,
+      "correlations": 0.012919116006415432,
+      "ratio": {
+        "count": 113,
+        "median": 1.1246436663456587,
+        "smallest": 0.9413811510932045,
+        "largest": 1.4525829723930173
+      },
+      "within": true,
       "iterations": 106,
-      "seconds": 21.9
+      "seconds": 24.2
     },
     {
       "seed": 4,
-      "parameters": 0.08976575703677137,
-      "correlations": 0.01727119005579686,
+      "reflected": [],
+      "parameters": 0.10599990964697081,
+      "correlations": 0.018184543899917027,
       "ratio": {
-        "count": 145,
-        "median": 1.0249624604573053,
-        "smallest": 0.7252908662467579,
-        "largest": 1.475077948897073
+        "count": 113,
+        "median": 1.1043833749475018,
+        "smallest": 0.9314621227615638,
+        "largest": 1.3871805577273333
       },
       "within": true,
       "iterations": 119,
-      "seconds": 22.9
+      "seconds": 25.6
+    },
+    {
+      "seed": 5,
+      "reflected": [
+        "C"
+      ],
+      "parameters": 0.08571566908779937,
+      "correlations": 0.022159040372301597,
+      "ratio": {
+        "count": 113,
+        "median": 1.1084742279436341,
+        "smallest": 0.9378901067058787,
+        "largest": 1.404992054426905
+      },
+      "within": true,
+      "iterations": 115,
+      "seconds": 24.3
+    },
+    {
+      "seed": 6,
+      "reflected": [],
+      "parameters": 0.13199606315556434,
+      "correlations": 0.011543797517834548,
+      "ratio": {
+        "count": 113,
+        "median": 1.1212650041022225,
+        "smallest": 0.9432996393311738,
+        "largest": 1.4988536828743315
+      },
+      "within": true,
+      "iterations": 140,
+      "seconds": 24.2
+    },
+    {
+      "seed": 7,
+      "reflected": [],
+      "parameters": 0.1245154281728631,
+      "correlations": 0.01899245200976718,
+      "ratio": {
+        "count": 113,
+        "median": 1.1112454556755957,
+        "smallest": 0.9278309022238195,
+        "largest": 1.4214316254137243
+      },
+      "within": true,
+      "iterations": 118,
+      "seconds": 24.5
+    },
+    {
+      "seed": 8,
+      "reflected": [],
+      "parameters": 0.11159328665052648,
+      "correlations": 0.007094050865182389,
+      "ratio": {
+        "count": 113,
+        "median": 1.1209323106173699,
+        "smallest": 0.9596700565420059,
+        "largest": 1.404935857856258
+      },
+      "within": true,
+      "iterations": 116,
+      "seconds": 26.5
+    },
+    {
+      "seed": 9,
+      "reflected": [],
+      "parameters": 0.08744449136381394,
+      "correlations": 0.03372225865816003,
+      "ratio": {
+        "count": 113,
+        "median": 1.1156062456627542,
+        "smallest": 0.9364217254172149,
+        "largest": 1.4168413692479045
+      },
+      "within": true,
+      "iterations": 109,
+      "seconds": 24.5
+    },
+    {
+      "seed": 10,
+      "reflected": [],
+      "parameters": 0.13045103177805029,
+      "correlations": 0.01563365669162109,
+      "ratio": {
+        "count": 113,
+        "median": 1.1149925188800291,
+        "smallest": 0.9430180166591648,
+        "largest": 1.4085222458229523
+      },
+      "within": true,
+      "iterations": 114,
+      "seconds": 24.9
     }
-  ]
+  ],
+  "averagedErrors": {
+    "count": 113,
+    "median": 1.1161979031468607,
+    "quartiles": [
+      1.0431326350594978,
+      1.1717807325758782
+    ],
+    "smallest": 0.9498543117956662,
+    "largest": 1.4255097219524147,
+    "beyond": [],
+    "within": false
+  }
 }

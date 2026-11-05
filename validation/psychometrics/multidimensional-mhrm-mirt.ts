@@ -1,15 +1,16 @@
 // How closely calibrateMultidimensional's MH-RM agrees with mirt's on five dimensions, which takes minutes: the tests hold
-// MH-RM against EM on two dimensions instead. mirt's MH-RM ran with seeds 1 to 4 on the first 800 complete cases of the 25
-// items of psych::bfi under the graded model (multidimensional-mhrm.json, by multidimensional.R); its estimates differ from
-// their mean over the seeds by up to 0.076, and its standard errors by 20% from seed to seed. Each seed here is compared
-// with mirt's mean over its seeds, within the tolerances that the test of seed 1 held: every slope and intercept within 0.3,
-// every correlation within 0.08, and of more than 100 standard errors, the median ratio to mirt's mean within 0.1 of 1 and
-// every ratio from 0.6 to 1.6.
+// MH-RM against EM on two dimensions instead. mirt's MH-RM ran with seeds 1 to 10 on the first 800 complete cases of the
+// 25 items of psych::bfi under the graded model (multidimensional-mhrm.json, by multidimensional.R), and MH-RM here runs
+// with the same seeds. Each seed's slopes and intercepts are held within 0.3 of mirt's mean over its seeds and its
+// correlations within 0.08, after any dimension that came out reflected is turned back. The standard errors of MH-RM vary with the seed, mirt's by up to 79%, so a ratio of one seed's
+// errors is noise: each parameter's standard error is averaged over the ten seeds of each program, and of more than 100
+// such ratios the median is held within 0.1 of 1 and every ratio from 0.6 to 1.6. Each seed's ratios to mirt's averages
+// are recorded too, and bound nothing.
 //
 // It writes results/multidimensional-mhrm-mirt.json beside it as each fit finishes: the seeds and sizes, the tolerances,
-// each fit's largest differences, its ratios of standard errors and its seconds, and the worst over the seeds. It takes
-// about 2 minutes, and exits with 1 when a fit misses a tolerance. Run after `pnpm build`:
-// node validation/psychometrics/multidimensional-mhrm-mirt.ts
+// each fit's largest differences, its ratios of standard errors and its seconds, and at the end the ratios of the averaged
+// errors, with the parameters beyond the bounds. It takes about 4 minutes, and exits with 1 when a tolerance is missed.
+// Run after `pnpm build`: node validation/psychometrics/multidimensional-mhrm-mirt.ts
 
 import { readFileSync } from "node:fs";
 import { buildResponseMatrix } from "@measurekit/psychometrics/data";
@@ -40,7 +41,7 @@ const mirt = JSON.parse(
   ),
 ) as MirtMhrm;
 
-const SEEDS = [1, 2, 3, 4];
+const SEEDS = Array.from({ length: 10 }, (_, k) => k + 1);
 const TOLERANCES = { parameters: 0.3, correlations: 0.08, medianRatio: 0.1, smallestRatio: 0.6, largestRatio: 1.6 };
 
 const average = (values: readonly number[]): number => values.reduce((sum, value) => sum + value, 0) / values.length;
@@ -67,13 +68,16 @@ const meanErrors = mirt.itemIds.map((_, i) => {
 
 const results = {
   source:
-    "calibrateMultidimensional by MH-RM with Hessian standard errors, on the 25 graded items of psych::bfi, the first 800 complete cases, 5 correlated dimensions, against the mean of mirt's MH-RM over seeds 1 to 4.",
+    "calibrateMultidimensional by MH-RM with Hessian standard errors, on the 25 graded items of psych::bfi, the first 800 complete cases, 5 correlated dimensions, against mirt's MH-RM on the same seeds 1 to 10: the parameters of each seed against mirt's mean, and each standard error averaged over the seeds of each program.",
   seeds: SEEDS,
   sizes: { persons: mirt.responses.length, items: mirt.itemIds.length, dimensions: 5 },
   tolerances: TOLERANCES,
-  worst: { parameters: 0, correlations: 0, medianRatio: 0, smallestRatio: Number.POSITIVE_INFINITY, largestRatio: 0 },
+  worst: { parameters: 0, correlations: 0 },
   fits: [] as object[],
+  averagedErrors: {} as object,
 };
+/** Each standard error of every fit here, by item and name, for the averages over the seeds. */
+const errorsHere = mirt.itemIds.map(() => new Map<string, number[]>());
 const data = buildResponseMatrix(mirt.responses, { itemIds: [...mirt.itemIds] });
 let missed = false;
 
@@ -86,10 +90,20 @@ for (const seed of SEEDS) {
       standardErrors: "hessian",
     }),
   );
+  // A dimension and its slopes may come out reflected, as the likelihood is the same: each is turned to agree with mirt's
+  // mean before the comparison.
+  const signs = Array.from({ length: 5 }, (_, d) =>
+    Math.sign(
+      fit.items.reduce(
+        (sum, { parameters: found }, i) => sum + (found.a[d] ?? 0) * (mirt.runs[0]?.items[i]?.parameters.a[d] ?? 0),
+        0,
+      ),
+    ),
+  );
   let parameters = 0;
   fit.items.forEach(({ parameters: found }, i) => {
     const { a, intercepts } = found as MultidimensionalGradedParameters;
-    [...slopes(a), ...intercepts].forEach((value, k) => {
+    [...slopes(a.map((value, d) => value * (signs[d] ?? 1))), ...intercepts].forEach((value, k) => {
       parameters = Math.max(parameters, Math.abs(value - (meanParameters[i]?.[k] ?? Number.NaN)));
     });
   });
@@ -97,8 +111,15 @@ for (const seed of SEEDS) {
   fit.correlations.forEach((row, i) => {
     row.forEach((value, j) => {
       const reference = average(mirt.runs.map((run) => run.correlations[i]?.[j] ?? Number.NaN));
-      correlations = Math.max(correlations, Math.abs(value - reference));
+      correlations = Math.max(correlations, Math.abs(value * (signs[i] ?? 1) * (signs[j] ?? 1) - reference));
     });
+  });
+  fit.items.forEach(({ standardErrors }, i) => {
+    for (const [name, value] of Object.entries(standardErrors ?? {})) {
+      const list = errorsHere[i]?.get(name) ?? [];
+      list.push(value);
+      errorsHere[i]?.set(name, list);
+    }
   });
   const ratios = fit.items
     .flatMap(({ standardErrors }, i) =>
@@ -111,25 +132,42 @@ for (const seed of SEEDS) {
     smallest: ratios[0] ?? Number.NaN,
     largest: ratios.at(-1) ?? Number.NaN,
   };
-  const within =
-    fit.converged &&
-    parameters <= TOLERANCES.parameters &&
-    correlations <= TOLERANCES.correlations &&
-    ratio.count > 100 &&
-    Math.abs(ratio.median - 1) <= TOLERANCES.medianRatio &&
-    ratio.smallest > TOLERANCES.smallestRatio &&
-    ratio.largest < TOLERANCES.largestRatio;
+  const within = fit.converged && parameters <= TOLERANCES.parameters && correlations <= TOLERANCES.correlations;
   missed ||= !within;
   results.worst = {
     parameters: Math.max(results.worst.parameters, parameters),
     correlations: Math.max(results.worst.correlations, correlations),
-    medianRatio: Math.max(results.worst.medianRatio, Math.abs(ratio.median - 1)),
-    smallestRatio: Math.min(results.worst.smallestRatio, ratio.smallest),
-    largestRatio: Math.max(results.worst.largestRatio, ratio.largest),
   };
-  results.fits.push({ seed, parameters, correlations, ratio, within, iterations: fit.iterations, seconds });
+  const reflected = fit.dimensions.filter((_, d) => signs[d] === -1);
+  results.fits.push({ seed, reflected, parameters, correlations, ratio, within, iterations: fit.iterations, seconds });
   writeResults(import.meta.url, results);
 }
+
+// Each standard error averaged over the seeds of each program, where every seed of both gives it.
+const averaged = mirt.itemIds.flatMap((id, i) =>
+  Object.entries(meanErrors[i] ?? {}).flatMap(([name, mean]) => {
+    const values = errorsHere[i]?.get(name) ?? [];
+    return values.length === SEEDS.length ? [{ item: id, name, ratio: average(values) / mean }] : [];
+  }),
+);
+const sorted = averaged.map(({ ratio }) => ratio).sort((x, y) => x - y);
+const median = sorted[Math.floor(sorted.length / 2)] ?? Number.NaN;
+const beyond = averaged.filter(({ ratio }) => !(ratio >= TOLERANCES.smallestRatio && ratio <= TOLERANCES.largestRatio));
+const errorsWithin = sorted.length > 100 && Math.abs(median - 1) <= TOLERANCES.medianRatio && beyond.length === 0;
+missed ||= !errorsWithin;
+results.averagedErrors = {
+  count: sorted.length,
+  median,
+  quartiles: [
+    sorted[Math.floor(sorted.length / 4)] ?? Number.NaN,
+    sorted[Math.floor((3 * sorted.length) / 4)] ?? Number.NaN,
+  ],
+  smallest: sorted[0] ?? Number.NaN,
+  largest: sorted.at(-1) ?? Number.NaN,
+  beyond,
+  within: errorsWithin,
+};
+writeResults(import.meta.url, results);
 
 if (missed) {
   console.error("A fit missed a tolerance: see results/multidimensional-mhrm-mirt.json.");

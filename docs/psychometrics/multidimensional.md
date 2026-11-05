@@ -880,17 +880,19 @@ Invalid input throws `DataError` naming the value found.
   same model on the scale of that standard deviation, which the 1PL's slope `a` carries here. On three occasions mirt's
   EM stops before its estimates settle, as for groups, and this library's log-likelihood is never below its own.
 - **MH-RM estimates.** The stages, gains and tolerance are mirt's defaults, and the estimates agree within Monte Carlo
-  error, not to the digits that EM does: on 800 persons, 25 graded items and 5 dimensions, mirt's four runs differ from
-  their mean by up to 0.08 in a parameter, and a run here from that mean by up to 0.17.
+  error, not to the digits that EM does: on 800 persons, 25 graded items and 5 dimensions, mirt's ten runs differ from
+  their mean by up to 0.19 in a parameter, and a run here from that mean by up to 0.20. A run may give a dimension
+  reflected, its slopes and correlations negated, at the same likelihood: one of the ten here did, mirt's none.
 - **MH-RM information.** A cycle's information is the observed complete-data information at the draws, as mirt's
   `Deriv` gives it. The expected information is about 10% larger and makes the estimates of weakly determined directions
   noisier, so it is not used.
 - **MH-RM standard errors.** mirt accumulates the score and information over at least 400 cycles in a running average;
-  here they are the person-wise Louis estimate above. On the same data the standard errors here are a median 1.03 of
-  the mean of mirt's four runs, with a quarter of them within 0.96 to 1.08; mirt's own vary 20% from seed to seed
-  at the median and 79% at most, and some are missing where its information is not positive definite.
+  here they are the person-wise Louis estimate above. MH-RM's standard errors vary with the seed, in mirt too: mirt's
+  differ from their mean over ten seeds by 44% at the median and 151% at most, and some are missing where its
+  information is not positive definite, so one seed's are compared with nothing. Averaged over the same ten seeds, the
+  standard errors here are a median 1.12 of mirt's, half of them from 1.04 to 1.17 and all from 0.95 to 1.43.
 - **MH-RM log-likelihood.** The importance-sampling estimate here agrees within about 1 with the exact log-likelihood
-  of EM on three dimensions. On the five-dimensional data mirt's reported log-likelihood is 24 to 29 below the estimate
+  of EM on three dimensions. On the five-dimensional data mirt's reported log-likelihood is 22 to 42 below the estimate
   here, at mirt's own parameters as well, so the two are not compared.
 
 ## References

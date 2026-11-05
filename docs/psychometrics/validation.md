@@ -967,12 +967,12 @@ Several results of the reference packages are not references:
   the correlation, 7% in the standard errors and -2.3 to 1.4 in the log-likelihood; 400 cycles of the last stage lower
   the parameters' difference only to about 0.03. The tests take the first 200 persons, where MH-RM runs in seconds, and
   hold it to EM on the same persons within 1.5 times the worst of the seeds 1 to 20 (above). The five-dimensional case
-  has no exact reference. mirt's MH-RM with four seeds differs from its mean over the seeds by up to 0.08 in a parameter
-  (median 0.012), and its standard errors by 20% at the median and 79% at most, with some missing where its information
-  is not positive definite. The estimates and standard errors here are compared with that mean, with tolerances of
-  about twice what the seeds 1 to 4 found here, 0.17 at most.
-- **mirt's MH-RM log-likelihood.** On the five-dimensional case mirt's reported log-likelihood is 24 to 29 below the
-  importance-sampling estimate here, which at mirt's own parameters gives -29548.6 against mirt's -29572 to -29577. On
+  has no exact reference. mirt's MH-RM with ten seeds differs from its mean over the seeds by up to 0.19 in a parameter
+  (median 0.014), and its standard errors by 44% at the median and 151% at most, with some missing where its information
+  is not positive definite. The estimates of each seed here are compared with that mean; the standard errors, whose
+  ratio for one seed is noise, are averaged over the same ten seeds of each program and then compared.
+- **mirt's MH-RM log-likelihood.** On the five-dimensional case mirt's reported log-likelihood is 22 to 42 below the
+  importance-sampling estimate here, which at mirt's own parameters gives -29548.6 against mirt's -29570 to -29590. On
   three dimensions the estimate agrees within about 1 with the exact log-likelihood of EM, so mirt's is not compared.
 - **mirt's `summary` loadings and communalities.** mirt's standardized loadings divide by √(1 + Σ (a / 1.702)²), and its
   communality is the sum of the squared loadings, whatever the correlations of the dimensions. The variance of a · θ is
@@ -1176,7 +1176,7 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
 | `multidimensional-m3pl.json`             | `simdata`, `set.seed(20261029)`: 1000 persons, 12 3PL items with g = 0.15, 6 on each of 2 dimensions                                                                                                                                                                                                                                                                     | Normal priors on logit c                                                                                                                                              |
 | `multidimensional-graded.json`           | `psych::bfi` A1-A5 and C1-C5, the first 800 complete cases, coded 0-5                                                                                                                                                                                                                                                                                                    | Six categories, two dimensions, EAP and MAP of 24 patterns                                                                                                            |
 | `multidimensional-graded3.json`          | `psych::bfi` A1-A5, C1-C5 and E1-E5, the first 150 complete cases                                                                                                                                                                                                                                                                                                        | Three dimensions, 15 points                                                                                                                                           |
-| `multidimensional-mhrm.json`             | `psych::bfi`, the 25 items, the first 800 complete cases, coded 0-5; mirt's MH-RM with seeds 1 to 4; the score and Hessian of two items at given thetas                                                                                                                                                                                                                  | Five dimensions, the Monte Carlo error of mirt's runs, mirt's complete-data derivatives                                                                               |
+| `multidimensional-mhrm.json`             | `psych::bfi`, the 25 items, the first 800 complete cases, coded 0-5; mirt's MH-RM with seeds 1 to 10; the score and Hessian of two items at given thetas                                                                                                                                                                                                                 | Five dimensions, the Monte Carlo error of mirt's runs, mirt's complete-data derivatives                                                                               |
 | `multidimensional-groups.json`           | `mirt::simdata` with `set.seed(20261029)`, 20261106 for a wide group: six cases of two or three groups on 2 or 3 dimensions, with items missing by design, graded items, 4 fixed items, and the wide group                                                                                                                                                               |                                                                                                                                                                       |
 | `longitudinal.json`                      | `set.seed(20261101)`: five cases of 2 or 3 occasions, with persons absent, items on one occasion only, graded items, and the Rasch model with TAM's estimates                                                                                                                                                                                                            |                                                                                                                                                                       |
 | `longitudinal-recovery.json`             | mirt's errors in recovering the moments of simulated abilities, `set.seed(20261101 + seed)`, over 2 to 5 occasions                                                                                                                                                                                                                                                       |                                                                                                                                                                       |
@@ -1556,8 +1556,8 @@ one item, two persons) are tested against values derived by hand in `test/ctt.te
 | MH-RM against EM, 200 persons: missing responses; 3PL with priors; its c                                | 0.8; 0.2; 0.011 absolute                                        | 0.52; 0.13; 0.007         |
 | MH-RM against EM, 200 persons: parameters held by `fixedParameters`                                     | 0.7 absolute                                                    | 0.46                      |
 | MH-RM graded parameters; log-likelihood against EM, 120 persons                                         | 0.35; 1.6 absolute                                              | 0.23; 1.04                |
-| MH-RM five-dimensional parameters; correlations against the mean of mirt's runs                         | 0.3; 0.08 absolute                                              | 0.17; 0.025               |
-| MH-RM five-dimensional standard errors against the mean of mirt's runs: median, range of ratios         | 1 ± 0.1; 0.6 to 1.6                                             | 1.04; 0.73 to 1.62        |
+| MH-RM five-dimensional parameters; correlations against the mean of mirt's runs                         | 0.3; 0.08 absolute                                              | 0.20; 0.034               |
+| MH-RM five-dimensional standard errors averaged over 10 seeds against mirt's: median, range             | 1 ± 0.1; 0.6 to 1.6                                             | 1.12; 0.95 to 1.43        |
 | MH-RM complete-data score against `Deriv`                                                               | 1e-10 relative to max(1, \|score\|)                             | 5.4e-14                   |
 | MH-RM observed information against `Deriv`: central, forward differences                                | 1e-8, 2e-4 relative to max(1, \|entry\|)                        | 1.3e-9, 3.9e-5            |
 | Exploratory parameters against the base R maximum                                                       | 2e-4 absolute                                                   | 1.8e-6                    |
@@ -1628,8 +1628,11 @@ variance free; the comparison converts it to the scale of that standard deviatio
 The MH-RM calibrations of the tests run with the default `tolerance` of 1e-3 and the seed 1, on the first 200 persons of
 a fixture, 120 for the graded model, against EM on the same persons; each bound is 1.5 times the worst over the seeds 1 to
 20, rounded up. `validation/psychometrics/multidimensional-mhrm-mirt.ts` compares the five-dimensional case with mirt's
-runs on the seeds 1 to 4, in about two minutes: seed 3 gives a ratio of standard errors of 1.62, above the 1.6 that seed 1
-meets, where mirt's own standard errors vary by up to 79% from seed to seed.
+runs on the seeds 1 to 10, in about four minutes. Each seed's estimates are within 0.20 of mirt's mean and its
+correlations within 0.034, after a dimension that came out reflected, C on seed 5, is turned back. Each standard error
+averaged over the ten seeds of each program gives ratios from 0.95 to 1.43, within 0.6 to 1.6, and a median of 1.12, above
+the bound of 1.1: the standard errors here are larger than mirt's by about a tenth across the parameters, and the study
+fails on it.
 
 catR's `thetaEst` finds ML, MAP and WLE roots with `uniroot`'s default tolerance, about 1.2e-4; this library's are
 good to 1e-12. catR's EAP uses the trapezoid rule on the 61 points of `posteriorMeanEstimate`, which halves the two

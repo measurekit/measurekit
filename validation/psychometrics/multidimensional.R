@@ -367,8 +367,9 @@ if (selected("graded3")) {
 # --- MH-RM: psych::bfi, five dimensions --------------------------------------------------------------------------------
 
 # mirt's MH-RM on all 25 items of psych::bfi under the graded model, the first 800 complete cases, on five correlated
-# dimensions, with several seeds: mirt and measurekit are both stochastic, so the seeds give mirt's own Monte Carlo
-# error, with which the test justifies its tolerance. mirt's default `SE.type = "MHRM"` gives the standard errors.
+# dimensions, with seeds 1 to 10: mirt and measurekit are both stochastic, so the seeds give mirt's own Monte Carlo error,
+# and multidimensional-mhrm-mirt.ts compares each standard error averaged over the same ten seeds of both. mirt's default
+# `SE.type = "MHRM"` gives the standard errors.
 if (selected("mhrm")) {
   mhrm_data <- bfi_items(c("A", "C", "E", "N", "O"))[1:800, ]
   mhrm_groups <- rep(c("A", "C", "E", "N", "O"), each = 5)
@@ -376,7 +377,7 @@ if (selected("mhrm")) {
     "A = 1-5\nC = 6-10\nE = 11-15\nN = 16-20\nO = 21-25\n",
     "COV = A*C, A*E, A*N, A*O, C*E, C*N, C*O, E*N, E*O, N*O"
   ))
-  fits <- lapply(1:4, function(seed) {
+  fits <- lapply(1:10, function(seed) {
     fit <- mirt(mhrm_data, mhrm_model, itemtype = "graded", method = "MHRM", SE = TRUE, verbose = FALSE,
                 technical = list(set.seed = seed))
     stopifnot_converged(fit)
@@ -401,7 +402,7 @@ if (selected("mhrm")) {
   })
   write_fixture("multidimensional-mhrm", list(
     source = paste("psych::bfi items A1-E5, N1-N5 and O1-O5, the first 800 complete cases, coded 0-5, under the graded model:",
-                   "mirt's MH-RM with seeds 1 to 4, and its complete-data score and information of items A1 and O3."),
+                   "mirt's MH-RM with seeds 1 to 10, and its complete-data score and information of items A1 and O3."),
     model = "mgrm", itemIds = colnames(mhrm_data), responses = unname(as.matrix(mhrm_data)),
     loadings = confirmatory_pattern(colnames(mhrm_data), mhrm_groups), dimensionNames = c("A", "C", "E", "N", "O"),
     runs = runs, thetas = unname(thetas), completeData = complete_data

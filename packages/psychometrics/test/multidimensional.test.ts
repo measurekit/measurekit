@@ -602,7 +602,7 @@ interface MhrmItem {
   readonly standardErrors?: Readonly<Record<string, number | null | undefined>>;
 }
 
-/** Runs of mirt's MH-RM on one dataset, with seeds 1 to 4, and the complete-data score and Hessian of two items at given thetas. */
+/** Runs of mirt's MH-RM on one dataset, with seeds 1 to 10, and the complete-data score and Hessian of two items at given thetas. */
 interface MhrmFixture extends Pick<Fixture, "model" | "itemIds" | "responses" | "loadings"> {
   readonly runs: readonly {
     readonly items: readonly MhrmItem[];
