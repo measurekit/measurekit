@@ -182,12 +182,13 @@ Every eigendecomposition, of the analyses of correlations, the starts of explora
 smoothing of correlations, pseudo-inverses and rotations, is by Householder's reduction and the implicit QL algorithm,
 which agree with base R's `eigen` within 1e-12 and take about 3 s at 1,000 items.
 
-The analyses of the pairs of items, the correlations, factors, parallel analysis, the minimum average partial test and
-the omegas, take at most 1,000 items, as each holds a matrix of every pair; so do local dependence, Yen's Q3 and every
-Mokken scale analysis but the imputation and the person fit indices, and Molenaar-Sijtsma reliability takes at most
-1,000 item steps. The tables of local dependence hold at most 2^24 cells, a cell for each pair of categories of each pair
-of items, C2 takes at most the 1,830 moments of 60 dichotomous items, S-X² items of a highest total score of at most
-300, `multistageCuts` a range at most 1,000 wide, and form assembly 2^26 counts of forms × (forms + pool items).
+The analyses of the pairs of items, the correlations, factors, parallel analysis, the minimum average partial test, the
+omegas and the smoothing of correlations, take at most 1,000 items, as each holds a matrix of every pair; so do local
+dependence, Yen's Q3 and every Mokken scale analysis but the imputation and the person fit indices, and Molenaar-Sijtsma
+reliability takes at most 1,000 item steps. The tables of local dependence hold at most 2^24 cells, a cell for each pair
+of categories of each pair of items, C2 takes at most the 1,830 moments of 60 dichotomous items, S-X² items of a highest
+total score of at most 300, `multistageCuts` a range at most 1,000 wide, and form assembly 2^26 counts of forms × (forms
+- pool items).
 
 Multidimensional scoring has maximum likelihood and Warm's weighted likelihood estimates,
 `multidimensionalMaximumLikelihoodEstimate` and `multidimensionalWeightedLikelihoodEstimate`, within a `range` in every
