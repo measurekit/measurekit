@@ -1,4 +1,5 @@
 import { checkOptions, checkPositive, type FieldNames } from "@measurekit/core";
+import { checkMatrixItems } from "../data/internal.js";
 import { checkCorrelationMatrix, symmetricEigen } from "../math/internal.js";
 
 /** Options of {@link smoothCorrelations}. */
@@ -32,7 +33,7 @@ const RAISE = 100;
  * @param options - The smallest eigenvalue that is kept.
  * @returns The smoothed matrix, by rows.
  * @throws `DataError` when `correlations` is not a square array of finite numbers from -1 to 1, symmetric with 1 on
- * the diagonal, or `tolerance` is not positive.
+ * the diagonal, or of more than 1,000 rows, or `tolerance` is not positive.
  * @see {@link https://doi.org/10.1177/014662168801200305 | Bock, Gibbons and Muraki (1988)}
  */
 export function smoothCorrelations(
@@ -44,6 +45,8 @@ export function smoothCorrelations(
   checkPositive(tolerance, "The option tolerance");
   checkCorrelationMatrix(correlations, "the correlations");
   const size = correlations.length;
+  // The decomposition takes the cube of the rows: about 3 s at the limit of the analyses of pairs of items.
+  checkMatrixItems(size, "Smoothing");
   const smoothed = smooth(Float64Array.from(correlations.flat()), size, tolerance).correlations;
   return Array.from({ length: size }, (_, i) => Array.from(smoothed.subarray(i * size, (i + 1) * size)));
 }

@@ -916,6 +916,14 @@ export const RULES: readonly Rule[] = [
     titles: "stops at the limit of QL iterations",
   },
   {
+    rule: "Smoothing takes at most 1,000 rows, as its eigendecomposition takes their cube, from a matrix that the caller gives.",
+    file: "packages/psychometrics/src/dimensionality/smoothing.ts",
+    find: 'checkMatrixItems(size, "Smoothing");',
+    replace: "",
+    test: "packages/psychometrics/test/dimensionality.test.ts",
+    titles: "smooths at most 1,000 rows",
+  },
+  {
     rule: "Omega takes at most 1,000 items, so that a few persons answering many items do not cost a matrix of their square.",
     file: "packages/psychometrics/src/ctt/omega.ts",
     find: '  checkMatrixItems(k, "Omega");\n',

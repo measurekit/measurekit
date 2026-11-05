@@ -1745,6 +1745,14 @@ describe("smoothCorrelations", () => {
     expect(() => smoothCorrelations(r, JSON.parse("null"))).toThrow(DataError);
     expect(() => smoothCorrelations(r, JSON.parse('{"tolerance": 0}'))).toThrow("The option tolerance");
   });
+
+  it("smooths at most 1,000 rows, as the decomposition takes their cube", () => {
+    const identity = (size: number) =>
+      Array.from({ length: size }, (_, i) => Array.from({ length: size }, (_, j) => (i === j ? 1 : 0)));
+    expect(() => smoothCorrelations(identity(1001))).toThrow(
+      "Smoothing holds a matrix of every pair of items, so it takes at most 1000 items, found 1001.",
+    );
+  });
 });
 
 describe("properties", () => {
