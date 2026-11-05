@@ -55,7 +55,10 @@ interface Marginal {
 }
 
 /** Returns the number of estimated parameters: the items' estimated entries, then those of the distributions. */
-export function parameterCount<TParameters>({ items, latents }: ScoredFit<TParameters>): number {
+export function parameterCount<TParameters>({
+  items,
+  latents,
+}: Pick<ScoredFit<TParameters>, "items" | "latents">): number {
   return items.reduce((sum, item) => sum + item.free.length, 0) + latents.reduce((sum, { size }) => sum + size, 0);
 }
 

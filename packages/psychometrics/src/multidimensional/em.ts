@@ -10,7 +10,7 @@ import { defaultPoints, type Grid, productGrid } from "./grid.js";
 import { population } from "./groups.js";
 import { itemMaximization } from "./m-step.js";
 import type { GroupMoments, Settings, Solution } from "./solution.js";
-import { crossProductCovariance, type Fit, louisCovariance, parameterCount } from "./standard-errors.js";
+import { crossProductCovariance, type EmModel, type Fit, louisCovariance, parameterCount } from "./standard-errors.js";
 
 /** The label of the group of all persons when fixed items come without the option `groups`. */
 const SINGLE_GROUP = "all";
@@ -30,36 +30,36 @@ function checkEmDimensions(dimensions: number): void {
 }
 
 /** Runs EM, with the extrapolation SQUAREM, until no parameter changes by more than `tolerance` or `maxIterations`. */
-function expectationMaximization<TParameters>(
-  fit: Fit<TParameters>,
+export function expectationMaximization<TParameters>(
+  model: EmModel<TParameters>,
   tolerance: number,
   maxIterations: number,
 ): { readonly converged: boolean; readonly iterations: number } {
-  return squarem(emIteration(fit), { tolerance, maxIterations });
+  return squarem(emIteration(model), { tolerance, maxIterations });
 }
 
 /**
  * Returns EM as an iteration on the unbounded coordinates of the items' estimated entries, then the parameters of the
- * distributions of the groups, which any values keep a distribution when the correlations are positive definite.
+ * distributions, which any values keep a distribution when the correlations are positive definite.
  */
-function emIteration<TParameters>(fit: Fit<TParameters>): Iteration {
-  const { items, latents, maximization, eStep } = fit;
+function emIteration<TParameters>(model: EmModel<TParameters>): Iteration {
+  const { items, latents, maximization, runExpectation, countsOf } = model;
   const itemSize = items.reduce((sum, item) => sum + item.free.length, 0);
-  const current = new Float64Array(parameterCount(fit));
+  const current = new Float64Array(parameterCount(model));
   const previous = new Float64Array(current.length);
   return {
     step() {
-      const logLikelihood = eStep.run();
-      estimatesOf(fit, previous);
+      const logLikelihood = runExpectation();
+      estimatesOf(model, previous);
       for (const item of items) maximization.maximize(item);
-      latents.forEach((latent, g) => {
-        latent.maximize(eStep.groupCounts[g] ?? eStep.nodeCounts);
+      latents.forEach((latent, index) => {
+        latent.maximize(countsOf(index));
       });
-      estimatesOf(fit, current);
+      estimatesOf(model, current);
       return { logLikelihood, change: largestChange(previous, current) };
     },
     get() {
-      const state = new Float64Array(parameterCount(fit));
+      const state = new Float64Array(current.length);
       let slot = 0;
       for (const item of items) {
         state.set(maximization.coordinates(item), slot);
@@ -89,9 +89,9 @@ function emIteration<TParameters>(fit: Fit<TParameters>): Iteration {
 
 /**
  * Writes the estimated parameters, on their own scale, into `out`: the items' estimated entries, then the entries of
- * each group's distribution, the standard deviations on the logarithmic scale.
+ * each distribution, the standard deviations on the logarithmic scale.
  */
-function estimatesOf<TParameters>({ items, latents }: Fit<TParameters>, out: Float64Array): void {
+function estimatesOf<TParameters>({ items, latents }: EmModel<TParameters>, out: Float64Array): void {
   let slot = 0;
   for (const item of items) for (const j of item.free) out[slot++] = item.vector[j] ?? 0;
   for (const latent of latents) {
@@ -120,24 +120,27 @@ export function calibrateByEm<TParameters>(
   const grid = productGrid(dimensions, points);
   const items = setUp(responses, options, design, grid.count);
   const { labels, groupOf, latents } = population(options, responses, items, design, grid);
+  const eStep = expectationStep(
+    responses,
+    items,
+    grid,
+    latents.map((latent) => latent.logWeights),
+    groupOf,
+  );
   const fit: Fit<TParameters> = {
     items,
     grid,
     latents,
     groupOf,
     maximization: itemMaximization(items, grid),
-    eStep: expectationStep(
-      responses,
-      items,
-      grid,
-      latents.map((latent) => latent.logWeights),
-      groupOf,
-    ),
+    runExpectation: () => eStep.run(),
+    countsOf: (group) => eStep.groupCounts[group] ?? eStep.nodeCounts,
+    eStep,
     responses,
   };
   if (settings.standardErrors !== "none") checkStandardErrorSize(parameterCount(fit));
   const { converged, iterations } = expectationMaximization(fit, settings.tolerance, settings.maxIterations);
-  const logLikelihood = fit.eStep.run();
+  const logLikelihood = eStep.run();
   const covariance = parameterCount(fit) > 0 ? covarianceOf(settings.standardErrors, fit) : null;
   const [first] = latents;
   return {

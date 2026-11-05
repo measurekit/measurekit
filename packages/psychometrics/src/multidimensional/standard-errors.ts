@@ -10,21 +10,29 @@ import { parameterCount, posteriorScoreMoments } from "./posterior-scores.js";
 
 export { parameterCount };
 
-/** What a calibration's standard errors need: the fitted items, the distribution of each group and the E-step. */
-export interface Fit<TParameters> {
+/** What EM estimates and how it reads the E-step: the items, the distributions of theta and the M-step of the items. */
+export interface EmModel<TParameters> {
   readonly items: readonly ItemState<TParameters>[];
-  readonly grid: Grid;
-  /** The distribution of each group. */
+  /** The distributions whose entries are estimated. */
   readonly latents: readonly Latent[];
+  readonly maximization: ItemMaximization<TParameters>;
+  /** Runs the E-step at the current parameters and returns the marginal log-likelihood. */
+  runExpectation(): number;
+  /** Returns the persons the last E-step expects at each node of the distribution of `latents[index]`. */
+  countsOf(index: number): Float64Array;
+}
+
+/** What a calibration's standard errors need: the fitted items, the distribution of each group and the E-step. */
+export interface Fit<TParameters> extends EmModel<TParameters> {
+  readonly grid: Grid;
   /** The index of each person's group, in the order of the persons of the responses. */
   readonly groupOf: Int32Array;
-  readonly maximization: ItemMaximization<TParameters>;
   readonly eStep: ExpectationStep;
   readonly responses: CompressedResponses;
 }
 
 /** The relative step of the central differences of the complete-data gradient, about the cube root of epsilon. */
-export const STEP = 1e-5;
+const STEP = 1e-5;
 
 /**
  * Returns the covariance matrix of the estimated parameters on their own scale, by rows, in the order of the items'
@@ -80,7 +88,7 @@ export function crossProductCovariance<TParameters>(fit: Fit<TParameters>): Floa
  * Writes the Hessian of the negative expected complete-data log-posterior of each item into its block of `information`,
  * by central differences of the exact gradient at the last E-step's counts, and returns the slot after the last item.
  */
-export function itemInformation<TParameters>(
+function itemInformation<TParameters>(
   items: readonly ItemState<TParameters>[],
   maximization: ItemMaximization<TParameters>,
   information: Float64Array,
@@ -111,15 +119,17 @@ export function itemInformation<TParameters>(
 
 /**
  * Returns the expected complete-data information of the estimated parameters on the unbounded scale: the Hessian of
- * the negative expected complete-data log-posterior of each item, and of each group's distribution, at the last
- * E-step's counts. It is block diagonal, as the items and the groups share no parameters.
+ * the negative expected complete-data log-posterior of each item, and of each estimated distribution, at the last
+ * E-step's counts. It is block diagonal, as the items and the distributions share no parameters.
  */
-function completeInformation<TParameters>(fit: Fit<TParameters>, size: number): Float64Array {
-  const { items, latents, maximization, eStep } = fit;
+export function completeInformation<TParameters>(
+  { items, latents, maximization, countsOf }: EmModel<TParameters>,
+  size: number,
+): Float64Array {
   const information = new Float64Array(size * size);
   let slot = itemInformation(items, maximization, information, size);
-  latents.forEach((latent, g) => {
-    latentInformation(latent, eStep.groupCounts[g] ?? eStep.nodeCounts, information, size, slot);
+  latents.forEach((latent, index) => {
+    latentInformation(latent, countsOf(index), information, size, slot);
     slot += latent.size;
   });
   return information;

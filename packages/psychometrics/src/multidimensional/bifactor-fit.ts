@@ -1,16 +1,17 @@
-import { type CompressedResponses, checkStandardErrorSize, type Iteration, squarem } from "../irt/internal.js";
-import { largestChange } from "../math/internal.js";
+import { type CompressedResponses, checkStandardErrorSize } from "../irt/internal.js";
 import { type BifactorExpectation, bifactorExpectation, type GroupNodes } from "./bifactor-expectation.js";
 import { groupGrid, groupWeights, specificRule } from "./bifactor-nodes.js";
 import { type GroupPatterns, patternsOf } from "./bifactor-patterns.js";
-import { bifactorCovariance, bifactorParameterCount } from "./bifactor-standard-errors.js";
+import { bifactorCovariance } from "./bifactor-standard-errors.js";
 import type { BifactorStructure } from "./bifactor-structure.js";
 import type { MultidimensionalCalibrationOptions } from "./calibration-options.js";
 import { type ItemState, setUp } from "./calibration-setup.js";
 import { type Latent, latentDistribution } from "./correlation.js";
+import { expectationMaximization } from "./em.js";
 import { checkTables, type Grid, productGrid } from "./grid.js";
 import { type ItemMaximization, itemMaximization } from "./m-step.js";
 import type { Settings, Solution } from "./solution.js";
+import { type EmModel, parameterCount } from "./standard-errors.js";
 
 /** Settings of the estimation of a bifactor model, after their defaults are filled in. */
 export interface BifactorSettings {
@@ -19,15 +20,16 @@ export interface BifactorSettings {
   readonly standardErrors: Settings["standardErrors"];
 }
 
-/** What EM works on: the items, the latent distribution of the primary dimensions, the M-step and the E-step. */
-export interface BifactorFit<TParameters> {
-  /** The items in the item order of the data. */
-  readonly items: readonly ItemState<TParameters>[];
+/**
+ * What EM works on: the items in the item order of the data, with `latents` the distribution of the primary dimensions
+ * when its correlation is estimated.
+ */
+export interface BifactorFit<TParameters> extends EmModel<TParameters> {
   readonly groups: readonly GroupNodes<TParameters>[];
+  /** The distribution of the primary dimensions. */
   readonly latent: Latent;
   /** Whether the correlation of the two primary dimensions is estimated. */
   readonly correlated: boolean;
-  readonly maximization: ItemMaximization<TParameters>;
   readonly expectation: BifactorExpectation;
 }
 
@@ -73,13 +75,17 @@ export function bifactorFit<TParameters>(
     };
   });
   const latent = latentDistribution(primary);
+  const expectation = bifactorExpectation(table, groups, latent.logWeights);
   return {
     items,
     groups,
     latent,
+    latents: design.correlated ? [latent] : [],
     correlated: design.correlated,
     maximization: groupMaximization(groups),
-    expectation: bifactorExpectation(table, groups, latent.logWeights),
+    runExpectation: () => expectation.run(),
+    countsOf: () => expectation.nodeCounts,
+    expectation,
   };
 }
 
@@ -129,9 +135,9 @@ export function solveBifactor<TParameters>(
   dimensions: number,
   settings: BifactorSettings,
 ): Solution<TParameters> {
-  const { standardErrors } = settings;
-  if (standardErrors !== "none") checkStandardErrorSize(bifactorParameterCount(fit));
-  const { converged, iterations } = squarem(emIteration(fit), settings);
+  const { standardErrors, tolerance, maxIterations } = settings;
+  if (standardErrors !== "none") checkStandardErrorSize(parameterCount(fit));
+  const { converged, iterations } = expectationMaximization(fit, tolerance, maxIterations);
   const logLikelihood = fit.expectation.run();
   return {
     items: fit.items,
@@ -156,51 +162,4 @@ function embedded(latent: Latent, dimensions: number): Float64Array {
     }
   }
   return matrix;
-}
-
-/**
- * Returns EM as an iteration on the unbounded coordinates of the items' estimated entries, then the parameters of the
- * correlation, which any values keep a correlation matrix when it is positive definite.
- */
-function emIteration<TParameters>(fit: BifactorFit<TParameters>): Iteration {
-  const { items, latent, correlated, maximization, expectation } = fit;
-  const itemSize = items.reduce((sum, item) => sum + item.free.length, 0);
-  const current = new Float64Array(itemSize + (correlated ? latent.pairs.length : 0));
-  const previous = new Float64Array(current.length);
-  return {
-    step() {
-      const logLikelihood = expectation.run();
-      estimatesOf(fit, previous);
-      for (const item of items) maximization.maximize(item);
-      if (correlated) latent.maximize(expectation.nodeCounts);
-      estimatesOf(fit, current);
-      return { logLikelihood, change: largestChange(previous, current) };
-    },
-    get() {
-      const state = new Float64Array(current.length);
-      let slot = 0;
-      for (const item of items) {
-        state.set(maximization.coordinates(item), slot);
-        slot += item.free.length;
-      }
-      if (correlated) state.set(latent.parameters(), itemSize);
-      return state;
-    },
-    set(state) {
-      // A correlation that is not positive definite stays as it was: the log-likelihood at the jump decides.
-      if (correlated) latent.assign(state.subarray(itemSize));
-      let slot = 0;
-      for (const item of items) {
-        maximization.assign(item, state.subarray(slot, slot + item.free.length));
-        slot += item.free.length;
-      }
-    },
-  };
-}
-
-/** Writes the estimated parameters, on their own scale, into `out`: the items' estimated entries, then the correlation. */
-function estimatesOf<TParameters>({ items, latent, correlated }: BifactorFit<TParameters>, out: Float64Array): void {
-  let slot = 0;
-  for (const item of items) for (const j of item.free) out[slot++] = item.vector[j] ?? 0;
-  if (correlated) for (const [i, j] of latent.pairs) out[slot++] = latent.matrix[i * latent.dimensions + j] ?? 0;
 }
