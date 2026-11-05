@@ -1157,6 +1157,14 @@ export const RULES: readonly Rule[] = [
     titles: "1,000 item steps",
   },
   {
+    rule: "The Q3 bootstrap checks the calibration's options against the matrix before any draw, as every draw can be drawn again before one is calibrated.",
+    file: "packages/psychometrics/src/fit/q3-critical-value.ts",
+    find: "checkCalibrationOptions(\n    matrix,",
+    replace: "((..._: unknown[]) => undefined)(\n    matrix,",
+    test: "packages/psychometrics/test/fit.test.ts",
+    titles: "before any draw",
+  },
+  {
     rule: "A replication of the Q3 bootstrap misses the responses that the data miss, as the calibration's persons did.",
     file: "packages/psychometrics/src/fit/q3-critical-value.ts",
     find: "((matrix.responses[person]?.[column] ?? null) === null ? null : response)",
