@@ -263,22 +263,13 @@ Rscript validation/benchmarks.R table   # the charts and tables of docs/<package
 
 ### Budgets
 
-A benchmark fails when its fastest sample is above its budget, which is in `packages/<package>/test/budgets.ts`. The fastest
-sample is the least affected by the other work of a shared machine. The budget of a time is five times the fastest sample that
-the CI runner took over at least five green runs of the `bench` job, rounded up to one significant digit, the one rule of
-STANDARDS.md section 11; the comment of each `budgets.ts` names the runs. The rule gives a ratio to a reference timed in the
-same process twice the highest ratio measured, rounded up to one significant digit; measurekit gates no ratio, as its
-references run in R and Python, outside the process of the benchmark. The sample is the runner's, because the gate runs there, and the budget is absolute, so it holds for the runner's class of
-machine: the runner took a median of 2.4 times as long as a laptop with an Apple M5, from 0.35 times (`ctt.mcdonaldOmega`)
-to 5.9 times as long (`numerics.logistic`), so a budget holds on a machine up to about five times slower than the runner,
-and on a slower one only the ratios to the references apply, which are documented and not gated, as R does not run on the
-runner. The factor allows for the noise of a shared runner, whose fastest samples of one benchmark differed by a median of
-1.8 times and by up to 3.1 times (`fit.localDependenceChiSquare`) over the 13 runs of 2026-11-05; every budget stands at
-least twice above the slowest of those samples. It is far below the cost of the changes that the budgets exist to catch.
-A benchmark that the runner has not taken, or took only before its code changed, has five times its fastest sample on the laptop, times the
-median ratio of the runner's fastest samples to the laptop's for the other benchmarks of its module, rounded up to one
-significant digit, until the runner's samples replace it; `budgets.ts` marks it. A budget changes only with the reason in
-the commit that changes it.
+| Rule         | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Gate         | A benchmark fails when its fastest sample is above its budget in `packages/<package>/test/budgets.ts`. The fastest sample is the least affected by the other work of a shared machine                                                                                                                                                                                                                                                                                        |
+| Time budget  | Five times the fastest sample that the CI runner took over at least five green runs of the `bench` job, rounded up to one significant digit, the one rule of STANDARDS.md section 11; the comment of each `budgets.ts` names the runs. It is absolute, so it holds for the runner's class of machine and for one up to about five times slower; on a slower one only the ratios to the references apply, which are documented and not gated, as R does not run on the runner |
+| Ratio budget | The rule gives a ratio to a reference timed in the same process twice the highest ratio measured, rounded up to one significant digit. measurekit gates no ratio, as its references run in R and Python, outside the process of the benchmark                                                                                                                                                                                                                                |
+| Noise        | Over the five runs of 2026-11-05 the fastest samples of one benchmark differed by a median of 1.6 times and by up to 3.0 times (`random.uniform`); every budget stands at least 1.7 times above the slowest of them. It is far below the cost of the changes that the budgets exist to catch                                                                                                                                                                                 |
+| Change       | A budget changes only with the reason in the commit that changes it                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 ## Sizes and peak memory
 
