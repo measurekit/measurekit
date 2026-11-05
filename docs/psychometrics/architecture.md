@@ -116,8 +116,9 @@ name.
 
 - Numerics work on `Float64Array` and do not allocate in inner loops.
 - Functions in `math/` assume valid input; public functions validate before calling them.
-- Scores are integers, so sums are exact: covariances come from Σxy, Σx and Σy, a variance is exactly 0 when the
-  values are equal, and no statistic depends on the order of persons. Zero-variance checks compare with 0.
+- Scores are integers, so sums are exact: covariances come from Σxy, Σx and Σy of the values less the first of each,
+  so that scores far from 0, such as near 1e8, do not cancel; a variance is exactly 0 when the values are equal, and no
+  statistic depends on the order of persons. Zero-variance checks compare with 0.
 - Calibration estimates bounded parameters on an unbounded scale (logit between two bounds), so the optimizers work
   without constraints.
 - Calibration stores the answered responses by person, with each response's item index, whether the input is a matrix

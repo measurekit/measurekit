@@ -1,17 +1,25 @@
 import { mean } from "@measurekit/core";
 
 /**
- * Returns the sample covariance (denominator n - 1) of at least two pairs of values, as (n Σxy - Σx Σy) / (n (n - 1)).
- * For scores, which are integers, the sums are exact, so the result does not depend on the order of the pairs.
+ * Returns the sample covariance (denominator n - 1) of at least two pairs of values, as (n Σxy - Σx Σy) / (n (n - 1))
+ * over each value less the first of its kind.
+ *
+ * @remarks
+ * The shift by a value of the data keeps values far from 0, such as scores near 1e8, from cancelling: no value lies
+ * farther from the mean than √(n - 1) standard deviations, so the relative error is at most about n times the machine
+ * epsilon. For scores, which are integers, the sums are exact and the covariance is the same for any shift, so it does
+ * not depend on the order of the pairs; equal values of any kind have a variance of exactly 0.
  */
 export function covariance(x: Float64Array, y: Float64Array): number {
   const n = x.length;
+  const firstX = x[0] ?? 0;
+  const firstY = y[0] ?? 0;
   let sumX = 0;
   let sumY = 0;
   let sumProducts = 0;
   for (let i = 0; i < n; i++) {
-    const xi = x[i] ?? 0;
-    const yi = y[i] ?? 0;
+    const xi = (x[i] ?? 0) - firstX;
+    const yi = (y[i] ?? 0) - firstY;
     sumX += xi;
     sumY += yi;
     sumProducts += xi * yi;

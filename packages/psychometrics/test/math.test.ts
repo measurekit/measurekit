@@ -11,6 +11,8 @@ import {
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
+  correlation,
+  covariance,
   findIncreasingRoot,
   findRoot,
   gaussHermite,
@@ -34,6 +36,7 @@ import {
   trace,
   traceOfProduct,
   transpose,
+  variance,
 } from "../src/math/internal.js";
 import { defined, expectClose } from "./assertions.js";
 import { type DimensionalityFactorsFixture, readFixture } from "./fixtures.js";
@@ -94,6 +97,38 @@ const MATRIX_ITEMS = 1000;
 function expectRelative(actual: number, expected: number, tolerance: number, label: string): void {
   expect(Math.abs(actual - expected), label).toBeLessThanOrEqual(tolerance * Math.abs(expected));
 }
+
+describe("covariance", () => {
+  it("gives scores far from 0 the covariance, variance and correlation of the same scores near 0, exactly", () => {
+    // n Σxy of scores near 1e8 passes 2^53, where the one-pass formula over the scores themselves cancelled to noise and
+    // gave a correlation of -1 for these, whose correlation is 0.5.
+    const near = (offset: number, step: number) =>
+      Float64Array.from({ length: 100 }, (_, s) => offset + ((step * s) % 5));
+    for (const offset of [1e8, 2 ** 31 - 1, -1e12]) {
+      expect(covariance(near(offset, 1), near(offset, 3))).toBe(covariance(near(0, 1), near(0, 3)));
+      expect(variance(near(offset, 1))).toBe(variance(near(0, 1)));
+      expect(correlation(near(offset, 1), near(offset, 3))).toBe(correlation(near(0, 1), near(0, 3)));
+    }
+    expect(correlation(near(1e8, 1), near(1e8, 3))).toBeCloseTo(0.5, 14);
+  });
+
+  it("gives a constant a variance of exactly 0, whatever its value, and integers the same in any order", () => {
+    for (const value of [0.1, 1e8 + 0.3, -7.25]) expect(variance(new Float64Array(9).fill(value))).toBe(0);
+    fc.assert(
+      fc.property(
+        fc.array(fc.tuple(fc.integer({ min: 0, max: 2 ** 20 }), fc.integer({ min: 0, max: 2 ** 20 })), {
+          minLength: 2,
+          maxLength: 40,
+        }),
+        (pairs) => {
+          const x = Float64Array.from(pairs, ([a]) => a);
+          const y = Float64Array.from(pairs, ([, b]) => b);
+          expect(covariance(x.toReversed(), y.toReversed())).toBe(covariance(x, y));
+        },
+      ),
+    );
+  });
+});
 
 describe("roundHalfToEven", () => {
   it("rounds to the nearest integer, a half to the even one, as R's round", () => {

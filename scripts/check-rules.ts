@@ -900,6 +900,14 @@ export const RULES: readonly Rule[] = [
     titles: "takes at most 1,000 items",
   },
   {
+    rule: "A covariance sums the values less the first of each, so that scores far from 0, such as near 1e8, are not cancelled to noise.",
+    file: "packages/psychometrics/src/math/statistics.ts",
+    find: "const xi = (x[i] ?? 0) - firstX;",
+    replace: "const xi = x[i] ?? 0;",
+    test: "packages/psychometrics/test/math.test.ts",
+    titles: "scores far from 0",
+  },
+  {
     rule: "A matrix with an entry that is not finite is not decomposed, as its QL iterations would each run to their limit, some 15 times the work of a finite matrix.",
     file: "packages/psychometrics/src/math/eigen.ts",
     find: "if (!work.every(Number.isFinite)) return { ...notDecomposed(size)",
