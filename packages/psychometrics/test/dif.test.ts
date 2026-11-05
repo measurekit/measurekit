@@ -1080,6 +1080,24 @@ function guideSample(
   return { matrix, personGroups: matrix.personIds.map((_, person) => (person < 500 ? "reference" : "focal")) };
 }
 
+/**
+ * 500 reference persons of the guide's data on 4 items, and a focal group of two persons whose answers are each other's
+ * opposite: the focal calibration's 8 parameters rest on 2 persons, and its information matrix cannot be inverted.
+ */
+function twoPersonFocalGroup(): { matrix: ResponseMatrix; personGroups: DifGroup[] } {
+  const { matrix } = guideSample(4, {}, 0);
+  const reference = matrix.responses.slice(0, 500);
+  const focal = [
+    [1, 0, 1, 0],
+    [0, 1, 0, 1],
+  ];
+  const twoGroups = buildResponseMatrix([...reference, ...focal]);
+  return {
+    matrix: twoGroups,
+    personGroups: twoGroups.personIds.map((_, person) => (person < 500 ? "reference" : "focal")),
+  };
+}
+
 /** Rounds to the significant digits a guide shows. */
 function shown(value: number | null | undefined, digits: number): number {
   return Number(defined(value).toPrecision(digits));
@@ -1271,6 +1289,16 @@ describe("lordChiSquare", () => {
     ).toThrow("The option fixedParameters must be an object of values by item id and parameter name, found null.");
   });
 
+  it("gives null chi-squares when a group's information matrix cannot be inverted, with the degrees of freedom", () => {
+    const { matrix, personGroups } = twoPersonFocalGroup();
+    const result = lordChiSquare(matrix, personGroups, twoParameterLogistic);
+    expect(result.focal.items.every(({ standardErrors }) => standardErrors === null)).toBe(true);
+    expect(result.reference.items.every(({ standardErrors }) => standardErrors !== null)).toBe(true);
+    expect(
+      result.items.map(({ chiSquare, degreesOfFreedom, significance }) => [chiSquare, degreesOfFreedom, significance]),
+    ).toEqual(Array.from({ length: 4 }, () => [null, 2, null]));
+  });
+
   it("rejects models other than the 2PL, 3PL and 4PL, and a group without persons", () => {
     const matrix = buildResponseMatrix(CONSTANT_ROWS);
     const custom = { ...twoParameterLogistic, name: "custom 2PL" };
@@ -1366,6 +1394,14 @@ describe("rajuAreaDif", () => {
       fixedParameters,
     });
     expectRaju(result.items, heldFixture.raju);
+  });
+
+  it("gives null areas and tests when a group's information matrix cannot be inverted", () => {
+    const { matrix, personGroups } = twoPersonFocalGroup();
+    const { items } = rajuAreaDif(matrix, personGroups, twoParameterLogistic);
+    expect(items.map(({ id, ...areas }) => [id, Object.values(areas).every((value) => value === null)])).toEqual(
+      matrix.itemIds.map((id) => [id, true]),
+    );
   });
 
   it("rejects models other than the 2PL, 3PL and 4PL, an item with an estimated asymptote, and a group without persons", () => {

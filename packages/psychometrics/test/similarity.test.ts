@@ -11,6 +11,7 @@ import {
   type PersonPair,
   selectPairs,
 } from "../src/similarity/index.js";
+import { binomialRange, poissonRange } from "../src/similarity/internal.js";
 import { defined } from "./assertions.js";
 import { readFixture } from "./fixtures.js";
 
@@ -128,8 +129,9 @@ describe("selectPairs", () => {
   });
 
   it("removes repeated pairs as it goes, so that contexts forming the same pairs stay within maxPairs", () => {
+    // 400 contexts form the same 3 pairs 1,200 times, past the 1,024 places the codes start with.
     const persons = ["a", "b", "c"];
-    const contexts = Object.fromEntries(Array.from({ length: 10 }, (_, k) => [`c${k}`, ["v", "v", "v"]]));
+    const contexts = Object.fromEntries(Array.from({ length: 400 }, (_, k) => [`c${k}`, ["v", "v", "v"]]));
     expect(selectPairs(persons, contexts, { maxPairs: 3 }).pairs).toHaveLength(3);
   });
 
@@ -242,6 +244,9 @@ describe("omegaIndex", () => {
     );
     expect(() => omegaIndex(matrix, DICHOTOMOUS, [0, 0], JSON.parse('[["person1"]]'))).toThrow(
       "Pair 1 must be an array of two person ids, found an array of length 1.",
+    );
+    expect(() => omegaIndex(matrix, DICHOTOMOUS, [0, 0], JSON.parse('["person1"]'))).toThrow(
+      'Pair 1 must be an array of two person ids, found "person1".',
     );
     expect(() => omegaIndex(buildResponseMatrix([[2], [0]]), [defined(DICHOTOMOUS[0])], [0, 0], [])).toThrow(
       'The response of person "person1" to item "item1" is 2, but the item has categories 0 to 1.',
@@ -502,6 +507,59 @@ describe("m4Index", () => {
     expect(() => m4Index(twins(1001), items, [0, 0], [["person1", "person2"]])).toThrow(
       "M4 compares at most 1000 items in a pair, found a pair that answered 1001 items in common.",
     );
+  });
+});
+
+describe("binomialRange and poissonRange", () => {
+  /** C(n, k) p^k (1 - p)^(n - k), by the product of the coefficient's factors. */
+  const binomialTerm = (k: number, n: number, p: number): number => {
+    let coefficient = 1;
+    for (let j = 1; j <= k; j++) coefficient = (coefficient * (n - k + j)) / j;
+    return coefficient * p ** k * (1 - p) ** (n - k);
+  };
+  /** e^(-mean) mean^k / k!. */
+  const poissonTerm = (k: number, mean: number): number => {
+    let term = Math.exp(-mean);
+    for (let j = 1; j <= k; j++) term = (term * mean) / j;
+    return term;
+  };
+  const sum = (from: number, to: number, term: (k: number) => number): number => {
+    let total = 0;
+    for (let k = from; k <= to; k++) total += term(k);
+    return total;
+  };
+
+  it("sums the probabilities of a range, derived term by term", () => {
+    for (const [low, high] of [
+      [0, 10],
+      [0, 2],
+      [3, 7],
+      [8, 10],
+    ] as const) {
+      expect(binomialRange(low, high, 10, 0.3)).toBeCloseTo(
+        sum(low, high, (k) => binomialTerm(k, 10, 0.3)),
+        14,
+      );
+      expect(poissonRange(low, high, 3.5)).toBeCloseTo(
+        sum(low, high, (k) => poissonTerm(k, 3.5)),
+        14,
+      );
+    }
+  });
+
+  it("keeps the digits of a tail of 1e-300, which 1 less the rest would round to 0", () => {
+    // P(X = 100) of 100 trials at 0.001 is 0.001^100.
+    expect(binomialRange(100, 100, 100, 0.001) / 0.001 ** 100).toBeCloseTo(1, 12);
+    expect(poissonRange(120, 120, 0.5) / poissonTerm(120, 0.5)).toBeCloseTo(1, 12);
+  });
+
+  it("gives 0 for a range without a count, and puts all the mass at 0 or at the trials at probabilities 0 and 1", () => {
+    expect(binomialRange(5, 4, 10, 0.5)).toBe(0);
+    expect(binomialRange(11, 12, 10, 0.5)).toBe(0);
+    expect(poissonRange(5, 4, 2)).toBe(0);
+    expect([binomialRange(0, 3, 10, 0), binomialRange(1, 3, 10, 0)]).toEqual([1, 0]);
+    expect([binomialRange(10, 10, 10, 1), binomialRange(0, 9, 10, 1)]).toEqual([1, 0]);
+    expect([poissonRange(0, 3, 0), poissonRange(1, 3, 0)]).toEqual([1, 0]);
   });
 });
 
