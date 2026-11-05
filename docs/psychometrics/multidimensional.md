@@ -184,6 +184,13 @@ The standardized loadings follow mirt's `summary`: λ = (a / 1.702) / √(1 + (a
 correlation matrix, and the communality is λᵀ Φ λ. With several groups, Φ is the correlation matrix of the first group
 and the slopes are scaled by its standard deviations.
 
+**Orientation.** A dimension turned around, its slopes, loadings and correlations and each group's mean and covariances
+with it negated, gives every response the same probability, so the likelihood has two maxima for it, and which one EM or
+MH-RM ends at depends on the starting values and the draws. Each dimension is turned so that its slopes sum above 0, as
+psych's `fa` and lavaan's exploratory factor analysis orient a factor. A dimension that a fixed item or a held slope
+orients keeps the orientation given, as does a dimension whose slopes have a prior or bounds, and every dimension of a
+calibration with a model other than the built-in ones, whose likelihood the turn need not keep.
+
 ### Held parameters
 
 `fixedParameters` holds single parameters of estimated items at given values while their other parameters are
@@ -881,8 +888,10 @@ Invalid input throws `DataError` naming the value found.
   EM stops before its estimates settle, as for groups, and this library's log-likelihood is never below its own.
 - **MH-RM estimates.** The stages, gains and tolerance are mirt's defaults, and the estimates agree within Monte Carlo
   error, not to the digits that EM does: on 800 persons, 25 graded items and 5 dimensions, mirt's ten runs differ from
-  their mean by up to 0.19 in a parameter, and a run here from that mean by up to 0.20. A run may give a dimension
-  reflected, its slopes and correlations negated, at the same likelihood: one of the ten here did, mirt's none.
+  their mean by up to 0.19 in a parameter, and a run here from that mean by up to 0.20.
+- **Orientation.** mirt keeps the orientation that its starting values give a dimension; here each dimension is turned
+  so that its slopes sum above 0 ([Orientation](#calibration)), which MH-RM's draws can otherwise reverse at the same
+  likelihood: without it, seed 5 of the ten above ends with the dimension C turned around.
 - **MH-RM information.** A cycle's information is the observed complete-data information at the draws, as mirt's
   `Deriv` gives it. The expected information is about 10% larger and makes the estimates of weakly determined directions
   noisier, so it is not used.

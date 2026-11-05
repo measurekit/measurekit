@@ -63,6 +63,7 @@ import {
   latentObservedInformation,
   latentScore,
   observedItemInformation,
+  orientDimensions,
   personLatentScores,
   productGrid,
   responsesByItem,
@@ -1515,6 +1516,57 @@ describe("calibration", () => {
       "intercept4",
       "intercept5",
     ]);
+  });
+
+  it("turns a dimension whose slopes sum below zero, with its loadings, correlations and the moments of its groups", () => {
+    const { itemIds, responses, loadings, personGroups } = groups.correlated;
+    const fit = calibrateMultidimensional(
+      buildResponseMatrix(responses, { itemIds: [...itemIds] }),
+      multidimensionalTwoParameterLogistic,
+      { loadings, groups: [...personGroups], points: 7, maxIterations: 2 },
+    );
+    // The fit reflected by hand on its first dimension, as an estimator may end: the same likelihood.
+    const turn = (value: number, d: number): number => (d === 0 && value !== 0 ? -value : value);
+    const turnRows = (rows: readonly (readonly number[])[]): number[][] =>
+      rows.map((row, i) => row.map((value, j) => ((i === 0) !== (j === 0) && value !== 0 ? -value : value)));
+    const reflected: MultidimensionalCalibration<MultidimensionalLogisticParameters> = {
+      ...fit,
+      items: fit.items.map((item) => ({
+        ...item,
+        parameters: { ...item.parameters, a: item.parameters.a.map(turn) },
+      })),
+      correlations: turnRows(fit.correlations),
+      groups: defined(fit.groups).map(({ group, means, covariance }) => ({
+        group,
+        means: means.map(turn),
+        covariance: turnRows(covariance),
+      })),
+      loadings: fit.loadings.map((row) => row.map(turn)),
+    };
+    expect(orientDimensions(reflected, [true, true])).toEqual(fit);
+    // A dimension that may not be turned stays as it is, and a fit whose slopes sum above zero is kept.
+    expect(orientDimensions(reflected, [false, true])).toBe(reflected);
+    expect(orientDimensions(fit, [true, true])).toBe(fit);
+  });
+
+  it("keeps the orientation that fixed items give", () => {
+    const { itemIds, responses, loadings, personGroups, fixed } = groups.anchors;
+    // The fixed items' slopes on the first dimension turned: the items they link follow them below zero.
+    const turnedFixed = Object.fromEntries(
+      Object.entries(defined(fixed)).map(([id, { a, intercept }]) => [
+        id,
+        { a: [-(a[0] ?? 0), a[1] ?? 0], intercept, c: 0, d: 1 },
+      ]),
+    );
+    const fit = calibrateMultidimensional(
+      buildResponseMatrix(responses, { itemIds: [...itemIds] }),
+      multidimensionalTwoParameterLogistic,
+      { loadings, groups: [...personGroups], fixed: turnedFixed, points: 15, maxIterations: 30 },
+    );
+    expect(fit.items.reduce((sum, { parameters }) => sum + (parameters.a[0] ?? 0), 0)).toBeLessThan(0);
+    for (const [id, parameters] of Object.entries(turnedFixed)) {
+      expect(fit.items.find((item) => item.id === id)?.parameters).toEqual(parameters);
+    }
   });
 
   it("stops at the largest number of iterations and says so", () => {

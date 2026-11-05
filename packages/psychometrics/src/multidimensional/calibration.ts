@@ -9,8 +9,10 @@ import { type ItemState, setUp } from "./calibration-setup.js";
 import { pairsOf } from "./correlation.js";
 import { type Design, designOf } from "./design.js";
 import { calibrateByEm, MAX_EM_DIMENSIONS } from "./em.js";
+import { multidimensionalGradedResponse } from "./graded.js";
 import { checkCorrelatedGroups } from "./groups.js";
 import { standardizedLoadings } from "./loadings.js";
+import { multidimensionalThreeParameterLogistic, multidimensionalTwoParameterLogistic } from "./logistic.js";
 import { calibrateByMhrm } from "./mhrm.js";
 import type { MultidimensionalModel, MultidimensionalTestItem } from "./model.js";
 import type { Settings, Solution } from "./solution.js";
@@ -193,7 +195,87 @@ export function calibrateMultidimensional<TParameters>(
   const solution = em
     ? calibrateByEm(responses, model, options, design, settings)
     : mhrm(responses, model, options, design, settings);
-  return assemble(design, solution, respondents);
+  return orientDimensions(assemble(design, solution, respondents), turnableDimensions(solution.items, design));
+}
+
+/** The built-in models, whose probabilities depend on theta through a · θ alone, so that a slope turns with its dimension. */
+const LINEAR_MODELS: ReadonlySet<unknown> = new Set([
+  multidimensionalTwoParameterLogistic,
+  multidimensionalThreeParameterLogistic,
+  multidimensionalGradedResponse,
+]);
+
+/**
+ * Returns whether each dimension may be turned: none when an item's model is not a built-in one, and not a dimension
+ * that a fixed item or a held slope orients, or whose estimated slopes have bounds or a prior, which the turn would not
+ * keep.
+ */
+function turnableDimensions<TParameters>(items: readonly ItemState<TParameters>[], design: Design): boolean[] {
+  const dimensions = design.dimensionNames.length;
+  const turnable = new Array<boolean>(dimensions).fill(items.every((item) => LINEAR_MODELS.has(item.model)));
+  for (const item of items) {
+    for (let d = 0; d < dimensions; d++) {
+      const k = item.free.indexOf(d);
+      const entry = item.entries[k];
+      const oriented =
+        entry === undefined
+          ? (item.vector[d] ?? 0) !== 0
+          : entry.prior !== undefined || Number.isFinite(entry.lower) || Number.isFinite(entry.upper);
+      if (oriented) turnable[d] = false;
+    }
+  }
+  return turnable;
+}
+
+/**
+ * Turns each dimension whose slopes sum below 0, of those `turnable` allows, so that they sum above it, as psych's `fa`
+ * and lavaan's exploratory factor analysis orient a factor.
+ *
+ * @remarks
+ * A dimension turned with its slopes, loadings, correlations and each group's mean and covariances gives every response
+ * the same probability, and so the same likelihood: which of the two an estimator ends at depends on its starting values
+ * and, for MH-RM, its draws, and the sum of the slopes chooses one.
+ *
+ * @param fit - A calibration.
+ * @param turnable - Whether each dimension may be turned.
+ * @returns The calibration with each such dimension turned, or `fit` itself when none is.
+ */
+export function orientDimensions<TParameters>(
+  fit: MultidimensionalCalibration<TParameters>,
+  turnable: readonly boolean[],
+): MultidimensionalCalibration<TParameters> {
+  const dimensions = fit.dimensions.length;
+  const signs = fit.dimensions.map((_, d) => {
+    if (turnable[d] !== true) return 1;
+    const sum = fit.items.reduce((total, { model, parameters }) => total + (model.toVector(parameters)[d] ?? 0), 0);
+    return sum < 0 ? -1 : 1;
+  });
+  if (signs.every((sign) => sign === 1)) return fit;
+  // A zero stays a zero rather than becoming -0.
+  const turn = (value: number, sign: number): number => (sign < 0 && value !== 0 ? -value : value);
+  const turnRows = (rows: readonly (readonly number[])[]): number[][] =>
+    rows.map((row, i) => row.map((value, j) => turn(value, (signs[i] ?? 1) * (signs[j] ?? 1))));
+  return {
+    ...fit,
+    items: fit.items.map((item) => {
+      const vector = item.model.toVector(item.parameters);
+      signs.forEach((sign, d) => {
+        vector[d] = turn(vector[d] ?? 0, sign);
+      });
+      return { ...item, parameters: item.model.fromVector(vector, dimensions) };
+    }),
+    correlations: turnRows(fit.correlations),
+    ...(fit.groups === undefined
+      ? {}
+      : {
+          groups: fit.groups.map(({ group, means, covariance }) => ({
+            group,
+            means: means.map((mean, d) => turn(mean, signs[d] ?? 1)),
+            covariance: turnRows(covariance),
+          })),
+        }),
+    loadings: fit.loadings.map((row) => row.map((value, d) => turn(value, signs[d] ?? 1))),
+  };
 }
 
 /** Estimates by MH-RM, which takes neither a grid nor the cross-product standard errors. */

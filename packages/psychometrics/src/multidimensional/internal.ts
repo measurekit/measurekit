@@ -3,6 +3,7 @@
 export { patternsOf } from "./bifactor-patterns.js";
 export { structureOf } from "./bifactor-structure.js";
 export { createWalk } from "./bifactor-walk.js";
+export { orientDimensions } from "./calibration.js";
 export { setUp } from "./calibration-setup.js";
 export { latentDistribution } from "./correlation.js";
 export { designOf } from "./design.js";

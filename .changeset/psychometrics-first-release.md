@@ -122,7 +122,8 @@ groups over all items, which keeps a fit within about 300 MB; so does the pool o
 
 `calibrateMultidimensional` calibrates several groups of persons on one scale, with the option `groups` and, for anchor
 items, `fixed`, up to three dimensions by EM. Items have the same parameters in every group, and the result reports each
-group's means and covariance in `groups`, as `mirt::multipleGroup` does.
+group's means and covariance in `groups`, as `mirt::multipleGroup` does. Each dimension comes out turned so that its slopes
+sum above 0, as psych's `fa` orients a factor, unless fixed items, held slopes or a prior on the slopes orient it.
 
 Bifactor and two-tier models are calibrated by `calibrateBifactor`, which integrates the specific dimensions one group of
 items at a time, as mirt's `bfactor` does, and runs 8 to 17 times as fast on 2,000 persons.

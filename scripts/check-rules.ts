@@ -332,6 +332,22 @@ export const RULES: readonly Rule[] = [
     titles: "match mirt with est = FALSE",
   },
   {
+    rule: "A dimension whose slopes sum below 0 is turned with its loadings, correlations and groups, so that an estimator's mirror image at the same likelihood gives one calibration.",
+    file: "packages/psychometrics/src/multidimensional/calibration.ts",
+    find: "return sum < 0 ? -1 : 1;",
+    replace: "return 1;",
+    test: "packages/psychometrics/test/multidimensional.test.ts",
+    titles: "turns a dimension whose slopes sum below zero",
+  },
+  {
+    rule: "A dimension that a fixed item or a held slope orients is not turned, as the turn would change what was given.",
+    file: "packages/psychometrics/src/multidimensional/calibration.ts",
+    find: "if (oriented) turnable[d] = false;",
+    replace: "",
+    test: "packages/psychometrics/test/multidimensional.test.ts",
+    titles: "keeps the orientation that fixed items give",
+  },
+  {
     rule: "A fixed items' covariance labels fixed items only, as an earlier covariance says nothing of an estimate made here.",
     file: "packages/psychometrics/src/irt/fixed-error.ts",
     find: "if (item.estimated) {",
