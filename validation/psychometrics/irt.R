@@ -928,9 +928,9 @@ fit_nr <- function(estimate, ...) {
   fit
 }
 
-# Anchors fix the scale: 4 of 12 2PL items at their generating values, theta ~ N(0.5, 1.2^2), 5% missing.
+# Anchors fix the scale: 4 of 12 2PL items at their generating values, theta ~ N(0.5, 1.2^2), 5% missing, 800 persons.
 set.seed(20261029)
-persons <- 2000
+persons <- 800
 item_count <- 12
 a <- round(runif(item_count, 0.8, 2), 2)
 b <- round(seq(-2, 2, length.out = item_count), 2)
@@ -945,14 +945,15 @@ anchored_fit <- fit_nr(mirt, anchored_data, 1, itemtype = "2PL", pars = values)
 anchored <- latent_case("2PL with 4 fixed items and a normal distribution, base R maximum", anchored_data,
                         rep("all", persons), anchored_anchors, c(all = "normal"), list(all = anchored_fit))
 
-# Two groups on one scale: 15 2PL items, the reference group N(0, 1), the focal group N(-0.5, 0.8^2), all items free.
+# Two groups on one scale: 15 2PL items, the reference group N(0, 1), the focal group N(-0.5, 0.8^2), all items free, 400
+# persons in each.
 set.seed(20261029)
 item_count <- 15
 a <- round(runif(item_count, 0.8, 2), 2)
 b <- round(seq(-2, 1.5, length.out = item_count), 2)
-group <- rep(c("reference", "focal"), each = 1000)
-theta <- ifelse(group == "reference", rnorm(2000), rnorm(2000, -0.5, 0.8))
-grouped_data <- sapply(seq_len(item_count), function(i) rbinom(2000, 1, plogis(a[i] * (theta - b[i]))))
+group <- rep(c("reference", "focal"), each = 400)
+theta <- ifelse(group == "reference", rnorm(800), rnorm(800, -0.5, 0.8))
+grouped_data <- sapply(seq_len(item_count), function(i) rbinom(800, 1, plogis(a[i] * (theta - b[i]))))
 colnames(grouped_data) <- sprintf("q%02d", seq_len(item_count))
 grouped_fit <- fit_nr(multipleGroup, grouped_data, 1, group = factor(group, c("reference", "focal")), itemtype = "2PL",
                       invariance = c(colnames(grouped_data), "free_means", "free_var"))
@@ -1022,7 +1023,7 @@ histogram_logLikelihood <- posteriors(online_data[, 1:operational], pool_a[1:ope
                                       matrix(log(weights), persons, POINTS, byrow = TRUE))$logLikelihood
 
 write_fixture("irt-latent", list(
-  source = "2PL simulations, set.seed(20261029): anchored items, two groups, adaptive tests with pretest items.",
+  source = "2PL simulations, set.seed(20261029): anchored items of 800 persons, two groups of 400 persons, adaptive tests of 2,000 persons with pretest items.",
   calibrations = list(anchored, grouped, online),
   histogram = list(
     name = sprintf("Empirical histogram on the %d fixed operational items of the adaptive tests, base R EM", operational),

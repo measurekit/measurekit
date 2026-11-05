@@ -1,0 +1,770 @@
+{
+  "source": "calibrate: the recipe of irt.md (400 bootstrap calibrations of 1,000 persons and 8 items, seeds 1 to 20) and the coverage of the pretest items' 95% intervals under fixed items calibrated on 150 other persons or on the same 1,000 (20 replications, seeds 7000 to 7019)",
+  "bootstrap": {
+    "replicates": 400,
+    "seeds": [
+      {
+        "seed": 1,
+        "worst": 0.12182542988556189,
+        "pooled": 0.03743333310199337,
+        "converged": true
+      },
+      {
+        "seed": 2,
+        "worst": 0.12980094383112828,
+        "pooled": 0.034185246215401754,
+        "converged": true
+      },
+      {
+        "seed": 3,
+        "worst": 0.10074622235996866,
+        "pooled": 0.0198705319935093,
+        "converged": true
+      },
+      {
+        "seed": 4,
+        "worst": 0.21686741542028454,
+        "pooled": 0.026530666343518305,
+        "converged": true
+      },
+      {
+        "seed": 5,
+        "worst": 0.07457804519084621,
+        "pooled": 0.02664431467117878,
+        "converged": true
+      },
+      {
+        "seed": 6,
+        "worst": 0.07604484050138915,
+        "pooled": 0.00834525264481667,
+        "converged": true
+      },
+      {
+        "seed": 7,
+        "worst": 0.13886272530054988,
+        "pooled": 0.048891118728486394,
+        "converged": true
+      },
+      {
+        "seed": 8,
+        "worst": 0.09280135519407517,
+        "pooled": 0.01684448551555362,
+        "converged": true
+      },
+      {
+        "seed": 9,
+        "worst": 0.17614419326526765,
+        "pooled": 0.03391394709774609,
+        "converged": true
+      },
+      {
+        "seed": 10,
+        "worst": 0.10827410631230805,
+        "pooled": 0.0313653530254272,
+        "converged": true
+      },
+      {
+        "seed": 11,
+        "worst": 0.07163019028995588,
+        "pooled": 0.02993703718146401,
+        "converged": true
+      },
+      {
+        "seed": 12,
+        "worst": 0.0851438051983332,
+        "pooled": 0.007004513688938063,
+        "converged": true
+      },
+      {
+        "seed": 13,
+        "worst": 0.17615111770826775,
+        "pooled": 0.03189227141437678,
+        "converged": true
+      },
+      {
+        "seed": 14,
+        "worst": 0.14631384886783017,
+        "pooled": 0.05381640293268042,
+        "converged": true
+      },
+      {
+        "seed": 15,
+        "worst": 0.12834229626862625,
+        "pooled": 0.06445188960886483,
+        "converged": true
+      },
+      {
+        "seed": 16,
+        "worst": 0.09081448380638879,
+        "pooled": -0.00662825498249342,
+        "converged": true
+      },
+      {
+        "seed": 17,
+        "worst": 0.1017009590477509,
+        "pooled": 0.03270286118690713,
+        "converged": true
+      },
+      {
+        "seed": 18,
+        "worst": 0.08931954431179467,
+        "pooled": 0.024097118564783138,
+        "converged": true
+      },
+      {
+        "seed": 19,
+        "worst": 0.12353472654297248,
+        "pooled": 0.04864187522422392,
+        "converged": true
+      },
+      {
+        "seed": 20,
+        "worst": 0.10740908267355453,
+        "pooled": 0.015626679513268016,
+        "converged": true
+      }
+    ],
+    "worst": 0.21686741542028454,
+    "pooledAbsolute": 0.06445188960886483
+  },
+  "coverage": [
+    {
+      "fixedItemsCalibratedOn": "150 other persons",
+      "replications": 20,
+      "seeds": [7000, 7019],
+      "shares": {
+        "carried": {
+          "a": 0.943125,
+          "b": 0.95375,
+          "mean": 0.95
+        },
+        "known": {
+          "a": 0.80375,
+          "b": 0.69875,
+          "mean": 0.5375
+        }
+      },
+      "bySeed": [
+        {
+          "seed": 7000,
+          "known": {
+            "a": 65,
+            "b": 57,
+            "mean": 11
+          },
+          "carried": {
+            "a": 79,
+            "b": 78,
+            "mean": 19
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7001,
+          "known": {
+            "a": 62,
+            "b": 62,
+            "mean": 10
+          },
+          "carried": {
+            "a": 75,
+            "b": 75,
+            "mean": 19
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7002,
+          "known": {
+            "a": 60,
+            "b": 50,
+            "mean": 10
+          },
+          "carried": {
+            "a": 76,
+            "b": 76,
+            "mean": 18
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7003,
+          "known": {
+            "a": 67,
+            "b": 45,
+            "mean": 12
+          },
+          "carried": {
+            "a": 76,
+            "b": 77,
+            "mean": 19
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7004,
+          "known": {
+            "a": 73,
+            "b": 61,
+            "mean": 10
+          },
+          "carried": {
+            "a": 79,
+            "b": 80,
+            "mean": 20
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7005,
+          "known": {
+            "a": 65,
+            "b": 51,
+            "mean": 12
+          },
+          "carried": {
+            "a": 74,
+            "b": 73,
+            "mean": 19
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7006,
+          "known": {
+            "a": 62,
+            "b": 56,
+            "mean": 11
+          },
+          "carried": {
+            "a": 76,
+            "b": 78,
+            "mean": 19
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7007,
+          "known": {
+            "a": 71,
+            "b": 70,
+            "mean": 10
+          },
+          "carried": {
+            "a": 76,
+            "b": 79,
+            "mean": 20
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7008,
+          "known": {
+            "a": 55,
+            "b": 58,
+            "mean": 14
+          },
+          "carried": {
+            "a": 73,
+            "b": 75,
+            "mean": 19
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7009,
+          "known": {
+            "a": 59,
+            "b": 49,
+            "mean": 10
+          },
+          "carried": {
+            "a": 73,
+            "b": 70,
+            "mean": 19
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7010,
+          "known": {
+            "a": 64,
+            "b": 51,
+            "mean": 12
+          },
+          "carried": {
+            "a": 71,
+            "b": 76,
+            "mean": 20
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7011,
+          "known": {
+            "a": 69,
+            "b": 58,
+            "mean": 8
+          },
+          "carried": {
+            "a": 79,
+            "b": 79,
+            "mean": 19
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7012,
+          "known": {
+            "a": 63,
+            "b": 52,
+            "mean": 14
+          },
+          "carried": {
+            "a": 75,
+            "b": 78,
+            "mean": 19
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7013,
+          "known": {
+            "a": 68,
+            "b": 57,
+            "mean": 13
+          },
+          "carried": {
+            "a": 74,
+            "b": 74,
+            "mean": 19
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7014,
+          "known": {
+            "a": 59,
+            "b": 53,
+            "mean": 12
+          },
+          "carried": {
+            "a": 78,
+            "b": 78,
+            "mean": 19
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7015,
+          "known": {
+            "a": 61,
+            "b": 56,
+            "mean": 9
+          },
+          "carried": {
+            "a": 72,
+            "b": 78,
+            "mean": 19
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7016,
+          "known": {
+            "a": 66,
+            "b": 60,
+            "mean": 15
+          },
+          "carried": {
+            "a": 75,
+            "b": 75,
+            "mean": 19
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7017,
+          "known": {
+            "a": 72,
+            "b": 59,
+            "mean": 9
+          },
+          "carried": {
+            "a": 79,
+            "b": 75,
+            "mean": 17
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7018,
+          "known": {
+            "a": 62,
+            "b": 57,
+            "mean": 4
+          },
+          "carried": {
+            "a": 75,
+            "b": 76,
+            "mean": 19
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7019,
+          "known": {
+            "a": 63,
+            "b": 56,
+            "mean": 9
+          },
+          "carried": {
+            "a": 74,
+            "b": 76,
+            "mean": 19
+          },
+          "items": 80,
+          "means": 20
+        }
+      ]
+    },
+    {
+      "fixedItemsCalibratedOn": "the same 1,000 persons",
+      "replications": 20,
+      "seeds": [7000, 7019],
+      "shares": {
+        "carried": {
+          "a": 0.9425,
+          "b": 0.95125,
+          "mean": 0
+        },
+        "known": {
+          "a": 0.9425,
+          "b": 0.9375,
+          "mean": 0
+        }
+      },
+      "bySeed": [
+        {
+          "seed": 7000,
+          "known": {
+            "a": 74,
+            "b": 77,
+            "mean": 0
+          },
+          "carried": {
+            "a": 74,
+            "b": 79,
+            "mean": 0
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7001,
+          "known": {
+            "a": 74,
+            "b": 73,
+            "mean": 0
+          },
+          "carried": {
+            "a": 74,
+            "b": 75,
+            "mean": 0
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7002,
+          "known": {
+            "a": 75,
+            "b": 73,
+            "mean": 0
+          },
+          "carried": {
+            "a": 75,
+            "b": 75,
+            "mean": 0
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7003,
+          "known": {
+            "a": 75,
+            "b": 76,
+            "mean": 0
+          },
+          "carried": {
+            "a": 75,
+            "b": 77,
+            "mean": 0
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7004,
+          "known": {
+            "a": 76,
+            "b": 73,
+            "mean": 0
+          },
+          "carried": {
+            "a": 76,
+            "b": 73,
+            "mean": 0
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7005,
+          "known": {
+            "a": 74,
+            "b": 77,
+            "mean": 0
+          },
+          "carried": {
+            "a": 74,
+            "b": 77,
+            "mean": 0
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7006,
+          "known": {
+            "a": 76,
+            "b": 75,
+            "mean": 0
+          },
+          "carried": {
+            "a": 76,
+            "b": 77,
+            "mean": 0
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7007,
+          "known": {
+            "a": 75,
+            "b": 73,
+            "mean": 0
+          },
+          "carried": {
+            "a": 75,
+            "b": 74,
+            "mean": 0
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7008,
+          "known": {
+            "a": 77,
+            "b": 76,
+            "mean": 0
+          },
+          "carried": {
+            "a": 77,
+            "b": 78,
+            "mean": 0
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7009,
+          "known": {
+            "a": 76,
+            "b": 78,
+            "mean": 0
+          },
+          "carried": {
+            "a": 76,
+            "b": 78,
+            "mean": 0
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7010,
+          "known": {
+            "a": 76,
+            "b": 78,
+            "mean": 0
+          },
+          "carried": {
+            "a": 76,
+            "b": 80,
+            "mean": 0
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7011,
+          "known": {
+            "a": 79,
+            "b": 77,
+            "mean": 0
+          },
+          "carried": {
+            "a": 79,
+            "b": 77,
+            "mean": 0
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7012,
+          "known": {
+            "a": 73,
+            "b": 74,
+            "mean": 0
+          },
+          "carried": {
+            "a": 73,
+            "b": 76,
+            "mean": 0
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7013,
+          "known": {
+            "a": 78,
+            "b": 72,
+            "mean": 0
+          },
+          "carried": {
+            "a": 78,
+            "b": 75,
+            "mean": 0
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7014,
+          "known": {
+            "a": 75,
+            "b": 75,
+            "mean": 0
+          },
+          "carried": {
+            "a": 75,
+            "b": 76,
+            "mean": 0
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7015,
+          "known": {
+            "a": 75,
+            "b": 76,
+            "mean": 0
+          },
+          "carried": {
+            "a": 75,
+            "b": 76,
+            "mean": 0
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7016,
+          "known": {
+            "a": 78,
+            "b": 73,
+            "mean": 0
+          },
+          "carried": {
+            "a": 78,
+            "b": 74,
+            "mean": 0
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7017,
+          "known": {
+            "a": 75,
+            "b": 76,
+            "mean": 0
+          },
+          "carried": {
+            "a": 75,
+            "b": 76,
+            "mean": 0
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7018,
+          "known": {
+            "a": 71,
+            "b": 75,
+            "mean": 0
+          },
+          "carried": {
+            "a": 71,
+            "b": 76,
+            "mean": 0
+          },
+          "items": 80,
+          "means": 20
+        },
+        {
+          "seed": 7019,
+          "known": {
+            "a": 76,
+            "b": 73,
+            "mean": 0
+          },
+          "carried": {
+            "a": 76,
+            "b": 73,
+            "mean": 0
+          },
+          "items": 80,
+          "means": 20
+        }
+      ]
+    }
+  ]
+}
