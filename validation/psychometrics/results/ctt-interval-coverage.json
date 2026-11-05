@@ -1,0 +1,16 @@
+{
+  "source": "percentile intervals of cronbachAlpha and mcdonaldOmega over 1,000 bootstrap samples of the persons, on 500 seeded samples of 200 persons answering 8 items of five categories that load 0.4 to 0.8 on one factor; the population value is the statistic of 200,000 persons, createRandom(1); the samples and the bootstrap draw from createRandom(2)",
+  "samples": 500,
+  "persons": 200,
+  "resamples": 1000,
+  "truth": {
+    "alpha": 0.7817288043800461,
+    "omega": 0.7868638600187765
+  },
+  "coverage": {
+    "alpha": 0.95,
+    "omega": 0.948
+  },
+  "bound": [0.92, 0.98],
+  "within": true
+}
