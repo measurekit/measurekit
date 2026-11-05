@@ -88,7 +88,6 @@ Rscript validation/psychometrics/multidimensional.R  # multidimensional IRT: mir
 Rscript validation/psychometrics/multidimensional-groups.R # multidimensional IRT in several groups, with fixed items: mirt's multipleGroup
 Rscript validation/psychometrics/missing-not-at-random.R # responses missing not at random: mirt's two-dimensional 2PL of the responses and their indicators
 Rscript validation/psychometrics/bifactor.R           # bifactor and two-tier models: mirt's bfactor; case names as arguments run only those cases
-node validation/psychometrics/bifactor-recovery.ts  # the recovery of a two-tier model of 80 items and 3,000 persons on 21 nodes, from the data of bifactor.R's `recovery`; run `pnpm build` first, about 10 seconds
 Rscript validation/psychometrics/longitudinal.R      # the same persons over two or three occasions: mirt with one dimension per occasion and tied items; TAM's tam.mml for the Rasch model
 Rscript validation/psychometrics/longitudinal-recovery.R # how well mirt recovers the moments of the occasions, which bounds the recovery tests and the number of occasions
 Rscript validation/psychometrics/change.R            # gains, reliability of a difference and reliable change: clinicalsignificance and base R
@@ -157,6 +156,13 @@ it as each fit finishes, with the seeds, the sizes and the bound it shows, and t
 same rule at a size that runs in seconds. `validation/` is a package of the workspace, so that the studies import the
 packages by name and `pnpm typecheck` checks them; no Vitest project and no job of CI runs them. A study exits with 1 when
 a fit misses the threshold it states.
+
+| Study                                          | Time             | Its results record                                                                                                                                                                                                                                                                 |
+| ---------------------------------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `psychometrics/bifactor-recovery.ts`           | About 10 seconds | A two-tier model of 80 items and 3,000 persons on 21 nodes, from the data of `bifactor.R`'s `recovery`: the root mean square errors of the primary and the specific slopes against 0.10 and 0.14, and the correlation's error against 0.04                                         |
+| `psychometrics/irt-error-recovery.ts`          | About 20 minutes | The guide's bootstrap of 400 resamples on 20 seeds: each error against the Hessian's and their root mean square; the coverage of the pretest items' intervals under fixed items calibrated on 150 other persons and on the same 1,000, with their error carried and taken as known |
+| `psychometrics/ctt-interval-coverage.ts`       | About 2 minutes  | The coverage of the percentile intervals of alpha and omega, 500 samples of 200 persons and 1,000 resamples, against 0.92 to 0.98                                                                                                                                                  |
+| `psychometrics/parallel-analysis-quantiles.ts` | About 2 minutes  | The means and the 0.95 quantiles of parallel analysis' random eigenvalues against base R's 2,000 permutations of `bfi`, 1,000 replications on 20 seeds, in Monte Carlo errors against 4 and 6                                                                                      |
 
 ## Knowledge tracing
 
