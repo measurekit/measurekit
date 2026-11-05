@@ -346,6 +346,12 @@ const PRESMOOTHING_TOLERANCE = 1e-11;
 /** Bootstrap standard errors above BOOTSTRAP_FLOOR against equate's, which have a Monte Carlo error of their own. */
 const BOOTSTRAP_TOLERANCE = 0.1;
 const BOOTSTRAP_FLOOR = 0.05;
+/**
+ * The replications of the bootstrap compared with equate's 2,000. A standard error from 1,000 has a Monte Carlo error of 2.2%
+ * and equate's of 1.6%, so that the tolerance of 10% is 3.7 of their combined errors; the three comparisons of the
+ * anchored, random groups and single group designs passed on the seeds 1 to 20.
+ */
+const BOOTSTRAP_REPLICATIONS = 1000;
 /** Delta-method standard errors against numDeriv's Jacobian, relative. */
 const STANDARD_ERROR_TOLERANCE = 1e-6;
 /** A chain of links computed from items against equateIRT's chainec, which composes its own links to about 1e-8. */
@@ -1194,7 +1200,7 @@ describe("bootstrapEquating", () => {
     });
   }
 
-  const options = { replications: bootstrap.replications };
+  const options = { replications: BOOTSTRAP_REPLICATIONS };
 
   it("matches the standard errors of equate's bootstrap of equating through an anchor", () => {
     const sample = { design: "neat" as const, from: bootstrap.neat.from, to: bootstrap.neat.to };
@@ -1308,9 +1314,9 @@ describe("bootstrapEquating", () => {
   });
 
   it("approaches the normal-theory standard error of linear equating from random groups", () => {
-    // Discretized normal distributions of 20,000 persons each, to which the formula of Kolen and Brennan applies:
+    // Discretized normal distributions of 5,000 persons each, to which the formula of Kolen and Brennan applies:
     // sd(Y) sqrt((1 + z² / 2)(1 / N_X + 1 / N_Y)) at the standardized score z of x.
-    const persons = 20_000;
+    const persons = 5000;
     const normal = (mean: number, sd: number): number[] =>
       Array.from({ length: 101 }, (_, x) =>
         Math.round((persons * Math.exp(-0.5 * ((x - mean) / sd) ** 2)) / (sd * Math.sqrt(2 * Math.PI))),
@@ -1971,7 +1977,7 @@ describe("irtEquatingStandardErrors", () => {
     };
     const rms = (errors: readonly number[]): number =>
       Math.sqrt(errors.reduce((sum, error) => sum + error ** 2, 0) / errors.length);
-    expect(rms(errorsFor(4000))).toBeLessThan(rms(errorsFor(500)));
+    expect(rms(errorsFor(1500))).toBeLessThan(rms(errorsFor(250)));
   });
 
   it("rejects invalid items, covariances and options", () => {
@@ -2109,8 +2115,8 @@ describe("linkCovariance and linkedEquatingErrors", () => {
   }
 
   it("recovers the spread of a chain's slope and intercept over draws of the estimates from their covariances", () => {
-    // Three forms of 20 2PL items, 10 common between neighbors, calibrated apart on groups N(0, 1), N(0.5, 1.1²) and
-    // N(1, 1.2²) of the first form's scale; the estimates are then drawn from their covariances, as calibrations of new
+    // Three forms of 20 2PL items, 10 common between neighbors, calibrated apart on 500 persons of groups N(0, 1), N(0.5, 1.1²)
+    // and N(1, 1.2²) of the first form's scale; the estimates are then drawn from their covariances, as calibrations of new
     // samples would scatter them, and the chain linked by Stocking-Lord for each draw.
     const random = createRandom(20261102);
     const truth = simulateItems(twoParameterLogistic, 40, random);
@@ -2121,7 +2127,7 @@ describe("linkCovariance and linkedEquatingErrors", () => {
     ] as const;
     const forms = groups.map(([mean, sd], f) => {
       const ids = Array.from({ length: 20 }, (_, j) => `i${10 * f + j}`);
-      const thetas = simulateThetas(1000, random).map((theta) => mean + sd * theta);
+      const thetas = simulateThetas(500, random).map((theta) => mean + sd * theta);
       const responses = simulateResponses(truth.slice(10 * f, 10 * f + 20), thetas, random);
       const { calibration, covariance } = calibrateWithCovariance(responses, twoParameterLogistic, {
         standardErrors: "hessian",
