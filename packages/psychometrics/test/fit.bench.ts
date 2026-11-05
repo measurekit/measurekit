@@ -48,7 +48,7 @@ test("computes the fit of 40 items to 2,000 persons", async (context) => {
 });
 
 test("bootstraps the critical value of Q3 of 40 items and 2,000 persons by 10 replications", async (context) => {
-  const options = { model: twoParameterLogistic, replications: 10 } as const;
+  const options = { replications: 10 } as const;
   await benchmark(
     context,
     "fit.yenQ3CriticalValue",

@@ -28,7 +28,6 @@ export {
   type Q3CriticalValue,
   type Q3CriticalValueOptions,
   type Q3Pair,
-  type Q3Statistic,
   yenQ3CriticalValue,
 } from "./q3-critical-value.js";
 export {

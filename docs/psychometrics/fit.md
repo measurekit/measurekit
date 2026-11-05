@@ -272,8 +272,8 @@ pairs, with a critical excess from a parametric bootstrap of the calibration of 
 flowchart LR
   D["Responses and the calibration's items"] --> E["Each pair's excess over the mean Q3"]
   D --> S["Thetas from N(0, 1), responses from the items,<br/>missing where the data are"]
-  S --> C["calibrate with the same options,<br/>abilityEstimates, yenQ3"]
-  C --> X["The replication's largest excess,<br/>or each pair's"]
+  S --> C["calibrate with the items' models and<br/>the same options, abilityEstimates, yenQ3"]
+  C --> X["The replication's largest excess"]
   X -->|"replications times"| S
   X --> Q["Critical excess: their quantile"]
   E --> F["flagged: the pairs above it"]
@@ -301,32 +301,31 @@ const matrix = buildResponseMatrix(
   others.responses.map((row, person) => [...(passage.responses[person] ?? []), ...row]),
 );
 
-// The calibration takes the items as independent; the bootstrap repeats it with the same options.
-const options = { model: twoParameterLogistic };
-const fit = calibrate(matrix, options);
-const q3 = yenQ3CriticalValue(matrix, fit.items, createRandom(1), { ...options, replications: 100 });
+// The calibration takes the items as independent; the bootstrap repeats it with the items' models.
+const fit = calibrate(matrix, { model: twoParameterLogistic });
+const q3 = yenQ3CriticalValue(matrix, fit.items, createRandom(1), { replications: 100 });
 q3.criticalExcess; // => 0.115
 q3.flagged.map((pair) => pair.items); // => [["item2", "item3"], ["item1", "item2"], ["item1", "item3"]]
 q3.flagged.map((pair) => pair.q3); // => [0.070, 0.068, 0.066]: the fixed cut 0.2 flags none
 ```
 
-`items` are the calibration's, in the order of the matrix, with their ids, and `options` hold the calibration's own:
-`model`, `fixed`, `fixedParameters`, `priors`, `itemPriors`, `quadrature`, `tolerance` and `maxIterations`. A
+`items` are the calibration's, in the order of the matrix, with their ids; each replication is calibrated with their
+models, and `options` hold the calibration's other options: `fixed`, `fixedParameters`, `priors`, `itemPriors`,
+`quadrature`, `tolerance` and `maxIterations`. A
 calibration with groups, a latent regression, testlets or person weights is not bootstrapped: thetas are drawn from the
 standard normal, and Q3 tests the local independence that testlets model.
 
 | Option         | Default                 | Meaning                                                                                                  |
 | -------------- | ----------------------- | -------------------------------------------------------------------------------------------------------- |
 | `replications` | `40`                    | Replications, each a calibration                                                                         |
-| `quantile`     | `0.95`                  | The quantile of the replications' statistics that is the critical excess, by R's default (type 7)        |
-| `statistic`    | `"largest"`             | `"largest"`: each replication's largest excess, Q3*; `"pairs"`: the excess of each of its pairs          |
+| `quantile`     | `0.95`                  | The quantile of the replications' largest excesses that is the critical excess, by R's default (type 7)  |
 | `maxRedraws`   | `40`                    | The most draws thrown away because an estimated item lacks a category; past them the bootstrap stops     |
 | `slopeLimit`   | `4`                     | The largest slope `a` of an item tested; the pairs of a steeper item are left out and the item is listed |
 | `estimator`    | `posteriorMeanEstimate` | The estimate of each person's theta for the residuals, as `abilityEstimates` takes it                    |
 
 | Field                     | Meaning                                                                                                          |
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `criticalExcess`          | The `quantile` of the replications' statistics; `null` without a replication or two items tested                 |
+| `criticalExcess`          | The `quantile` of the replications' largest excesses; `null` without a replication or two items tested           |
 | `meanQ3`, `flagged`       | The observed mean Q3 of the pairs tested, and the pairs whose excess is above the critical excess, largest first |
 | `largestExcesses`         | Each replication's largest excess, in the order drawn                                                            |
 | `replications`            | The replications used: fewer than asked when the redraws ran out                                                 |
@@ -334,13 +333,12 @@ standard normal, and Q3 tests the local independence that testlets model.
 | `nearDeterministic`       | The items whose slope is above `slopeLimit`                                                                      |
 
 - **The statistic.** The quantile of each replication's largest excess, Christensen, Makransky and Horton's Q3*, holds
-  the chance of any false flag among the pairs near 1 - `quantile`. `"pairs"` takes the quantile of every pair's
-  excess, a level for each pair: on the example, `"pairs"` at 0.999 also flags item 4 with item 12, as a level of
-  0.001 for each of 66 pairs leaves a chance of a false flag near 0.06.
+  the chance of any false flag among the pairs near 1 - `quantile`. For one pair named before the data, they compare its
+  Q3 with a percentile of that pair's own null distribution, which this function does not give: `yenQ3`,
+  `simulateResponses` and `calibrate` make the replications.
 - **Replications.** Each costs a calibration, an estimate of each person's theta and Q3: 100 replications of the
   example take about 2 seconds. The quantile of 40 replications has a Monte Carlo error of its own; a decision near the
-  critical excess takes more, as the example's 100. `"pairs"` keeps each pair's excess of each replication, at most
-  2^24 of them.
+  critical excess takes more, as the example's 100.
 - **Redraws.** A draw in which an item that the calibration estimates lacks a response in one of its categories cannot
   be calibrated as the data were, so it is drawn again; an item in `fixed` needs none.
 - **Near-deterministic items.** Where responses depend on theta almost alone, as parts of a task that one action
@@ -586,8 +584,7 @@ Invalid input throws `DataError` naming the value found.
 | C2 of more than 1,830 moments                             | Test fewer items, or group the categories of items of many                              |
 | More than 1,000 items for `yenQ3` or local dependence     | Test the pairs of a part of the items, such as those that share a stimulus              |
 | Items of `yenQ3CriticalValue` without the matrix's ids    | Give the items of a calibration of the matrix, in its order                             |
-| An option of the bootstrap out of its range               | Give the replications, quantile, statistic, redraws, slope limit and estimator above    |
-| `"pairs"` of more than 2^24 pair excesses                 | Use fewer replications, or the statistic `"largest"`                                    |
+| An option of the bootstrap out of its range               | Give the replications, quantile, redraws, slope limit and estimator above               |
 | A calibration option a replication's `calibrate` refuses  | Give the options that the calibration of the items took                                 |
 | Tables of local dependence of more than 2^24 cells        | Test fewer items, or group the categories of items of many                              |
 | `"m2"` with a polytomous item                             | Use `"m2-star"` or `"c2"`                                                               |

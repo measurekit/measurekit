@@ -1,5 +1,4 @@
 import {
-  checkChoice,
   checkIntegerFrom,
   checkOptions,
   checkPositive,
@@ -27,20 +26,13 @@ import { simulateResponses, simulateThetas } from "../sim/internal.js";
 import { yenQ3 } from "./local-dependence.js";
 
 /**
- * What each replication of the bootstrap gives the critical excess: `"largest"`, its largest pair excess, the Q3* of
- * Christensen, Makransky and Horton, whose quantile bounds the chance of any false flag among the pairs; `"pairs"`, the
- * excess of each of its pairs, whose quantile bounds the chance of a false flag for one pair.
- */
-export type Q3Statistic = "largest" | "pairs";
-
-/**
  * Options of {@link yenQ3CriticalValue}: those of the calibration that estimated the items, which each replication's
  * calibration repeats, and those of the bootstrap.
  */
 export interface Q3CriticalValueOptions<TParameters>
   extends Pick<
     CalibrationOptions<TParameters>,
-    "model" | "fixed" | "fixedParameters" | "priors" | "itemPriors" | "quadrature" | "tolerance" | "maxIterations"
+    "fixed" | "fixedParameters" | "priors" | "itemPriors" | "quadrature" | "tolerance" | "maxIterations"
   > {
   /**
    * The number of replications, each a calibration of responses simulated from the items.
@@ -49,17 +41,11 @@ export interface Q3CriticalValueOptions<TParameters>
    */
   readonly replications?: number;
   /**
-   * The quantile of the replications' statistics that is the critical excess, from 0 to 1.
+   * The quantile of the replications' largest pair excesses, Q3*, that is the critical excess, from 0 to 1.
    *
    * @defaultValue `0.95`
    */
   readonly quantile?: number;
-  /**
-   * What each replication contributes: its largest pair excess, or the excess of each of its pairs.
-   *
-   * @defaultValue `"largest"`
-   */
-  readonly statistic?: Q3Statistic;
   /**
    * The most draws thrown away because an estimated item lacks a response in one of its categories, which its
    * calibration could not estimate; past them the bootstrap stops with the replications it has.
@@ -83,7 +69,6 @@ export interface Q3CriticalValueOptions<TParameters>
 }
 
 const Q3_CRITICAL_VALUE_OPTIONS: FieldNames<Q3CriticalValueOptions<unknown>> = {
-  model: true,
   fixed: true,
   fixedParameters: true,
   priors: true,
@@ -93,7 +78,6 @@ const Q3_CRITICAL_VALUE_OPTIONS: FieldNames<Q3CriticalValueOptions<unknown>> = {
   maxIterations: true,
   replications: true,
   quantile: true,
-  statistic: true,
   maxRedraws: true,
   slopeLimit: true,
   estimator: true,
@@ -112,8 +96,8 @@ export interface Q3Pair {
 /** The critical value of Yen's Q3 by parametric bootstrap, with the observed pairs above it. */
 export interface Q3CriticalValue {
   /**
-   * The critical excess: the `quantile` of the replications' statistics; `null` without a replication or without two
-   * items tested.
+   * The critical excess: the `quantile` of the replications' largest excesses; `null` without a replication or without
+   * two items tested.
    */
   readonly criticalExcess: number | null;
   /** The mean Q3 of the observed pairs tested, which a pair's excess is taken from; `null` without such a pair. */
@@ -143,9 +127,6 @@ const DEFAULT_MAX_REDRAWS = 40;
  * a task that one action decides reach 175 (`docs/psychometrics/fit.md`).
  */
 const DEFAULT_SLOPE_LIMIT = 4;
-/** The most pair excesses `"pairs"` keeps, 128 MB of them. */
-const MAX_POOLED_EXCESSES = 2 ** 24;
-const STATISTICS: readonly Q3Statistic[] = ["largest", "pairs"];
 
 /**
  * Returns the critical value of Yen's Q3 for a calibration by parametric bootstrap, with the pairs of items above it.
@@ -154,9 +135,10 @@ const STATISTICS: readonly Q3Statistic[] = ["largest", "pairs"];
  * A pair's excess is its Q3 less the mean Q3 of the pairs, at each person's estimate of theta from the items. Each
  * replication draws one standard normal theta per person, `simulateThetas`, and the responses to the items,
  * `simulateResponses`, from `random` in that order; sets missing the responses that `matrix` lacks; calibrates them
- * with the calibration's options; and gives its largest pair excess, or each pair's. The critical excess is the
- * `quantile` of the statistics of the replications, by R's default quantile (type 7), and the observed pairs whose
- * excess is above it are flagged (Christensen, Makransky and Horton). A draw in which an item that the calibration
+ * with the items' models and the calibration's options; and gives its largest pair excess. The critical excess is the
+ * `quantile` of the replications' largest excesses, Q3*, by R's default quantile (type 7), which holds the chance of
+ * any false flag among the pairs near 1 - `quantile`; the observed pairs whose excess is above it are flagged
+ * (Christensen, Makransky and Horton). A draw in which an item that the calibration
  * estimates, not `fixed`, lacks a response in one of its categories is drawn again, at most `maxRedraws` times.
  *
  * An item whose slope `a` is above `slopeLimit` is near-deterministic: its residuals are near 0 for most persons, so
@@ -164,19 +146,18 @@ const STATISTICS: readonly Q3Statistic[] = ["largest", "pairs"];
  * pairs are left out of every excess, observed and replicated, and the item is listed; parts of a task that one action
  * decides are better declared a testlet. Items of models without a parameter `a`, such as the NRM, are always tested.
  *
- * `"pairs"` keeps every pair excess of every replication, at most 2^24 of them. Each replication costs a calibration,
- * an estimate of each person's theta and Q3, which takes at most 1,000 items.
+ * Each replication costs a calibration, an estimate of each person's theta and Q3, which takes at most 1,000 items.
  *
  * @param matrix - The responses the items were calibrated on.
  * @param items - The calibration's items, in the order of the matrix's items, with their ids.
  * @param random - The generator of the replications' thetas and responses.
- * @param options - The calibration's model, anchors, held parameters, priors, quadrature and stopping rules, and the
- *   replications, the quantile, the statistic, the redraws, the slope limit and the estimator of theta.
+ * @param options - The calibration's anchors, held parameters, priors, quadrature and stopping rules, and the
+ *   replications, the quantile, the redraws, the slope limit and the estimator of theta.
  * @returns The critical excess, the observed mean Q3 and the pairs above the critical excess, each replication's
  *   largest excess, and the counts of replications, redraws and calibrations that did not converge.
  * @throws `DataError` when the matrix, the items or `random` are invalid, the items' ids are not the matrix's, an
- * option is invalid, `"pairs"` would keep more than 2^24 excesses, there are more than 1,000 items, or a replication's
- * calibration throws it, as for an invalid calibration option.
+ * option is invalid, there are more than 1,000 items, or a replication's calibration throws it, as for an invalid
+ * calibration option.
  * @see {@link https://doi.org/10.1177/0146621616677520 | Christensen, Makransky and Horton (2017)}
  * @see {@link https://doi.org/10.1177/014662168400800201 | Yen (1984)}
  *
@@ -196,7 +177,7 @@ const STATISTICS: readonly Q3Statistic[] = ["largest", "pairs"];
  * const others = simulateResponses(items.slice(2), thetas, random);
  * const matrix = buildResponseMatrix(others.responses.map((row, person) => [...(passage.responses[person] ?? []), ...row]));
  * const fit = calibrate(matrix, { model: twoParameterLogistic });
- * const q3 = yenQ3CriticalValue(matrix, fit.items, createRandom(1), { model: twoParameterLogistic, replications: 20 });
+ * const q3 = yenQ3CriticalValue(matrix, fit.items, createRandom(1), { replications: 20 });
  * q3.flagged.map((pair) => pair.items); // => [["item1", "item2"]]
  * ```
  */
@@ -204,13 +185,13 @@ export function yenQ3CriticalValue<TParameters>(
   matrix: ResponseMatrix,
   items: readonly TestItem<TParameters>[],
   random: Random,
-  options: Q3CriticalValueOptions<TParameters>,
+  options: Q3CriticalValueOptions<TParameters> = {},
 ): Q3CriticalValue {
   checkItemsOfMatrix(matrix, items);
   checkItemIds(matrix, items);
   checkRandom(random);
   const settings = bootstrapSettings(options);
-  const { slopeLimit, estimator, statistic, replications } = settings;
+  const { slopeLimit, estimator } = settings;
   const tested = items.map((item) => !((slopeOf(item) ?? 0) > slopeLimit));
   const nearDeterministic = items.flatMap((item, j) => (tested[j] === true ? [] : [item.id]));
   const observed = pairExcesses(matrix, items, tested, estimator);
@@ -226,15 +207,8 @@ export function yenQ3CriticalValue<TParameters>(
       nearDeterministic,
     };
   }
-  const testedCount = tested.filter(Boolean).length;
-  const pairCount = (testedCount * (testedCount - 1)) / 2;
-  if (statistic === "pairs" && replications * pairCount > MAX_POOLED_EXCESSES) {
-    throw new DataError(
-      `The statistic "pairs" keeps the excess of each of ${pairCount} pairs in each of ${replications} replications, ${replications * pairCount}, and takes at most ${MAX_POOLED_EXCESSES}; use fewer replications or the statistic "largest".`,
-    );
-  }
-  const bootstrap = runBootstrap(matrix, items, random, tested, settings, pairCount);
-  const statistics = (bootstrap.pooled ?? Float64Array.from(bootstrap.largestExcesses)).sort();
+  const bootstrap = runBootstrap(matrix, items, random, tested, settings);
+  const statistics = Float64Array.from(bootstrap.largestExcesses).sort();
   const criticalExcess = statistics.length === 0 ? null : sampleQuantile(statistics, settings.quantile);
   const flagged =
     criticalExcess === null
@@ -256,11 +230,10 @@ export function yenQ3CriticalValue<TParameters>(
 interface BootstrapSettings<TParameters> {
   readonly replications: number;
   readonly quantile: number;
-  readonly statistic: Q3Statistic;
   readonly maxRedraws: number;
   readonly slopeLimit: number;
   readonly estimator: AbilityEstimator;
-  readonly calibration: CalibrationOptions<TParameters>;
+  readonly calibration: Omit<CalibrationOptions<TParameters>, "model">;
 }
 
 /**
@@ -274,7 +247,6 @@ function bootstrapSettings<TParameters>(options: Q3CriticalValueOptions<TParamet
   const {
     replications = DEFAULT_REPLICATIONS,
     quantile = DEFAULT_QUANTILE,
-    statistic = "largest",
     maxRedraws = DEFAULT_MAX_REDRAWS,
     slopeLimit = DEFAULT_SLOPE_LIMIT,
     estimator = posteriorMeanEstimate,
@@ -282,48 +254,41 @@ function bootstrapSettings<TParameters>(options: Q3CriticalValueOptions<TParamet
   } = options;
   checkPositiveInteger(replications, "The option replications");
   checkUnitInterval(quantile, "The option quantile");
-  checkChoice(statistic, "The option statistic", STATISTICS);
   checkIntegerFrom(maxRedraws, "The option maxRedraws", 0);
   checkPositive(slopeLimit, "The option slopeLimit");
   checkFunction(
     estimator,
     "The option estimator must be a function of items and responses, such as posteriorMeanEstimate",
   );
-  return { replications, quantile, statistic, maxRedraws, slopeLimit, estimator, calibration };
+  return { replications, quantile, maxRedraws, slopeLimit, estimator, calibration };
 }
 
-/** The replications of the bootstrap: their largest excesses, their pair excesses for `"pairs"`, and the counts. */
+/** The replications of the bootstrap: their largest excesses, and the counts. */
 interface Bootstrap {
   readonly largestExcesses: readonly number[];
-  /** With `"pairs"`, every pair excess of every replication, in the first entries of a buffer sized for them; `null` with `"largest"`. */
-  readonly pooled: Float64Array | null;
   readonly redrawn: number;
   readonly notConverged: number;
 }
 
 /**
  * Draws and calibrates the replications, drawing again a replication in which an estimated item lacks a category or
- * no pair has a Q3, until there are `replications` of them or the redraws run out. `pairCount` is the number of pairs
- * of the tested items, the most excesses a replication gives.
+ * no pair has a Q3, until there are `replications` of them or the redraws run out.
  */
 function runBootstrap<TParameters>(
   matrix: ResponseMatrix,
   items: readonly TestItem<TParameters>[],
   random: Random,
   tested: readonly boolean[],
-  { replications, statistic, maxRedraws, estimator, calibration }: BootstrapSettings<TParameters>,
-  pairCount: number,
+  { replications, maxRedraws, estimator, calibration }: BootstrapSettings<TParameters>,
 ): Bootstrap {
   const fixed = calibration.fixed ?? {};
   const estimated = items.map(({ id }) => !Object.hasOwn(fixed, id));
   const largestExcesses: number[] = [];
-  // At most `replications` × `pairCount` excesses, which the caller bounds, in one buffer that the quantile sorts in place.
-  const buffer = statistic === "pairs" ? new Float64Array(replications * pairCount) : null;
-  let filled = 0;
+  const models = items.map(({ model }) => model);
   let redrawn = 0;
   let notConverged = 0;
   const excessesOf = (simulated: ResponseMatrix): PairExcesses | null => {
-    const fit = calibrate(simulated, calibration);
+    const fit = calibrate(simulated, { model: models, ...calibration });
     if (!fit.converged) notConverged += 1;
     return pairExcesses(simulated, fit.items, tested, estimator);
   };
@@ -336,10 +301,8 @@ function runBootstrap<TParameters>(
       continue;
     }
     largestExcesses.push(replicated.largest);
-    buffer?.set(replicated.excesses, filled);
-    filled += replicated.excesses.length;
   }
-  return { largestExcesses, pooled: buffer?.subarray(0, filled) ?? null, redrawn, notConverged };
+  return { largestExcesses, redrawn, notConverged };
 }
 
 /**
@@ -368,7 +331,6 @@ function slopeOf({ model, parameters }: IrtItem): number | null {
 interface PairExcesses {
   readonly mean: number;
   readonly largest: number;
-  readonly excesses: readonly number[];
   readonly pairs: readonly Q3Pair[];
 }
 
@@ -399,7 +361,7 @@ function pairExcesses(
   const excesses = pairs.map((pair) => pair.q3 - mean);
   let largest = Number.NEGATIVE_INFINITY;
   for (const excess of excesses) largest = Math.max(largest, excess);
-  return { mean, largest, excesses, pairs: pairs.map((pair, k) => ({ ...pair, excess: excesses[k] ?? 0 })) };
+  return { mean, largest, pairs: pairs.map((pair, k) => ({ ...pair, excess: excesses[k] ?? 0 })) };
 }
 
 /**

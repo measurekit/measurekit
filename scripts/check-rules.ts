@@ -1157,14 +1157,6 @@ export const RULES: readonly Rule[] = [
     titles: "yenQ3CriticalValue.*leaves out the pairs",
   },
   {
-    rule: "The Q3 bootstrap keeps at most 2^24 pair excesses, so that many items and replications do not cost the product of their pairs.",
-    file: "packages/psychometrics/src/fit/q3-critical-value.ts",
-    find: 'if (statistic === "pairs" && replications * pairCount > MAX_POOLED_EXCESSES) {',
-    replace: "if (false) {",
-    test: "packages/psychometrics/test/fit.test.ts",
-    titles: "yenQ3CriticalValue.*past 2\\^24 excesses",
-  },
-  {
     rule: "The tables of local dependence hold at most 2^24 cells, so that items of many categories do not cost the square of them.",
     file: "packages/psychometrics/src/fit/local-dependence.ts",
     find: "if (cells > MAX_TABLE_CELLS) {",
