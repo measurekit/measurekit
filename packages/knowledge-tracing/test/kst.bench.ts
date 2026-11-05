@@ -45,17 +45,17 @@ const structure = surmiseStructure(
 );
 
 test("fits the basic local independence model of a chain of 12 items", async (context) => {
-  const model = kst({ structure, over: "items" });
+  const model = kst(structure, { over: "items" });
   await benchmark(context, "kst.blim", () => model.fit(log), SLOW_OPTIONS);
 });
 
 test("fits the basic local independence model of a chain of 12 items by minimum discrepancy maximum likelihood", async (context) => {
-  const model = kst({ structure, over: "items", method: "mdml" });
+  const model = kst(structure, { over: "items", method: "mdml" });
   await benchmark(context, "kst.mdml", () => model.fit(log), SLOW_OPTIONS);
 });
 
 test("finds the local identifiability of the model of a chain of 12 items and 13 states", async (context) => {
-  const model = kst({ structure, over: "items" });
+  const model = kst(structure, { over: "items" });
   await benchmark(context, "kst.identifiability", () => model.identifiability());
 });
 

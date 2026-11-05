@@ -240,7 +240,8 @@ Where the code departs from `STANDARDS.md`, with the reason: none.
   (`GroupOptions`), and a method's after it (`NextQuestionOptions`). Results are nouns: `ItemStatistics`, `SplitHalf`.
 - Psychometrics labels are string unions in kebab-case (`"very-good"`); their thresholds are `<NAME>_THRESHOLDS`.
 - A knowledge tracing model family has a factory named after it, `elo(options)`, that returns a `LearnerModel` or a type
-  extending it (`EloModel`). Its files: `<family>.ts` for the factory, `state.ts` and `parameters.ts` for the plain data
+  extending it (`EloModel`); a family that cannot work without a value takes it first, as `irt(parameters, options)` and
+  `kst(structure, options)` do. Its files: `<family>.ts` for the factory, `state.ts` and `parameters.ts` for the plain data
   and their checks, `estimation.ts` for a fit's numerics.
 - Iterative methods take `tolerance` and `maxIterations` and report `converged` and `iterations`; random starts take
   `restarts` and `seed`. Defaults are named constants, such as `DEFAULT_TOLERANCE`.

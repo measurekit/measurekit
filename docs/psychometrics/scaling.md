@@ -307,9 +307,7 @@ import { predictFormScore } from "@measurekit/psychometrics/scaling";
 
 // `operational` and `conversion` are those of the previous example; q1 to q4 are the practice items.
 const model = irt({
-  parameters: {
-    items: { q1: { a: 1, b: -1 }, q2: { a: 1.2, b: -0.2 }, q3: { a: 0.9, b: 0.5 }, q4: { a: 1.4, b: 1.1 } },
-  },
+  items: { q1: { a: 1, b: -1 }, q2: { a: 1.2, b: -0.2 }, q3: { a: 0.9, b: 0.5 }, q4: { a: 1.4, b: 1.1 } },
 });
 const answers: [string, number][] = [
   ["q1", 1],

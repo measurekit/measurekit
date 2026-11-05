@@ -310,7 +310,8 @@ rSquared }`: the error rate at the first opportunity, the rate of learning, and 
 error rate is equal. Points with an error rate of 0 have no logarithm and are left out; the fit is `null` under two
 points.
 
-`categorizeCurve(points, options)` returns DataShop's category of a skill's curve. The points of fewer than
+`categorizeCurve(points, slope, thresholds, options)` returns DataShop's category of a skill's curve, with `slope`, the
+skill's slope in AFM, its rise in the logit of P(correct) per opportunity. The points of fewer than
 `minLearners` learners are discarded, and the first rule that holds decides:
 
 | Order | Rule                                   | Category            |
@@ -321,16 +322,19 @@ points.
 | 4     | `slope` is below `minSlope`            | `"no learning"`     |
 | 5     | None of the above                      | `"good"`            |
 
-| Option        | Meaning                                                                         | Default |
-| ------------- | ------------------------------------------------------------------------------- | ------- |
-| `minLearners` | The learners a point needs: DataShop's student threshold                        | none    |
-| `minPoints`   | The points a curve needs: DataShop's opportunity threshold                      | none    |
-| `slope`       | The skill's slope in AFM, its rise in the logit of P(correct) per opportunity   | none    |
-| `minSlope`    | The slope below which a curve shows no learning: DataShop's AFM slope threshold | none    |
-| `lowError`    | The error rate under which a point makes the curve low and flat: Bloom's 20%    | `0.2`   |
-| `highError`   | The error rate over which the last point makes the curve still high             | `0.4`   |
+| Threshold     | Meaning                                                                         |
+| ------------- | ------------------------------------------------------------------------------- |
+| `minLearners` | The learners a point needs: DataShop's student threshold                        |
+| `minPoints`   | The points a curve needs: DataShop's opportunity threshold                      |
+| `minSlope`    | The slope below which a curve shows no learning: DataShop's AFM slope threshold |
 
-The first four depend on the curriculum, so they are required. `slope` comes from a fit of AFM with the same Q-matrix.
+| Option      | Meaning                                                                      | Default |
+| ----------- | ---------------------------------------------------------------------------- | ------- |
+| `lowError`  | The error rate under which a point makes the curve low and flat: Bloom's 20% | `0.2`   |
+| `highError` | The error rate over which the last point makes the curve still high          | `0.4`   |
+
+The thresholds depend on the curriculum, so `thresholds` is required. `slope` comes from a fit of AFM with the same
+Q-matrix.
 
 ```ts continues
 import { elo } from "@measurekit/knowledge-tracing/elo";
@@ -340,7 +344,7 @@ import { categorizeCurve, fitPowerLaw, learningCurve } from "@measurekit/knowled
 const fractions =
   learningCurve(log, { predictions: elo({ skills: true }).fit(log).predictions }).skills.fractions ?? [];
 fitPowerLaw(fractions); // => { scale: 0.60, exponent: 0.21, rSquared: 0.19 }
-categorizeCurve(fractions, { minLearners: 3, minPoints: 3, slope: 0.2, minSlope: 0.1 }); // => "good"
+categorizeCurve(fractions, 0.2, { minLearners: 3, minPoints: 3, minSlope: 0.1 }); // => "good"
 ```
 
 ## Errors

@@ -130,7 +130,7 @@ function expectTrace(
   { prior, points, trace }: { prior: IrtPrior; points: number; trace: AbilityTrace },
 ): void {
   const spacing = (12 * prior.sd) / (points - 1) / 0.2;
-  const model = irt({ parameters, prior, points });
+  const model = irt(parameters, { prior, points });
   const fit = model.fit(events);
   const eap: number[] = [];
   const moments: number[] = [];
@@ -185,7 +185,7 @@ describe("IRT ability estimates against R", () => {
 });
 
 describe("IRT model", () => {
-  const model = irt({ parameters: { items } });
+  const model = irt({ items });
 
   it("returns itself from a fit, and works with cross-validation and model comparison unchanged", () => {
     expect(model.fit(log).model).toBe(model);
@@ -212,7 +212,7 @@ describe("IRT model", () => {
   it("raises the estimate after a correct answer and lowers it after a wrong one", () => {
     fc.assert(
       fc.property(dichotomous, answers, (item, pairs) => {
-        const tested = irt({ parameters: { items: { ...items, x: item } } });
+        const tested = irt({ items: { ...items, x: item } });
         let state = tested.initialState("ana");
         for (const event of eventsOf(pairs)) state = tested.update(state, event);
         const before = tested.ability(state).theta;
@@ -280,7 +280,7 @@ describe("IRT model", () => {
   });
 
   it("starts from the prior, on the grid of the prior", () => {
-    const shifted = irt({ parameters: { items }, prior: { mean: 0.5, sd: 2 }, points: 41 });
+    const shifted = irt({ items }, { prior: { mean: 0.5, sd: 2 }, points: 41 });
     const { nodes, weights } = shifted.posterior(shifted.initialState("ana"));
     expect(nodes[0]).toBe(0.5 - 12);
     expect(nodes[40]).toBe(0.5 + 12);
@@ -310,7 +310,7 @@ describe("IRT model", () => {
   });
 
   it("updates and estimates on a grid of more points than a spread into Math.max takes", () => {
-    const fine = irt({ parameters: { items }, points: 200_001 });
+    const fine = irt({ items }, { points: 200_001 });
     const state = fine.update(fine.initialState("ana"), {
       learner: "ana",
       item: "i1",
@@ -322,7 +322,7 @@ describe("IRT model", () => {
   });
 
   it("reports a mode beyond the grid at its end", () => {
-    const hard = irt({ parameters: { items: { x: { a: 1, b: 10 } } } });
+    const hard = irt({ items: { x: { a: 1, b: 10 } } });
     let state = hard.initialState("ana");
     for (let time = 0; time < 10; time++) {
       state = hard.update(state, { learner: "ana", item: "x", skills: [], time, outcome: 1 });
@@ -331,7 +331,7 @@ describe("IRT model", () => {
   });
 
   it("gives the error of a mode as 1 / √(-ℓ''), and Infinity where ℓ is not curved down", () => {
-    const model = irt({ parameters: { items } });
+    const model = irt({ items });
     const falling = (curvature: number): IrtState => ({
       learner: "ana",
       logDensity: Array.from({ length: 61 }, (_, q) => -q),
@@ -369,7 +369,7 @@ describe("IRT with nominal items", () => {
         // Slopes a tenth apart at least, so that the direction is not lost to rounding.
         const item = { ...drawn, a: drawn.a.map((slope) => Math.round(10 * slope) / 10) };
         fc.pre(new Set(item.a).size === item.a.length);
-        const tested = irt({ parameters: { items: { ...items, x: item } } });
+        const tested = irt({ items: { ...items, x: item } });
         const state = stateAfter(tested, pairs);
         const before = tested.ability(state).theta;
         const last = item.a.length - 1;
@@ -389,7 +389,7 @@ describe("IRT with nominal items", () => {
           a: item.a.map((slope) => slope + shift),
           c: item.c.map((c) => c - shift),
         };
-        const [one, other] = [item, moved].map((x) => irt({ parameters: { items: { x } } }));
+        const [one, other] = [item, moved].map((x) => irt({ items: { x } }));
         const outcome = (k % item.a.length) / (item.a.length - 1);
         const [first, second] = [one, other].map((model) =>
           defined(model).update(defined(model).initialState("ana"), answer(outcome)),
@@ -408,7 +408,7 @@ describe("IRT with nominal items", () => {
 
   it("gives the states of the 2PL item that a nominal item of two categories is, and of a GPCM item with slopes k a", () => {
     const run = (x: IrtItem, outcomes: readonly number[]): IrtState => {
-      const model = irt({ parameters: { items: { x } } });
+      const model = irt({ items: { x } });
       return outcomes.reduce(
         (state, outcome, time) => model.update(state, { ...answer(outcome), time }),
         model.initialState("ana"),
@@ -437,11 +437,11 @@ describe("IRT with nominal items", () => {
 });
 
 describe("IRT edge cases", () => {
-  const model = irt({ parameters: { items } });
+  const model = irt({ items });
   const event: Event = { learner: "ana", item: "i1", skills: [], time: 1, outcome: 1 };
 
   it("rejects invalid items, priors and grids", () => {
-    const build = (item: unknown) => () => irt({ parameters: { items: { x: item as IrtItem } } });
+    const build = (item: unknown) => () => irt({ items: { x: item as IrtItem } });
     expect(build({ a: 1, b: 0, c: 0.5, d: 0.4 })).toThrow('Item "x" needs 0 ≤ c < d ≤ 1, found c = 0.5 and d = 0.4.');
     expect(build({ a: 1, b: 0, c: "0.2" })).toThrow('Item "x" needs 0 ≤ c < d ≤ 1, found c = "0.2" and d = 1.');
     expect(build({ a: 1, b: 0, d: null })).toThrow('Item "x" needs 0 ≤ c < d ≤ 1, found c = 0 and d = null.');
@@ -460,22 +460,20 @@ describe("IRT edge cases", () => {
     expect(build({ model: "nominal", a: [0, Number.NaN], c: [0, 0] })).toThrow("found a = [0, NaN]");
     expect(build(JSON.parse('{"model":"nominal","a":[0,1],"c":"0,0"}'))).toThrow('and c = "0,0".');
     expect(build({ model: "nominal", a: 1, b: [0] })).toThrow("found a = 1 and c = undefined.");
-    expect(() => irt({ parameters: { items }, prior: { mean: 0, sd: 0 } })).toThrow(
+    expect(() => irt({ items }, { prior: { mean: 0, sd: 0 } })).toThrow(
       "The sd of the prior must be a positive number, found 0.",
     );
-    expect(() => irt({ parameters: { items }, points: 2 })).toThrow("The option points must be an integer from 3");
-    expect(() => irt({ parameters: { items }, prior: { mean: 0, sd: 1e-300 } })).toThrow(
+    expect(() => irt({ items }, { points: 2 })).toThrow("The option points must be an integer from 3");
+    expect(() => irt({ items }, { prior: { mean: 0, sd: 1e-300 } })).toThrow(
       "The prior needs a mean and an sd whose grid has distinct, finite points, with finite squares of their spacing and of 1 / sd, found mean 0 and sd 1e-300.",
     );
-    expect(() => irt({ parameters: { items }, prior: { mean: 0, sd: 1e300 } })).toThrow(
-      "finite squares of their spacing",
-    );
-    expect(() => irt({ parameters: { items }, prior: { mean: 1e308, sd: 1 } })).toThrow("distinct, finite points");
+    expect(() => irt({ items }, { prior: { mean: 0, sd: 1e300 } })).toThrow("finite squares of their spacing");
+    expect(() => irt({ items }, { prior: { mean: 1e308, sd: 1 } })).toThrow("distinct, finite points");
   });
 
   it("keeps the log-probability of a wrong answer to an easy item where P(correct) rounds to 1", () => {
     // At θ = 6, a (θ - b) = 40 and 1 - logistic(40) is 0 in doubles; ln P(wrong) is ln logistic(-40).
-    const easy = irt({ parameters: { items: { x: { a: 4, b: -4 } } } });
+    const easy = irt({ items: { x: { a: 4, b: -4 } } });
     const prior = easy.initialState("ana");
     const state = easy.update(prior, { ...event, item: "x", outcome: 0 });
     const gain = (q: number) => (state.logDensity[q] ?? 0) - (prior.logDensity[q] ?? 0);
@@ -494,12 +492,10 @@ describe("IRT edge cases", () => {
     fc.assert(
       fc.property(extreme, fc.array(fc.constantFrom(0, 1), { minLength: 1, maxLength: 30 }), (item, outcomes) => {
         const tested = irt({
-          parameters: {
-            items: {
-              x: item,
-              g: { model: "graded", a: item.a, b: [item.b, item.b + 1] },
-              n: { model: "nominal", a: [-item.a, 0, item.a], c: [item.b, 0, -item.b] },
-            },
+          items: {
+            x: item,
+            g: { model: "graded", a: item.a, b: [item.b, item.b + 1] },
+            n: { model: "nominal", a: [-item.a, 0, item.a], c: [item.b, 0, -item.b] },
           },
         });
         let state = tested.initialState("ana");
@@ -543,15 +539,14 @@ describe("IRT edge cases", () => {
 describe("IRT options from JavaScript", () => {
   it("rejects options, priors and ability options that are not objects", () => {
     const missing = JSON.parse("null");
-    expect(() => irt(missing)).toThrow("The options must be an object, found null.");
-    expect(() => irt(JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
-    expect(() => irt({ parameters: { items }, prior: missing })).toThrow(
-      "The prior must be an object { mean, sd }, found null.",
-    );
-    expect(() => irt({ parameters: { items }, prior: JSON.parse('{"mean":0,"sd":1,"df":3}') })).toThrow(
+    expect(() => irt({ items }, missing)).toThrow("The options must be an object, found null.");
+    expect(() => irt({ items }, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
+    expect(() => irt(missing)).toThrow("IRT parameters must be an object, found null.");
+    expect(() => irt({ items }, { prior: missing })).toThrow("The prior must be an object { mean, sd }, found null.");
+    expect(() => irt({ items }, { prior: JSON.parse('{"mean":0,"sd":1,"df":3}') })).toThrow(
       'The prior may hold only mean and sd, found "df".',
     );
-    const model = irt({ parameters: { items } });
+    const model = irt({ items });
     expect(() => model.ability(model.initialState("ana"), missing)).toThrow(
       "The options must be an object, found null.",
     );
@@ -562,7 +557,7 @@ describe("IRT options from JavaScript", () => {
 });
 
 describe("IRT with events that have no outcome", () => {
-  const model = irt({ parameters: { items } });
+  const model = irt({ items });
 
   it("is unaffected by them: a lesson is no item, and it does not move the posterior", () => {
     expectUnaffectedByLessons(model, log);
@@ -629,7 +624,7 @@ function caseLog({ events }: DriftCase): { parameters: IrtParameters; log: Event
 /** Runs a case through a model with drift on `points` points: EAP, SD and MAP at its checkpoints, and the fit. */
 function runCase(driftCase: DriftCase, points: number) {
   const { parameters, log } = caseLog(driftCase);
-  const model = irt({ parameters, points, drift: DRIFT });
+  const model = irt(parameters, { points, drift: DRIFT });
   const checkpoints = new Set(driftCase.checkpoints);
   const trace = { mean: [] as number[], sd: [] as number[], mode: [] as number[] };
   let state = model.initialState("ana");
@@ -704,7 +699,7 @@ describe("IRT with drift against R", () => {
 
 describe("IRT with drift", () => {
   const items: Record<string, IrtItem> = { easy: { a: 1.5, b: -1 }, hard: { a: 1.5, b: 1 } };
-  const model = irt({ parameters: { items }, points: 241, drift: DRIFT });
+  const model = irt({ items }, { points: 241, drift: DRIFT });
   const attempt = { learner: "ana", item: "easy", skills: [], time: START };
   /** A state at START whose posterior has an SD of about 0.4, after 10 outcomes at one time. */
   const settled = Array.from({ length: 10 }, (_, k) => k).reduce(
@@ -772,7 +767,7 @@ describe("IRT with drift", () => {
 
   it("takes no drift for an event, attempt or time before the state's time, and keeps that time", () => {
     const early = START - DAY;
-    const fixed = irt({ parameters: { items }, points: 241 });
+    const fixed = irt({ items }, { points: 241 });
     const static_ = fixed.update(fixed.initialState("ana"), { ...attempt, outcome: 1 });
     const next = model.update(model.initialState("ana"), { ...attempt, outcome: 1 });
     const back = model.update(next, { ...attempt, item: "hard", time: early, outcome: 0 });
@@ -786,7 +781,7 @@ describe("IRT with drift", () => {
   });
 
   it("starts without a time, takes its first event's time with no drift, and keeps no derivatives", () => {
-    const fixed = irt({ parameters: { items }, points: 241 });
+    const fixed = irt({ items }, { points: 241 });
     expect(model.initialState("ana")).toEqual({ learner: "ana", logDensity: fixed.initialState("ana").logDensity });
     const first = model.update(model.initialState("ana"), { ...attempt, outcome: 1 });
     expect(first).toEqual({
@@ -828,7 +823,7 @@ describe("IRT with drift", () => {
   });
 
   it("goes flat after a gap past its cap, and returns at once for a wrong unit of time", () => {
-    const wrongUnit = irt({ parameters: { items }, points: 241, drift: { variance: 0.02, per: 7 } });
+    const wrongUnit = irt({ items }, { points: 241, drift: { variance: 0.02, per: 7 } });
     const state = wrongUnit.update(wrongUnit.initialState("ana"), { ...attempt, outcome: 1 });
     const { weights } = wrongUnit.posterior(state, { at: START + 30 * DAY });
     for (const weight of weights) expect(Math.abs(241 * weight - 1)).toBeLessThan(UNIFORM_TOLERANCE);
@@ -849,8 +844,8 @@ describe("IRT with drift", () => {
 
   it("reads a stored state of a model without drift, and drops its derivatives at the first event", () => {
     const found = JSON.parse(JSON.stringify(stored.models.irt));
-    const fixed = irt({ parameters: found.parameters });
-    const reading = irt({ parameters: found.parameters, points: 61, drift: DRIFT });
+    const fixed = irt(found.parameters);
+    const reading = irt(found.parameters, { points: 61, drift: DRIFT });
     const state: IrtState = found.states[found.attempt.learner];
     expect(reading.predict(state, found.attempt)).toBe(found.prediction);
     expect(reading.ability(state)).toEqual(fixed.ability(state));
@@ -894,25 +889,25 @@ describe("IRT with drift", () => {
 
   it("rejects drift without points, invalid drift and points, and states and times it cannot read", () => {
     const parameters = { items };
-    expect(() => irt({ parameters, drift: DRIFT })).toThrow(
+    expect(() => irt(parameters, { drift: DRIFT })).toThrow(
       "The option drift needs the option points: 241 is recommended, or the number of points of stored states.",
     );
-    expect(() => irt({ parameters, points: 5, drift: DRIFT })).toThrow(
+    expect(() => irt(parameters, { points: 5, drift: DRIFT })).toThrow(
       "The option points must be an integer from 6, found 5.",
     );
-    expect(() => irt({ parameters, points: 241, drift: JSON.parse("null") })).toThrow(
+    expect(() => irt(parameters, { points: 241, drift: JSON.parse("null") })).toThrow(
       "The option drift must be an object { variance, per }, found null.",
     );
-    expect(() => irt({ parameters, points: 241, drift: JSON.parse('{"variance":0.1,"per":1,"rate":1}') })).toThrow(
+    expect(() => irt(parameters, { points: 241, drift: JSON.parse('{"variance":0.1,"per":1,"rate":1}') })).toThrow(
       'The option drift may hold only variance and per, found "rate".',
     );
-    expect(() => irt({ parameters, points: 241, drift: { variance: 0, per: 1 } })).toThrow(
+    expect(() => irt(parameters, { points: 241, drift: { variance: 0, per: 1 } })).toThrow(
       "The variance of the drift must be a positive number, found 0.",
     );
-    expect(() => irt({ parameters, points: 241, drift: { variance: 1, per: JSON.parse('"7"') } })).toThrow(
+    expect(() => irt(parameters, { points: 241, drift: { variance: 1, per: JSON.parse('"7"') } })).toThrow(
       'The per of the drift must be a positive number, found "7".',
     );
-    const fixed = irt({ parameters, points: 241 });
+    const fixed = irt(parameters, { points: 241 });
     expect(() => fixed.predict(settled, attempt)).toThrow(
       'The IRT state of learner "ana" has no slope, which a model without the option drift needs: a state written by a model with drift is read by a model with it.',
     );

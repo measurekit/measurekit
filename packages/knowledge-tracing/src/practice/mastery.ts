@@ -55,40 +55,6 @@ export interface ThresholdOptions {
 
 const THRESHOLD_OPTIONS: FieldNames<ThresholdOptions> = { threshold: true };
 
-/** Options of {@link movingAverageMastery}. */
-export interface MovingAverageOptions {
-  /**
-   * The weight d of the average on its past, from 0 to 1: the average of a skill moves by 1 - d of its distance to the
-   * outcome. Required, as its values depend on the domain.
-   */
-  readonly decay: number;
-  /** The value of the average that counts as mastery, from 0 to 1. Required, for the same reason. */
-  readonly threshold: number;
-}
-
-const MOVING_AVERAGE_OPTIONS: FieldNames<MovingAverageOptions> = { decay: true, threshold: true };
-
-/** Options of {@link windowMastery}. */
-export interface WindowOptions {
-  /** The number of outcomes of 1 among the last `window` that counts as mastery: an integer from 1 to `window`. Required. */
-  readonly correct: number;
-  /** The number of the latest outcomes to look at, a positive integer. Required. */
-  readonly window: number;
-}
-
-const WINDOW_OPTIONS: FieldNames<WindowOptions> = { correct: true, window: true };
-
-/** Options of {@link predictedMastery}. */
-export interface PredictedOptions {
-  /**
-   * The predicted probability of a correct answer that counts as mastery, from 0 to 1. Required: it does not mean what
-   * the threshold of {@link thresholdMastery} means, as a prediction of 0.95 is out of reach at a slip above 0.05.
-   */
-  readonly threshold: number;
-}
-
-const PREDICTED_OPTIONS: FieldNames<PredictedOptions> = { threshold: true };
-
 /** Options of {@link opportunitiesToStreak}. */
 export interface OpportunitiesToStreakOptions extends StreakOptions {
   /**
@@ -131,16 +97,16 @@ export function streakMastery(log: EventLog, options: StreakOptions = {}): Maste
  * event without an outcome is no opportunity and leaves the average as it is.
  *
  * @param log - The log to take the opportunities of.
- * @param options - The decay of the average and the threshold it must reach.
+ * @param decay - The weight d of the average on its past, from 0 to 1: the average of a skill moves by 1 - d of its
+ *   distance to the outcome. Required, as its values depend on the domain.
+ * @param threshold - The value of the average that counts as mastery, from 0 to 1. Required, for the same reason.
  * @returns The opportunity of each learner at each skill they practiced; `null` where the log ends before it is met.
  * @throws `DataError` when the log is malformed, or the decay or the threshold is not from 0 to 1.
  * @see {@link https://doi.org/10.1145/3079628.3079667 | Pelánek and Řihák (2017)}
  */
-export function movingAverageMastery(log: EventLog, options: MovingAverageOptions): MasteryTable {
-  checkOptions(options, MOVING_AVERAGE_OPTIONS);
-  const { decay, threshold } = options;
-  checkUnitInterval(decay, "The option decay");
-  checkUnitInterval(threshold, "The option threshold");
+export function movingAverageMastery(log: EventLog, decay: number, threshold: number): MasteryTable {
+  checkUnitInterval(decay, "The decay");
+  checkUnitInterval(threshold, "The threshold");
   checkLog(log);
   const averages = new Map<string, number>();
   return firstOpportunities(log, (event) => (skill, outcome) => {
@@ -157,19 +123,19 @@ export function movingAverageMastery(log: EventLog, options: MovingAverageOption
  * an outcome is no opportunity and leaves the window as it is.
  *
  * @param log - The log to take the opportunities of.
- * @param options - The number of attempts in the window and of correct outcomes it needs.
+ * @param correct - The number of outcomes of 1 among the last `window` that counts as mastery: an integer from 1 to
+ *   `window`. Required.
+ * @param window - The number of the latest outcomes to look at, a positive integer. Required.
  * @returns The opportunity of each learner at each skill they practiced; `null` where the log ends before it is met.
  * @throws `DataError` when the log is malformed, `window` is not a positive integer, or `correct` is not an integer from
  * 1 to `window`.
  * @see {@link https://doi.org/10.1145/3079628.3079667 | Pelánek and Řihák (2017)}
  */
-export function windowMastery(log: EventLog, options: WindowOptions): MasteryTable {
-  checkOptions(options, WINDOW_OPTIONS);
-  const { correct, window } = options;
-  checkPositiveInteger(window, "The option window");
-  checkIntegerFrom(correct, "The option correct", 1);
+export function windowMastery(log: EventLog, correct: number, window: number): MasteryTable {
+  checkPositiveInteger(window, "The window");
+  checkIntegerFrom(correct, "The number correct", 1);
   if (correct > window) {
-    throw new DataError(`The option correct must be at most the window ${window}, found ${correct}.`);
+    throw new DataError(`The number correct must be at most the window ${window}, found ${correct}.`);
   }
   checkLog(log);
   const recent = new Map<string, number[]>();
@@ -231,20 +197,16 @@ export function thresholdMastery<TState>(
  *
  * @param model - The learner model.
  * @param log - The log to replay.
- * @param options - The threshold.
+ * @param threshold - The predicted probability of a correct answer that counts as mastery, from 0 to 1. Required: it
+ *   does not mean what the threshold of {@link thresholdMastery} means, as a prediction of 0.95 is out of reach at a
+ *   slip above 0.05.
  * @returns The opportunity of each learner at each skill they practiced; `null` where the log ends before it is met.
  * @throws `DataError` when the model is not a learner model, the log is malformed, the threshold is not from 0 to 1, an
  * event with an outcome has no skills, as the table is by skill, or the model rejects an event or an attempt.
  */
-export function predictedMastery<TState>(
-  model: LearnerModel<TState>,
-  log: EventLog,
-  options: PredictedOptions,
-): MasteryTable {
+export function predictedMastery<TState>(model: LearnerModel<TState>, log: EventLog, threshold: number): MasteryTable {
   checkModel(model, "predictedMastery needs a learner model");
-  checkOptions(options, PREDICTED_OPTIONS);
-  const { threshold } = options;
-  checkUnitInterval(threshold, "The option threshold");
+  checkUnitInterval(threshold, "The threshold");
   checkLog(log);
   log.forEach((event, index) => {
     checkObservedHasSkills(event, `Event ${index + 1}`, "mastery table");

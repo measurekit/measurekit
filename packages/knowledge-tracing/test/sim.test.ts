@@ -233,10 +233,10 @@ describe("recovery from simulated learners", () => {
       ]),
     );
     const thetas = Array.from({ length: 200 }, () => random.normal());
-    const model = irt({ parameters: { items } });
+    const model = irt({ items });
     const estimates = thetas.map((theta, l) => {
       // A learner of known ability: a prior concentrated at it.
-      const learner = irt({ parameters: { items }, prior: { mean: theta, sd: 1e-3 } });
+      const learner = irt({ items }, { prior: { mean: theta, sd: 1e-3 } });
       const attempts = Object.keys(items).map((item, time) => ({ learner: `l${l}`, item, skills: [], time }));
       const { log } = simulate(learner, attempts, random);
       return model.ability(log.reduce((state, event) => model.update(state, event), model.initialState(`l${l}`))).theta;
@@ -282,8 +282,8 @@ describe("recovery from simulated learners", () => {
     const attempts = Array.from({ length: 20_000 }, (_, l) =>
       structure.domain.map((item, i) => ({ learner: `l${l}`, item, skills: [], time: l * 10 + i })),
     ).flat();
-    const { log } = simulate(kst({ structure, over: "items", parameters: truth }), attempts, own);
-    const fit = kst({ structure, over: "items" }).fit(log);
+    const { log } = simulate(kst(structure, { over: "items", parameters: truth }), attempts, own);
+    const fit = kst(structure, { over: "items" }).fit(log);
     for (const [item, rates] of Object.entries(truth.items)) {
       const found = defined(fit.model.parameters.items[item]);
       if (!forward(item)) {
@@ -294,12 +294,12 @@ describe("recovery from simulated learners", () => {
       }
     }
     expect(["a", "f"].every(forward) && ["d", "h"].every(backward)).toBe(true);
-    const atTruth = kst({ structure, over: "items", parameters: truth, maxIterations: 1 }).fit(log);
+    const atTruth = kst(structure, { over: "items", parameters: truth, maxIterations: 1 }).fit(log);
     expect(fit.logLikelihood).toBeGreaterThanOrEqual(atTruth.logLikelihood);
   });
 
   it("finds learners' knowledge states by adaptive assessment as often as its posterior expects", () => {
-    const model = kst({ structure, over: "items", parameters: truth });
+    const model = kst(structure, { over: "items", parameters: truth });
     let found = 0;
     let expected = 0;
     const learners = 500;

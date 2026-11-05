@@ -13,7 +13,12 @@ export {
   type FoldEvaluation,
   type UnseenSkills,
 } from "./cross-validation.js";
-export { type CurveCategory, type CurveCategoryOptions, categorizeCurve } from "./curve-category.js";
+export {
+  type CurveCategory,
+  type CurveCategoryOptions,
+  type CurveThresholds,
+  categorizeCurve,
+} from "./curve-category.js";
 export { fitPowerLaw, type PowerLaw } from "./curve-fit.js";
 export type { ErrorRatePoint } from "./curve-points.js";
 export {

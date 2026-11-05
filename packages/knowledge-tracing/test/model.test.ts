@@ -14,6 +14,7 @@ import {
   type IrtParameters,
   type IrtState,
   irt,
+  type KnowledgeStructure,
   type KstOptions,
   type KstParameters,
   type KstState,
@@ -76,13 +77,15 @@ describe("stored states and parameters", () => {
   });
 
   it("are read by online IRT as the build that wrote them did", () => {
-    const found = storedOf<IrtOptions, IrtState, IrtParameters>("irt");
-    expectReadable(irt({ ...found.options, parameters: found.parameters }), found);
+    const found = storedOf<IrtOptions & { parameters: IrtParameters }, IrtState, IrtParameters>("irt");
+    const { parameters, ...options } = found.options;
+    expectReadable(irt(parameters, options), found);
   });
 
   it("are read by KST as the build that wrote them did", () => {
-    const found = storedOf<KstOptions, KstState, KstParameters>("kst");
-    expectReadable(kst({ ...found.options, parameters: found.parameters }), found);
+    const found = storedOf<KstOptions & { structure: KnowledgeStructure }, KstState, KstParameters>("kst");
+    const { structure, ...options } = found.options;
+    expectReadable(kst(structure, { ...options, parameters: found.parameters }), found);
   });
 
   it("are read by a logistic model, exposures included, as the build that wrote them did", () => {

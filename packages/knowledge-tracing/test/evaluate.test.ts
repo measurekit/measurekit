@@ -1101,9 +1101,12 @@ describe("the analysis of learning curves", () => {
   });
 
   it.each(powerLaws.cases)("categorizes as DataShop's rules do: $name", (reference) => {
-    reference.categories.forEach(({ options, category }, index) => {
-      expect(categorizeCurve(reference.points, options), `options ${index}`).toBe(category);
-    });
+    reference.categories.forEach(
+      ({ options: { slope, minLearners, minPoints, minSlope, ...rest }, category }, index) => {
+        const thresholds = { minLearners, minPoints, minSlope };
+        expect(categorizeCurve(reference.points, slope, thresholds, rest), `options ${index}`).toBe(category);
+      },
+    );
   });
 
   it("recovers the scale and exponent of an exact power law, whatever the counts", () => {
@@ -1136,47 +1139,46 @@ describe("the analysis of learning curves", () => {
         errorRate: defined(errors[index]),
         predictedErrorRate: null,
       }));
-    const options = { minLearners: 10, minPoints: 3, slope: 0.1, minSlope: 0.1 };
+    const slope = 0.1;
+    const thresholds = { minLearners: 10, minPoints: 3, minSlope: 0.1 };
 
     it("calls a curve good at exactly the thresholds: only a value beyond one is bad", () => {
-      expect(categorizeCurve(curve([10, 10, 10], [0.9, 0.6, 0.4]), options)).toBe("good");
-      expect(categorizeCurve(curve([10, 10, 10], [0.9, 0.5, 0.2]), options)).toBe("good");
-      expect(categorizeCurve(curve([10, 10, 10], [0.9, 0.6, 0.41]), options)).toBe("still high");
-      expect(categorizeCurve(curve([10, 10, 10], [0.9, 0.6, 0.19]), options)).toBe("low and flat");
-      expect(categorizeCurve(curve([10, 10, 10], [0.9, 0.6, 0.4]), { ...options, slope: 0.09 })).toBe("no learning");
+      expect(categorizeCurve(curve([10, 10, 10], [0.9, 0.6, 0.4]), slope, thresholds)).toBe("good");
+      expect(categorizeCurve(curve([10, 10, 10], [0.9, 0.5, 0.2]), slope, thresholds)).toBe("good");
+      expect(categorizeCurve(curve([10, 10, 10], [0.9, 0.6, 0.41]), slope, thresholds)).toBe("still high");
+      expect(categorizeCurve(curve([10, 10, 10], [0.9, 0.6, 0.19]), slope, thresholds)).toBe("low and flat");
+      expect(categorizeCurve(curve([10, 10, 10], [0.9, 0.6, 0.4]), 0.09, thresholds)).toBe("no learning");
     });
 
     it("discards points of fewer learners before it counts the points and reads the last", () => {
-      expect(categorizeCurve(curve([9, 10, 10], [0.9, 0.6, 0.4]), options)).toBe("too little data");
-      expect(categorizeCurve(curve([9, 10, 10], [0.9, 0.6, 0.4]), { ...options, minPoints: 2 })).toBe("good");
-      expect(categorizeCurve(curve([10, 2, 10], [0.9, 0.05, 0.3]), { ...options, minLearners: 5, minPoints: 2 })).toBe(
-        "good",
-      );
-      expect(categorizeCurve(curve([10, 10, 2], [0.9, 0.35, 0.95]), { ...options, minLearners: 5, minPoints: 2 })).toBe(
-        "good",
-      );
-      expect(categorizeCurve(curve([2, 2], [0.9, 0.5]), options)).toBe("too little data");
+      expect(categorizeCurve(curve([9, 10, 10], [0.9, 0.6, 0.4]), slope, thresholds)).toBe("too little data");
+      expect(categorizeCurve(curve([9, 10, 10], [0.9, 0.6, 0.4]), slope, { ...thresholds, minPoints: 2 })).toBe("good");
+      expect(
+        categorizeCurve(curve([10, 2, 10], [0.9, 0.05, 0.3]), slope, { ...thresholds, minLearners: 5, minPoints: 2 }),
+      ).toBe("good");
+      expect(
+        categorizeCurve(curve([10, 10, 2], [0.9, 0.35, 0.95]), slope, { ...thresholds, minLearners: 5, minPoints: 2 }),
+      ).toBe("good");
+      expect(categorizeCurve(curve([2, 2], [0.9, 0.5]), slope, thresholds)).toBe("too little data");
     });
 
     it("tests the categories in order: too little data, low and flat, still high, no learning", () => {
-      expect(categorizeCurve(curve([10, 10], [0.1, 0.9]), { ...options, minPoints: 3, slope: 0 })).toBe(
-        "too little data",
-      );
-      expect(categorizeCurve(curve([10, 10, 10], [0.1, 0.5, 0.9]), { ...options, slope: 0 })).toBe("low and flat");
-      expect(categorizeCurve(curve([10, 10, 10], [0.9, 0.5, 0.9]), { ...options, slope: 0 })).toBe("still high");
+      expect(categorizeCurve(curve([10, 10], [0.1, 0.9]), 0, { ...thresholds, minPoints: 3 })).toBe("too little data");
+      expect(categorizeCurve(curve([10, 10, 10], [0.1, 0.5, 0.9]), 0, thresholds)).toBe("low and flat");
+      expect(categorizeCurve(curve([10, 10, 10], [0.9, 0.5, 0.9]), 0, thresholds)).toBe("still high");
     });
 
     it("takes the thresholds of DataShop unless they are given", () => {
       const points = curve([10, 10, 10], [0.9, 0.5, 0.3]);
-      expect(categorizeCurve(points, options)).toBe("good");
-      expect(categorizeCurve(points, { ...options, lowError: 0.35 })).toBe("low and flat");
-      expect(categorizeCurve(points, { ...options, highError: 0.25 })).toBe("still high");
+      expect(categorizeCurve(points, slope, thresholds)).toBe("good");
+      expect(categorizeCurve(points, slope, thresholds, { lowError: 0.35 })).toBe("low and flat");
+      expect(categorizeCurve(points, slope, thresholds, { highError: 0.25 })).toBe("still high");
     });
   });
 
   it("rejects points and options that are not valid", () => {
     const point = { opportunity: 1, count: 5, errorRate: 0.5, predictedErrorRate: null };
-    const options = { minLearners: 1, minPoints: 1, slope: 0, minSlope: 0 };
+    const thresholds = { minLearners: 1, minPoints: 1, minSlope: 0 };
     expect(() => fitPowerLaw([{ ...point, opportunity: 0 }])).toThrow(
       "Point 1 needs an opportunity that is an integer from 1, found 0.",
     );
@@ -1197,16 +1199,26 @@ describe("the analysis of learning curves", () => {
     expect(() => fitPowerLaw(JSON.parse("[null]"))).toThrow(
       "Point 1 must be an object { opportunity, count, errorRate }, found null.",
     );
-    expect(() => categorizeCurve([point], { ...options, minLearners: 0 })).toThrow(
-      "The option minLearners must be a positive integer, found 0.",
+    expect(() => categorizeCurve([point], 0, { ...thresholds, minLearners: 0 })).toThrow(
+      "The threshold minLearners must be a positive integer, found 0.",
     );
-    expect(() => categorizeCurve([point], { ...options, slope: JSON.parse('"1"') })).toThrow(
-      'The option slope must be a finite number, found "1".',
+    expect(() => categorizeCurve([point], JSON.parse('"1"'), thresholds)).toThrow(
+      'The slope must be a finite number, found "1".',
     );
-    expect(() => categorizeCurve([point], { ...options, highError: 2 })).toThrow(DataError);
-    expect(() => categorizeCurve([point], JSON.parse("null"))).toThrow("The options must be an object, found null.");
-    expect(() => categorizeCurve([point], JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
-    expect(() => categorizeCurve([point], JSON.parse("{}"))).toThrow(DataError);
+    expect(() => categorizeCurve([point], 0, thresholds, { highError: 2 })).toThrow(DataError);
+    expect(() => categorizeCurve([point], 0, thresholds, JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
+    );
+    expect(() => categorizeCurve([point], 0, thresholds, JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
+    );
+    expect(() => categorizeCurve([point], 0, JSON.parse("null"))).toThrow(
+      "The thresholds must be an object { minLearners, minPoints, minSlope }, found null.",
+    );
+    expect(() =>
+      categorizeCurve([point], 0, JSON.parse('{"minLearners":1,"minPoints":1,"minSlope":0,"slope":0}')),
+    ).toThrow('The thresholds may hold only minLearners, minPoints and minSlope, found "slope".');
+    expect(() => categorizeCurve([point], 0, JSON.parse("{}"))).toThrow(DataError);
     expect(fitPowerLaw([])).toBeNull();
   });
 });

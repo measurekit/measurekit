@@ -32,17 +32,17 @@ const nominalItems = Object.fromEntries(
 );
 
 test("updates the grid posterior of the ability of 2,000 learners after each of 40 responses", async (context) => {
-  const model = irt({ parameters: { items } });
+  const model = irt({ items });
   await benchmark(context, "irt.replay", () => online(model, log));
 });
 
 test("updates the grid posterior of the ability of 2,000 learners after each of 40 responses to nominal items", async (context) => {
-  const model = irt({ parameters: { items: nominalItems } });
+  const model = irt({ items: nominalItems });
   await benchmark(context, "irt.nominal", () => online(model, nominalLog));
 });
 
 test("updates the grid posterior of 200 learners with drift on 241 points after each of 40 responses", async (context) => {
   // The times are minutes, so that θ drifts by a variance of 0.02 a week.
-  const model = irt({ parameters: { items }, points: 241, drift: { variance: 0.02, per: 10_080 } });
+  const model = irt({ items }, { points: 241, drift: { variance: 0.02, per: 10_080 } });
   await benchmark(context, "irt.drift", () => online(model, driftLog));
 });

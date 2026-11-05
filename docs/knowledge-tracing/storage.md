@@ -72,7 +72,7 @@ const next = tracer.update(stateRow, {
 ```
 
 A logistic model takes the rows of the item's skills and, with fixed proficiency, the learner's θ; an IRT model the
-item's row, as `irt({ parameters: { items: { q7: itemRow } } })`.
+item's row, as `irt({ items: { q7: itemRow } })`.
 
 Updating a learner takes about 0.1 µs with Elo, 0.2 µs with BKT and 3 µs with IRT, whose model takes 4 µs to build. A
 KST update takes time proportional to the knowledge states: about 0.01 ms for 400 states, 0.1 ms for 6,000. A KST model

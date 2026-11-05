@@ -250,12 +250,13 @@ export function bestRates(log: EventLog) {
 }
 ```
 
-| Option           | Meaning                                                                                    | Default |
-| ---------------- | ------------------------------------------------------------------------------------------ | ------- |
-| `start`          | The rates to start from, each strictly between its bounds: one for each rate `build` takes | none    |
-| `lower`, `upper` | The bounds of each rate                                                                    | none    |
-| `tolerance`      | The largest absolute gradient component, over the rates mapped to the line, at convergence | `1e-6`  |
-| `maxIterations`  | The most iterations                                                                        | `100`   |
+`searchRates(build, log, rates, options)` takes the `rates` to search for: `start`, the rates to start from, each
+strictly between its bounds, one for each rate `build` takes, and `lower` and `upper`, the bounds of each rate.
+
+| Option          | Meaning                                                                                    | Default |
+| --------------- | ------------------------------------------------------------------------------------------ | ------- |
+| `tolerance`     | The largest absolute gradient component, over the rates mapped to the line, at convergence | `1e-6`  |
+| `maxIterations` | The most iterations                                                                        | `100`   |
 
 Each trial fits the model, and a gradient takes two fits for each rate, so the cost is the cost of a fit times the trials.
 The result may be a local optimum: the log-likelihood in the rates need not have one maximum, so a search from another

@@ -17,6 +17,6 @@ export {
   pfa,
 } from "./logistic.js";
 export type { LogisticParameters, LogisticSkill, Proficiency } from "./parameters.js";
-export { type RateSearch, type RateSearchOptions, searchRates } from "./rate-search.js";
+export { type RateBounds, type RateSearch, type RateSearchOptions, searchRates } from "./rate-search.js";
 export type { DecayedCounts, ExposureHistory, LeakyCounts, LogisticState, SkillHistory } from "./state.js";
 export type { InterceptKind, LogisticTerm, TermCoefficient, TermScope } from "./terms.js";

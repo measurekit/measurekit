@@ -49,7 +49,7 @@ describe("ids named as members of an object", () => {
 
   it("are data of the items of online IRT", () => {
     const items = Object.fromEntries(NAMES.map((id) => [id, { a: 1, b: 0, c: 0 }]));
-    expectReplayed(irt({ parameters: stored({ items }) }));
+    expectReplayed(irt(stored({ items })));
   });
 
   it("are data of a fit of KST and of its stored parameters", () => {
@@ -57,9 +57,9 @@ describe("ids named as members of an object", () => {
       domain: [...NAMES],
       states: [[], ["__proto__"], ["__proto__", "constructor"], [...NAMES]],
     };
-    const { model } = kst({ structure, over: "items" }).fit(LOG);
+    const { model } = kst(structure, { over: "items" }).fit(LOG);
     expect(Object.keys(model.parameters.items).sort()).toEqual([...NAMES].sort());
-    expectReplayed(kst({ structure, over: "items", parameters: stored(model.parameters) }));
+    expectReplayed(kst(structure, { over: "items", parameters: stored(model.parameters) }));
   });
 
   it("are data of a logistic model's covariates and exposures, whose stored records hold them", () => {

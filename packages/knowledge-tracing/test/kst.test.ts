@@ -980,8 +980,7 @@ describe("structure tools, errors", () => {
 describe("BLIM against pks", () => {
   it.each(blims)("fits $name by $method as pks's blim", (reference) => {
     const { method } = reference;
-    const fit = kst({
-      structure: reference.structure,
+    const fit = kst(reference.structure, {
       over: "items",
       method,
       tolerance: 1e-13,
@@ -1022,7 +1021,7 @@ describe("IITA against DAKS", () => {
 /** Fits a case of the constraint fixture as pks did, with the same rates held or shared. */
 function fitConstraint(reference: ConstraintReference) {
   const { structure, method, fixed, equal } = reference;
-  return kst({ structure, over: "items", method, fixed, equal, tolerance: 1e-13, maxIterations: 1e6 }).fit(
+  return kst(structure, { over: "items", method, fixed, equal, tolerance: 1e-13, maxIterations: 1e6 }).fit(
     patternLog(structure.domain, reference.patterns),
   );
 }
@@ -1083,8 +1082,7 @@ describe("BLIM with fixed and equal rates against pks", () => {
   it("recovers the rates of a chain of 6 items from 20 seeded sets as pks does, one slip and one guess", () => {
     const { structure, slip, guess, sets } = constraints.recovery;
     const rates = sets.map((set) => {
-      const fit = kst({
-        structure,
+      const fit = kst(structure, {
         over: "items",
         equal: { guess: [structure.domain], slip: [structure.domain] },
         tolerance: 1e-13,
@@ -1107,8 +1105,7 @@ describe("local identifiability against pks", () => {
     "finds the rank of the Jacobian of the pattern probabilities: $name",
     (reference) => {
       const { structure } = reference;
-      const model = kst({
-        structure,
+      const model = kst(structure, {
         over: "items",
         fixed: reference.fixed,
         parameters: {
@@ -1258,7 +1255,7 @@ describe("adaptive assessment", () => {
       ]),
     ),
   };
-  const model = kst({ structure, over: "items", parameters });
+  const model = kst(structure, { over: "items", parameters });
   const candidates: Attempt[] = structure.domain.map((item, time) => ({ learner: "ana", item, skills: [], time }));
 
   it.each(assessment.assessments)("asks the written-out questions and reaches its posterior: $truth", (reference) => {
@@ -1273,9 +1270,9 @@ describe("adaptive assessment", () => {
   });
 
   it("assigns every response pattern that is a state to that state without errors, as kst's kassess", () => {
-    const exact = kst({ structure, over: "items" });
+    const exact = kst(structure, { over: "items" });
     const items = Object.fromEntries(structure.domain.map((item) => [item, { guess: 0, slip: 0 }]));
-    const deterministic = kst({ structure, over: "items", parameters: { ...exact.parameters, items } });
+    const deterministic = kst(structure, { over: "items", parameters: { ...exact.parameters, items } });
     assessment.deterministic.patterns.forEach((pattern, p) => {
       let state = deterministic.initialState("ana");
       for (let question = deterministic.nextQuestion(state, candidates, { threshold: 1 }); question !== null; ) {
@@ -1331,7 +1328,7 @@ describe("KST model", () => {
     });
   }).flat();
   const log = buildEventLog(events, { qMatrix });
-  const model = kst({ structure });
+  const model = kst(structure);
 
   it("predicts from a fit as online inference does, and works with cross-validation and comparison unchanged", () => {
     const fit = model.fit(log);
@@ -1343,14 +1340,14 @@ describe("KST model", () => {
     expect(fit.mostLikelyStates).toEqual(likely);
     expect(Object.keys(fit.mostLikelyStates)).toEqual([...run.states.keys()]);
     expect(fit.states).toBeUndefined();
-    const withPosteriors = kst({ structure, posteriors: true }).fit(log);
+    const withPosteriors = kst(structure, { posteriors: true }).fit(log);
     expect(Object.fromEntries(run.states)).toEqual(withPosteriors.states);
     expect(withPosteriors.mostLikelyStates).toEqual(fit.mostLikelyStates);
     expect(withPosteriors.predictions).toEqual(fit.predictions);
     expect(fit.aic).not.toBeNull();
     const folds = splitByLearner(log, 3, createRandom(1));
     expect(crossValidate(model, folds).metrics.count).toBe(log.length);
-    expect(compareModels({ kst: model, md: kst({ structure, method: "md" }) }, folds).map((row) => row.name)).toEqual([
+    expect(compareModels({ kst: model, md: kst(structure, { method: "md" }) }, folds).map((row) => row.name)).toEqual([
       "kst",
       "md",
     ]);
@@ -1358,7 +1355,7 @@ describe("KST model", () => {
 
   it("is unaffected by events without an outcome, which are no items, and IITA reads the others", () => {
     for (const options of [{}, { method: "md" as const }])
-      expectUnaffectedByLessons(kst({ structure, ...options }), log);
+      expectUnaffectedByLessons(kst(structure, { ...options }), log);
     expect(iita(withLessons(log, 3))).toEqual(iita(log));
   });
 
@@ -1404,7 +1401,7 @@ describe("KST model", () => {
   });
 
   it("stops at maxIterations without converging, and reports it", () => {
-    const stopped = kst({ structure, maxIterations: 2 }).fit(log);
+    const stopped = kst(structure, { maxIterations: 2 }).fit(log);
     expect(stopped.converged).toBe(false);
     expect(stopped.iterations).toBe(2);
   });
@@ -1434,7 +1431,7 @@ describe("KST edge cases", () => {
     const items = { q: { guess: 0, slip: 0 }, r: { guess: 0, slip: 0 } };
     const probabilities = structure.states.map((state) => (state.length === 1 ? 0.3 : 0.02));
     const at = (item: string, skills: string[]) => ({ learner: "ana", item, skills, time: 0 });
-    const model = kst({ structure, parameters: { probabilities, items } });
+    const model = kst(structure, { parameters: { probabilities, items } });
     const state = model.initialState("ana");
     expectClose(model.predict(state, at("q", [joined])), 0.36, 1e-15);
     expectClose(model.predict(state, at("r", ["a", "b"])), 0.04, 1e-15);
@@ -1484,8 +1481,7 @@ describe("KST edge cases", () => {
   it("rejects fringes of a set that is not a state, and events outside the structure", () => {
     const structure = surmiseStructure({ a: [], b: ["a"] });
     expect(() => fringes(structure, ["b"])).toThrow("The state [b] is not a state of the structure.");
-    const model = kst({
-      structure,
+    const model = kst(structure, {
       parameters: { probabilities: [1 / 3, 1 / 3, 1 / 3], items: { q: { guess: 0, slip: 0 } } },
     });
     const event = { learner: "ana", item: "q", skills: ["b"], time: 0, outcome: 1 };
@@ -1554,7 +1550,7 @@ describe("KST edge cases", () => {
     const skills = Array.from({ length: 16 }, (_, k) => `s${k}`);
     const structure = surmiseStructure(Object.fromEntries(skills.map((skill) => [skill, []])), { maxStates: 2 ** 16 });
     const probabilities = structure.states.map(() => 1 / structure.states.length);
-    const model = kst({ structure, parameters: { probabilities, items: { q: { guess: 0.1, slip: 0.1 } } } });
+    const model = kst(structure, { parameters: { probabilities, items: { q: { guess: 0.1, slip: 0.1 } } } });
     const state = model.initialState("ana");
     const attempt = (set: number) => ({
       learner: "ana",
@@ -1600,12 +1596,12 @@ describe("BLIM constraints and diagnostics", () => {
       { method: "mdml" as const },
       { equal: { slip: [["a", "b", "c"]] }, fixed: { guess: { a: 0.1 } } },
     ]) {
-      expectUnaffectedByLessons(kst({ structure: chain, over: "items", ...options }), chainLog);
+      expectUnaffectedByLessons(kst(chain, { over: "items", ...options }), chainLog);
     }
   });
 
   it("gives G² and the discrepancy only for a table of one answer to every item", () => {
-    const model = kst({ structure: chain, over: "items" });
+    const model = kst(chain, { over: "items" });
     const complete = model.fit(chainLog);
     expect(complete.goodnessOfFit).not.toBeNull();
     expect(complete.discrepancy).not.toBeNull();
@@ -1630,9 +1626,7 @@ describe("BLIM constraints and diagnostics", () => {
   });
 
   it("leaves the p-value out when the model has no degrees of freedom", () => {
-    const fit = kst({ structure: chain, over: "items" }).fit(
-      patternLog(chain.domain, { "000": 1, "111": 1, "100": 1 }),
-    );
+    const fit = kst(chain, { over: "items" }).fit(patternLog(chain.domain, { "000": 1, "111": 1, "100": 1 }));
     const gof = defined(fit.goodnessOfFit);
     expect(gof.degreesOfFreedom).toBe(3 - (4 - 1 + 6));
     expect(gof.pValue).toBeNull();
@@ -1641,7 +1635,7 @@ describe("BLIM constraints and diagnostics", () => {
 
   it("counts a parameter for each state but one, and for each group of free rates", () => {
     const parameters = (options: object): number => {
-      const fit = kst({ structure: chain, over: "items", ...options }).fit(chainLog);
+      const fit = kst(chain, { over: "items", ...options }).fit(chainLog);
       return (defined(fit.aic) + 2 * fit.logLikelihood) / 2;
     };
     expectClose(parameters({}), 3 + 6, 1e-12);
@@ -1651,29 +1645,29 @@ describe("BLIM constraints and diagnostics", () => {
   });
 
   it("holds a fixed rate at 0 or 1, which an estimated rate cannot reach", () => {
-    const fit = kst({ structure: chain, over: "items", fixed: { guess: { a: 0 }, slip: { c: 0 } } }).fit(chainLog);
+    const fit = kst(chain, { over: "items", fixed: { guess: { a: 0 }, slip: { c: 0 } } }).fit(chainLog);
     expect(defined(fit.model.parameters.items.a).guess).toBe(0);
     expect(defined(fit.model.parameters.items.c).slip).toBe(0);
-    const free = kst({ structure: chain, over: "items" }).fit(chainLog);
+    const free = kst(chain, { over: "items" }).fit(chainLog);
     expect(
       Math.min(...Object.values(free.model.parameters.items).flatMap((item) => [item.guess, item.slip])),
     ).toBeGreaterThanOrEqual(1e-6);
   });
 
   it("holds a rate at 0 through an MDML fit, and rejects answers that no state gives without an error", () => {
-    const fit = kst({ structure: chain, over: "items", method: "mdml", fixed: { slip: { a: 0, c: 0 } } }).fit(chainLog);
+    const fit = kst(chain, { over: "items", method: "mdml", fixed: { slip: { a: 0, c: 0 } } }).fit(chainLog);
     expect(fit.converged).toBe(true);
     expect(defined(fit.model.parameters.items.a).slip).toBe(0);
     expect(defined(fit.model.parameters.items.c).slip).toBe(0);
     const none = { guess: { a: 0, b: 0, c: 0 }, slip: { a: 0, b: 0, c: 0 } };
-    expect(() => kst({ structure: chain, over: "items", method: "mdml", fixed: none }).fit(chainLog)).toThrow(
+    expect(() => kst(chain, { over: "items", method: "mdml", fixed: none }).fit(chainLog)).toThrow(
       "probability 0 under the parameters",
     );
   });
 
   it("restricts MDML to the states of least discrepancy, so its estimates differ from those of ML", () => {
-    const ml = kst({ structure: chain, over: "items" }).fit(chainLog);
-    const mdml = kst({ structure: chain, over: "items", method: "mdml" }).fit(chainLog);
+    const ml = kst(chain, { over: "items" }).fit(chainLog);
+    const mdml = kst(chain, { over: "items", method: "mdml" }).fit(chainLog);
     expect(mdml.converged).toBe(true);
     expect(mdml.aic).toBeNull();
     expect(mdml.logLikelihood).toBeLessThanOrEqual(ml.logLikelihood + 1e-9);
@@ -1681,25 +1675,24 @@ describe("BLIM constraints and diagnostics", () => {
   });
 
   it("compares fits by their G², and leaves the comparison out when it has no meaning", () => {
-    const free = kst({ structure: chain, over: "items" }).fit(chainLog);
-    const equal = kst({ structure: chain, over: "items", equal: { guess: [["a", "b", "c"]] } }).fit(chainLog);
+    const free = kst(chain, { over: "items" }).fit(chainLog);
+    const equal = kst(chain, { over: "items", equal: { guess: [["a", "b", "c"]] } }).fit(chainLog);
     const comparison = defined(compareFits(equal, free));
     expect(comparison.degreesOfFreedom).toBe(2);
     expectClose(comparison.g2, defined(equal.goodnessOfFit).g2 - defined(free.goodnessOfFit).g2, 1e-12);
     expect(comparison.g2).toBeGreaterThanOrEqual(0);
     expect(compareFits(free, free)).toBeNull();
     expect(compareFits(free, equal)).toBeNull();
-    const incomplete = kst({ structure: chain, over: "items" }).fit(buildEventLog(chainLog.slice(1)));
+    const incomplete = kst(chain, { over: "items" }).fit(buildEventLog(chainLog.slice(1)));
     expect(compareFits(equal, incomplete)).toBeNull();
     expect(compareFits(incomplete, free)).toBeNull();
-    const md = kst({ structure: chain, over: "items", method: "md" }).fit(chainLog);
+    const md = kst(chain, { over: "items", method: "md" }).fit(chainLog);
     expect(compareFits(equal, md)).toBeNull();
   });
 
   it("finds a single item with both of its rates free not identifiable, by the rank of 1 in 3 parameters", () => {
     const single = surmiseStructure({ a: [] });
-    const model = kst({
-      structure: single,
+    const model = kst(single, {
       over: "items",
       parameters: { probabilities: [0.4, 0.6], items: { a: { guess: 0.1, slip: 0.2 } } },
     });
@@ -1707,14 +1700,18 @@ describe("BLIM constraints and diagnostics", () => {
   });
 
   it("finds a model identifiable once enough rates are fixed, and keeps the rank within the patterns", () => {
-    const base = { structure: chain, over: "items" as const };
+    const base = { over: "items" as const };
     const parameters = {
       probabilities: [0.1, 0.2, 0.3, 0.4],
       items: { a: { guess: 0.1, slip: 0.2 }, b: { guess: 0.2, slip: 0.1 }, c: { guess: 0.15, slip: 0.25 } },
     };
-    const free = kst({ ...base, parameters }).identifiability();
+    const free = kst(chain, { ...base, parameters }).identifiability();
     expect(free.rank).toBeLessThanOrEqual(2 ** 3 - 1);
-    const fixed = kst({ ...base, parameters, fixed: { guess: { a: 0.1 }, slip: { c: 0.25 } } }).identifiability();
+    const fixed = kst(chain, {
+      ...base,
+      parameters,
+      fixed: { guess: { a: 0.1 }, slip: { c: 0.25 } },
+    }).identifiability();
     expect(fixed.parameters).toBe(free.parameters - 2);
     expect(fixed.rank).toBeLessThanOrEqual(fixed.parameters);
     expect(fixed.identifiable).toBe(fixed.rank === fixed.parameters);
@@ -1725,30 +1722,30 @@ describe("BLIM constraints and diagnostics", () => {
       probabilities: [0.25, 0.25, 0.25, 0.25],
       items: Object.fromEntries(chain.domain.map((item) => [item, { guess: 0.1, slip: 0.1 }])),
     };
-    const given = kst({ structure: chain, over: "items", parameters: explicit }).identifiability();
-    const absent = kst({ structure: chain, over: "items" }).identifiability();
+    const given = kst(chain, { over: "items", parameters: explicit }).identifiability();
+    const absent = kst(chain, { over: "items" }).identifiability();
     expect(absent).toEqual(given);
   });
 
   it("refuses identifiability for a model over skills, with equal rates, or too big for the limit", () => {
-    expect(() => kst({ structure: chain }).identifiability()).toThrow('create the model with over: "items"');
-    expect(() => kst({ structure: chain, over: "items", equal: { slip: [["a", "b"]] } }).identifiability()).toThrow(
+    expect(() => kst(chain).identifiability()).toThrow('create the model with over: "items"');
+    expect(() => kst(chain, { over: "items", equal: { slip: [["a", "b"]] } }).identifiability()).toThrow(
       "with equal rates has no reference",
     );
     for (const length of [20, 40, 1100]) {
       const domain = Array.from({ length }, (_, i) => `q${i}`);
       const long = { domain, states: Array.from({ length: length + 1 }, (_, size) => domain.slice(0, size)) };
-      expect(() => kst({ structure: long, over: "items" }).identifiability()).toThrow(
+      expect(() => kst(long, { over: "items" }).identifiability()).toThrow(
         `a Jacobian of 2 ^ ${length} patterns by ${length + 2 * length} parameters, more than the limit of 10000000 cells`,
       );
     }
-    expect(() => kst({ structure: chain, over: "items", fixed: { slip: { z: 0.1 } } }).identifiability()).toThrow(
+    expect(() => kst(chain, { over: "items", fixed: { slip: { z: 0.1 } } }).identifiability()).toThrow(
       'The option fixed.slip names item "z", which is not an element of the structure.',
     );
   });
 
   it("rejects rates and groups that are not what they should be", () => {
-    const build = (options: object) => () => kst({ structure: chain, over: "items", ...options });
+    const build = (options: object) => () => kst(chain, { over: "items", ...options });
     expect(build({ fixed: { guess: { a: 1.5 } } })).toThrow(
       'The option fixed.guess needs a probability from 0 to 1 for item "a", found 1.5.',
     );
@@ -1773,17 +1770,16 @@ describe("BLIM constraints and diagnostics", () => {
   });
 
   it("rejects fixed and equal rates of items that the log does not answer", () => {
-    expect(() => kst({ structure: chain, over: "items", fixed: { guess: { z: 0.1 } } }).fit(chainLog)).toThrow(
+    expect(() => kst(chain, { over: "items", fixed: { guess: { z: 0.1 } } }).fit(chainLog)).toThrow(
       'The option fixed.guess names item "z", which has no event with an outcome in the log.',
     );
-    expect(() => kst({ structure: chain, over: "items", equal: { slip: [["a", "z"]] } }).fit(chainLog)).toThrow(
+    expect(() => kst(chain, { over: "items", equal: { slip: [["a", "z"]] } }).fit(chainLog)).toThrow(
       'The option equal.slip names item "z", which has no event with an outcome in the log.',
     );
   });
 
   it("rejects a fit that has no state able to give a learner's answers", () => {
-    const model = kst({
-      structure: chain,
+    const model = kst(chain, {
       over: "items",
       method: "md",
       fixed: { slip: { a: 0, b: 0, c: 0 }, guess: { a: 0, b: 0, c: 0 } },
@@ -2071,7 +2067,7 @@ describe("KST options from JavaScript", () => {
   it("rejects options that are not an object", () => {
     const missing = JSON.parse("null");
     const structure = surmiseStructure({ a: [] });
-    const model = kst({ structure });
+    const model = kst(structure);
     const log = buildEventLog([
       { learner: "ana", item: "x", skills: [], time: 0, outcome: 1 },
       { learner: "ana", item: "y", skills: [], time: 1, outcome: 0 },
@@ -2081,7 +2077,7 @@ describe("KST options from JavaScript", () => {
       [JSON.parse('{"verbose":1}'), 'There is no option "verbose"'],
     ]) {
       for (const use of [
-        () => kst(options),
+        () => kst(structure, options),
         () => surmiseStructure({ a: [] }, options),
         () => iita(log, options),
         () => model.nextQuestion(model.initialState("ana"), [], options),
@@ -2089,7 +2085,7 @@ describe("KST options from JavaScript", () => {
         expect(use).toThrow(message);
       }
     }
-    expect(() => kst({ structure, posteriors: JSON.parse('"yes"') })).toThrow(
+    expect(() => kst(structure, { posteriors: JSON.parse('"yes"') })).toThrow(
       'The option posteriors must be a boolean, found "yes".',
     );
   });
@@ -2107,7 +2103,7 @@ describe("KST options from JavaScript", () => {
 
   it("rejects fixed and equal rates of other types, which do not stand for none", () => {
     const structure = surmiseStructure({ a: [], b: ["a"] });
-    const build = (options: string) => () => kst({ structure, ...JSON.parse(options) });
+    const build = (options: string) => () => kst(structure, { ...JSON.parse(options) });
     expect(build('{"fixed": null}')).toThrow(
       "The option fixed must be an object of fixed rates by guess and slip, found null.",
     );
@@ -2137,7 +2133,7 @@ describe("KST options from JavaScript", () => {
     const structure = surmiseStructure({ a: [], b: ["a"] });
     const missing = JSON.parse("null");
     const log = patternLog(["a", "b"], { "11": 3, "10": 2, "00": 2, "01": 1 });
-    const fit = kst({ structure, over: "items" }).fit(log);
+    const fit = kst(structure, { over: "items" }).fit(log);
     expect(() => compareFits(missing, fit)).toThrow("The restricted fit must be a fit of a KST model, found null.");
     expect(() => compareFits(fit, JSON.parse('{"goodnessOfFit": 3}'))).toThrow(
       "The general fit needs a goodnessOfFit, an object or null, found 3.",
@@ -2174,7 +2170,7 @@ describe("KST options from JavaScript", () => {
 
   it("rejects parameters of null, which do not stand for the default", () => {
     const structure = surmiseStructure({ a: [] });
-    expect(() => kst({ structure, parameters: JSON.parse("null") })).toThrow(
+    expect(() => kst(structure, { parameters: JSON.parse("null") })).toThrow(
       "KST parameters must be an object, found null.",
     );
   });

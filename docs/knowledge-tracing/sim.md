@@ -54,10 +54,10 @@ truth for each learner is part of the model:
 | BKT with given rates         | `bkt({ parameters })`                                                                      |
 | AFM or PFA with known θ      | `afm({ parameters: { skills, learners } })`, θ by learner                                  |
 | Rasch learners, for Elo      | `logistic({ proficiency: "fixed", parameters })` with one skill per item, its intercept -d |
-| A known IRT ability θ        | `irt({ parameters, prior: { mean: θ, sd: 1e-3 } })`, one model per learner                 |
-| A population of IRT learners | `irt({ parameters, prior })`: θ is drawn from the prior                                    |
-| A known knowledge state      | `kst({ structure, parameters })` with π 1 at that state                                    |
-| A population of KST learners | `kst({ structure, parameters })`: the state is drawn from π                                |
+| A known IRT ability θ        | `irt(parameters, { prior: { mean: θ, sd: 1e-3 } })`, one model per learner                 |
+| A population of IRT learners | `irt(parameters, { prior })`: θ is drawn from the prior                                    |
+| A known knowledge state      | `kst(structure, { parameters })` with π 1 at that state                                    |
+| A population of KST learners | `kst(structure, { parameters })`: the state is drawn from π                                |
 
 Elo is an estimator, not a model of how answers arise: simulating from Elo follows its own updates. A prediction of a
 polytomous IRT item is its expected score, so simulate such items with their category probabilities instead.

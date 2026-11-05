@@ -184,7 +184,7 @@ export const READERS: readonly ReaderCase[] = [
         maxStates: 2 ** 16,
       });
       const probabilities = structure.states.map(() => 1 / structure.states.length);
-      const model = tracing.kst({ structure, parameters: { probabilities, items: { q: { guess: 0.1, slip: 0.1 } } } });
+      const model = tracing.kst(structure, { parameters: { probabilities, items: { q: { guess: 0.1, slip: 0.1 } } } });
       return { model, state: model.initialState("ana"), attempts };
     },
     read: ({

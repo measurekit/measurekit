@@ -258,11 +258,11 @@ function tableOf({ criterion, options }: MasteryReference): MasteryTable {
     case "streak":
       return streakMastery(masteryLog, { length: at("length") });
     case "movingAverage":
-      return movingAverageMastery(masteryLog, { decay: at("decay"), threshold: at("threshold") });
+      return movingAverageMastery(masteryLog, at("decay"), at("threshold"));
     case "window":
-      return windowMastery(masteryLog, { correct: at("correct"), window: at("window") });
+      return windowMastery(masteryLog, at("correct"), at("window"));
     default:
-      return predictedMastery(performance, masteryLog, { threshold: at("threshold") });
+      return predictedMastery(performance, masteryLog, at("threshold"));
   }
 }
 
@@ -288,40 +288,40 @@ describe("mastery criteria of the moving average, the window and the prediction"
   it("moves the average of a skill to d m + (1 - d) y from 0, and counts partial credit as it is", () => {
     // 0.5, 0.75, 0.875; and for outcomes of 0.5, 0.25, 0.375, 0.4375.
     const log = buildEventLog(answers([1, 1, 1]));
-    expect(movingAverageMastery(log, { decay: 0.5, threshold: 0.5 })).toEqual({ ana: { s: 1 } });
-    expect(movingAverageMastery(log, { decay: 0.5, threshold: 0.75 })).toEqual({ ana: { s: 2 } });
-    expect(movingAverageMastery(log, { decay: 0.5, threshold: 0.9 })).toEqual({ ana: { s: null } });
-    expect(movingAverageMastery(buildEventLog(answers([0.5, 0.5, 0.5])), { decay: 0.5, threshold: 0.4 })).toEqual({
+    expect(movingAverageMastery(log, 0.5, 0.5)).toEqual({ ana: { s: 1 } });
+    expect(movingAverageMastery(log, 0.5, 0.75)).toEqual({ ana: { s: 2 } });
+    expect(movingAverageMastery(log, 0.5, 0.9)).toEqual({ ana: { s: null } });
+    expect(movingAverageMastery(buildEventLog(answers([0.5, 0.5, 0.5])), 0.5, 0.4)).toEqual({
       ana: { s: 3 },
     });
   });
 
   it("takes the last outcome at a decay of 0, and never moves at a decay of 1 unless the threshold is 0", () => {
     const log = buildEventLog(answers([0, 0.6, 0]));
-    expect(movingAverageMastery(log, { decay: 0, threshold: 0.6 })).toEqual({ ana: { s: 2 } });
-    expect(movingAverageMastery(log, { decay: 1, threshold: 0.01 })).toEqual({ ana: { s: null } });
-    expect(movingAverageMastery(log, { decay: 1, threshold: 0 })).toEqual({ ana: { s: 1 } });
+    expect(movingAverageMastery(log, 0, 0.6)).toEqual({ ana: { s: 2 } });
+    expect(movingAverageMastery(log, 1, 0.01)).toEqual({ ana: { s: null } });
+    expect(movingAverageMastery(log, 1, 0)).toEqual({ ana: { s: 1 } });
   });
 
   it("counts the outcomes of 1 among the last attempts, the attempts so far where there are fewer than the window", () => {
     const log = buildEventLog(answers([1, 0, 1, 1, 0, 0]));
-    expect(windowMastery(log, { correct: 2, window: 3 })).toEqual({ ana: { s: 3 } });
-    expect(windowMastery(log, { correct: 3, window: 4 })).toEqual({ ana: { s: 4 } });
-    expect(windowMastery(log, { correct: 3, window: 3 })).toEqual({ ana: { s: null } });
-    expect(windowMastery(buildEventLog(answers([1, 0.9, 1])), { correct: 2, window: 2 })).toEqual({ ana: { s: null } });
+    expect(windowMastery(log, 2, 3)).toEqual({ ana: { s: 3 } });
+    expect(windowMastery(log, 3, 4)).toEqual({ ana: { s: 4 } });
+    expect(windowMastery(log, 3, 3)).toEqual({ ana: { s: null } });
+    expect(windowMastery(buildEventLog(answers([1, 0.9, 1])), 2, 2)).toEqual({ ana: { s: null } });
   });
 
   it("leaves the average and the window as they are for an event without an outcome", () => {
     const log = buildEventLog(answers([1, null, null, 1, null]));
-    expect(movingAverageMastery(log, { decay: 0.5, threshold: 0.75 })).toEqual({ ana: { s: 2 } });
-    expect(windowMastery(log, { correct: 2, window: 2 })).toEqual({ ana: { s: 2 } });
-    expect(windowMastery(buildEventLog(answers([null, null])), { correct: 1, window: 1 })).toEqual({});
+    expect(movingAverageMastery(log, 0.5, 0.75)).toEqual({ ana: { s: 2 } });
+    expect(windowMastery(log, 2, 2)).toEqual({ ana: { s: 2 } });
+    expect(windowMastery(buildEventLog(answers([null, null])), 1, 1)).toEqual({});
   });
 
   it("credits an event to each of its skills, and each learner has a table of their own", () => {
     const log = buildEventLog([...answers([1, 1], ["s", "t"]), ...answers([0, 1], ["s"], "budi")]);
-    expect(windowMastery(log, { correct: 2, window: 2 })).toEqual({ ana: { s: 2, t: 2 }, budi: { s: null } });
-    expect(movingAverageMastery(log, { decay: 0, threshold: 1 })).toEqual({ ana: { s: 1, t: 1 }, budi: { s: 2 } });
+    expect(windowMastery(log, 2, 2)).toEqual({ ana: { s: 2, t: 2 }, budi: { s: null } });
+    expect(movingAverageMastery(log, 0, 1)).toEqual({ ana: { s: 1, t: 1 }, budi: { s: 2 } });
   });
 
   it("tells learners and skills apart whatever characters their ids hold", () => {
@@ -331,8 +331,8 @@ describe("mastery criteria of the moving average, the window and the prediction"
     ]);
     const apart = { "a\u0000b": { c: null }, a: { "b\u0000c": null } };
     expect(streakMastery(log, { length: 2 })).toEqual(apart);
-    expect(windowMastery(log, { correct: 2, window: 2 })).toEqual(apart);
-    expect(movingAverageMastery(log, { decay: 0.5, threshold: 0.7 })).toEqual(apart);
+    expect(windowMastery(log, 2, 2)).toEqual(apart);
+    expect(movingAverageMastery(log, 0.5, 0.7)).toEqual(apart);
   });
 
   it("predicts the attempt after its own outcome, for each of its skills, and never for an event without one", () => {
@@ -351,9 +351,9 @@ describe("mastery criteria of the moving average, the window and the prediction"
     };
     const log = buildEventLog(answers([1, null, 1, 1], ["s", "t"]));
     // The state is the outcomes so far, and the prediction a quarter of it: 0.25 after the first, 0.5 after the second.
-    expect(predictedMastery(model, log, { threshold: 0.5 })).toEqual({ ana: { s: 2, t: 2 } });
+    expect(predictedMastery(model, log, 0.5)).toEqual({ ana: { s: 2, t: 2 } });
     expect(predictions).toEqual(["0:1", "2:2", "3:3"]);
-    expect(predictedMastery(model, buildEventLog(answers([null])), { threshold: 0.5 })).toEqual({});
+    expect(predictedMastery(model, buildEventLog(answers([null])), 0.5)).toEqual({});
   });
 
   it("meets a stricter criterion no earlier, for any log", () => {
@@ -366,20 +366,10 @@ describe("mastery criteria of the moving average, the window and the prediction"
           const b = loose.ana?.s;
           return b === undefined || b === null ? true : a === null || (a ?? 0) >= b;
         };
+        expect(later(windowMastery(log, 3, 3), windowMastery(log, 2, 3))).toBe(true);
+        expect(later(movingAverageMastery(log, 0.6, 0.9), movingAverageMastery(log, 0.6, 0.7))).toBe(true);
         expect(
-          later(windowMastery(log, { correct: 3, window: 3 }), windowMastery(log, { correct: 2, window: 3 })),
-        ).toBe(true);
-        expect(
-          later(
-            movingAverageMastery(log, { decay: 0.6, threshold: 0.9 }),
-            movingAverageMastery(log, { decay: 0.6, threshold: 0.7 }),
-          ),
-        ).toBe(true);
-        expect(
-          later(
-            predictedMastery(performance, withPfa(log), { threshold: 0.8 }),
-            predictedMastery(performance, withPfa(log), { threshold: 0.6 }),
-          ),
+          later(predictedMastery(performance, withPfa(log), 0.8), predictedMastery(performance, withPfa(log), 0.6)),
         ).toBe(true);
       }),
     );
@@ -393,7 +383,7 @@ describe("mastery criteria of the moving average, the window and the prediction"
         fc.integer({ min: 1, max: 5 }),
         (values, length) => {
           const log = buildEventLog(answers(values, ["s", "t"]));
-          expect(windowMastery(log, { correct: length, window: length })).toEqual(streakMastery(log, { length }));
+          expect(windowMastery(log, length, length)).toEqual(streakMastery(log, { length }));
         },
       ),
     );
@@ -408,60 +398,43 @@ function withPfa(log: readonly Event[]) {
 describe("mastery criteria, errors", () => {
   const log = buildEventLog([{ learner: "ana", item: "q", skills: ["s"], time: 0, outcome: 1 }]);
 
-  it("rejects options of other types and values from JavaScript", () => {
+  it("rejects thresholds and options of other types and values from JavaScript", () => {
     const missing = JSON.parse("null");
-    expect(() => movingAverageMastery(log, missing)).toThrow("The options must be an object, found null.");
-    expect(() => movingAverageMastery(log, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
-    expect(() => windowMastery(log, missing)).toThrow("The options must be an object, found null.");
-    expect(() => windowMastery(log, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
-    expect(() => predictedMastery(performance, log, missing)).toThrow("The options must be an object, found null.");
-    expect(() => predictedMastery(performance, log, JSON.parse('{"verbose":1}'))).toThrow(
-      'There is no option "verbose"',
+    expect(() => movingAverageMastery(log, missing, 0.5)).toThrow(
+      "The decay must be a number from 0 to 1, found null.",
     );
-    expect(() => movingAverageMastery(log, JSON.parse('{"decay": 0.5}'))).toThrow(
-      "The option threshold must be a number from 0 to 1, found undefined.",
+    expect(() => movingAverageMastery(log, 0.5, JSON.parse("{}").threshold)).toThrow(
+      "The threshold must be a number from 0 to 1, found undefined.",
     );
-    expect(() => movingAverageMastery(log, { decay: 1.5, threshold: 0.5 })).toThrow(
-      "The option decay must be a number from 0 to 1, found 1.5.",
+    expect(() => movingAverageMastery(log, 1.5, 0.5)).toThrow("The decay must be a number from 0 to 1, found 1.5.");
+    expect(() => movingAverageMastery(log, JSON.parse('"0.5"'), 0.5)).toThrow(
+      'The decay must be a number from 0 to 1, found "0.5".',
     );
-    expect(() => movingAverageMastery(log, JSON.parse('{"decay": "0.5", "threshold": 0.5}'))).toThrow(
-      'The option decay must be a number from 0 to 1, found "0.5".',
+    expect(() => predictedMastery(performance, log, -0.1)).toThrow(
+      "The threshold must be a number from 0 to 1, found -0.1.",
     );
-    expect(() => predictedMastery(performance, log, { threshold: -0.1 })).toThrow(
-      "The option threshold must be a number from 0 to 1, found -0.1.",
-    );
-    expect(() => predictedMastery(performance, log, JSON.parse("{}"))).toThrow("The option threshold must be a number");
+    expect(() => predictedMastery(performance, log, JSON.parse("{}"))).toThrow("The threshold must be a number");
   });
 
   it("rejects a window and a number correct that do not fit", () => {
-    expect(() => windowMastery(log, { correct: 2, window: 1 })).toThrow(
-      "The option correct must be at most the window 1, found 2.",
-    );
-    expect(() => windowMastery(log, { correct: 0, window: 3 })).toThrow("The option correct must be an integer from 1");
-    expect(() => windowMastery(log, { correct: 1, window: 2.5 })).toThrow(
-      "The option window must be a positive integer",
-    );
-    expect(() => windowMastery(log, JSON.parse('{"correct": 1}'))).toThrow(
-      "The option window must be a positive integer",
-    );
+    expect(() => windowMastery(log, 2, 1)).toThrow("The number correct must be at most the window 1, found 2.");
+    expect(() => windowMastery(log, 0, 3)).toThrow("The number correct must be an integer from 1");
+    expect(() => windowMastery(log, 1, 2.5)).toThrow("The window must be a positive integer");
+    expect(() => windowMastery(log, 1, JSON.parse("{}").window)).toThrow("The window must be a positive integer");
   });
 
   it("rejects a log that is not one, a model that is not one, and an event with an outcome and no skills", () => {
     const missing = JSON.parse("null");
-    expect(() => movingAverageMastery(missing, { decay: 0.5, threshold: 0.5 })).toThrow(
-      "A log must be an array of events, found null.",
-    );
-    expect(() => windowMastery([], { correct: 1, window: 1 })).toThrow("A log needs at least one event.");
-    expect(() => predictedMastery(missing, log, { threshold: 0.5 })).toThrow(
-      "predictedMastery needs a learner model, found null.",
-    );
+    expect(() => movingAverageMastery(missing, 0.5, 0.5)).toThrow("A log must be an array of events, found null.");
+    expect(() => windowMastery([], 1, 1)).toThrow("A log needs at least one event.");
+    expect(() => predictedMastery(missing, log, 0.5)).toThrow("predictedMastery needs a learner model, found null.");
     const unskilled = buildEventLog([{ learner: "ana", item: "q", skills: [], time: 0, outcome: 1 }]);
-    expect(() => predictedMastery(performance, unskilled, { threshold: 0.5 })).toThrow(
+    expect(() => predictedMastery(performance, unskilled, 0.5)).toThrow(
       "Event 1 has no skills; a mastery table needs at least one.",
     );
-    expect(
-      predictedMastery(performance, buildEventLog([{ ...unskilled[0], outcome: null } as Event]), { threshold: 0.5 }),
-    ).toEqual({});
+    expect(predictedMastery(performance, buildEventLog([{ ...unskilled[0], outcome: null } as Event]), 0.5)).toEqual(
+      {},
+    );
   });
 });
 
@@ -492,8 +465,8 @@ describe("mastery criteria of the guide", () => {
       },
     });
     const at = (fractions: number | null) => ({ ana: { fractions, decimals: null }, budi: { decimals: null } });
-    expect(movingAverageMastery(log, { decay: 0.5, threshold: 0.75 })).toEqual(at(3));
-    expect(windowMastery(log, { correct: 2, window: 3 })).toEqual(at(3));
-    expect(predictedMastery(model, log, { threshold: 0.7 })).toEqual(at(4));
+    expect(movingAverageMastery(log, 0.5, 0.75)).toEqual(at(3));
+    expect(windowMastery(log, 2, 3)).toEqual(at(3));
+    expect(predictedMastery(model, log, 0.7)).toEqual(at(4));
   });
 });

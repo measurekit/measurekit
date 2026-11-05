@@ -61,8 +61,6 @@ import {
 
 /** Options of {@link kst}. */
 export interface KstOptions {
-  /** The knowledge structure. */
-  readonly structure: KnowledgeStructure;
   /**
    * What the structure's states hold: `"skills"`, so a state masters an item when it holds all of the attempt's skills,
    * or `"items"`, so it masters the items it holds.
@@ -120,7 +118,6 @@ export interface KstOptions {
 }
 
 const KST_OPTIONS: FieldNames<KstOptions> = {
-  structure: true,
   over: true,
   method: true,
   tolerance: true,
@@ -244,20 +241,21 @@ const DEFAULT_THRESHOLD = 0.9;
  * state. These masks hold at most 2^28 cells, 256 MB, as for 26,000 sets of skills over 10,000 states; an attempt that
  * would pass them throws.
  *
- * @param options - The structure, whether it is over items or skills, the method and the start, fixed and equal rates
- *   of the fit.
+ * @param structure - The knowledge structure.
+ * @param options - Whether the structure is over items or skills, the method and the start, fixed and equal rates of
+ *   the fit.
  * @returns The model: `fit` estimates the slip and guess rates, `update` and `predict` serve online, and
  *   `mostLikelyState` and `nextQuestion` serve assessment.
  * @throws `DataError` when the structure, the options or the parameters are invalid.
  */
-export function kst(options: KstOptions): KstModel {
-  return create(options).model;
+export function kst(structure: KnowledgeStructure, options: KstOptions = {}): KstModel {
+  return create(structure, options).model;
 }
 
 /** Builds a KST model with its steps, which `fit` replays the log with. */
-function create(options: KstOptions): { model: KstModel; steps: Steps<KstState> } {
+function create(structure: KnowledgeStructure, options: KstOptions): { model: KstModel; steps: Steps<KstState> } {
   const settings = settingsOf(options);
-  const compiled = compile(options.structure);
+  const compiled = compile(structure);
   const {
     parameters = { probabilities: Array.from({ length: compiled.count }, () => 1 / compiled.count), items: {} },
   } = options;
@@ -303,7 +301,7 @@ function create(options: KstOptions): { model: KstModel; steps: Steps<KstState> 
 
   const model: KstModel = {
     parameters,
-    fit: (log) => fitLog({ options, settings, compiled, parameters, maskOf }, log),
+    fit: (log) => fitLog({ structure, options, settings, compiled, parameters, maskOf }, log),
     initialState(learner) {
       checkLearnerId(learner);
       return steps.initialState(learner);
@@ -360,6 +358,7 @@ function create(options: KstOptions): { model: KstModel; steps: Steps<KstState> 
 
 /** What a fit needs of the model it is made from. */
 interface FitContext {
+  readonly structure: KnowledgeStructure;
   readonly options: KstOptions;
   readonly settings: Settings;
   readonly compiled: CompiledStructure;
@@ -368,7 +367,7 @@ interface FitContext {
 }
 
 /** Fits the BLIM of a model to a log, and replays the log through the model with the estimates. */
-function fitLog({ options, settings, compiled, parameters, maskOf }: FitContext, log: EventLog): KstFit {
+function fitLog({ structure, options, settings, compiled, parameters, maskOf }: FitContext, log: EventLog): KstFit {
   checkLog(log);
   checkObservedEvents(log, "a KST model");
   const observed = log.filter(isObserved);
@@ -381,7 +380,7 @@ function fitLog({ options, settings, compiled, parameters, maskOf }: FitContext,
   };
   const constraints = constraintsOf(settings.restrictions, items, start, "has no event with an outcome in the log");
   const result = estimate(design, start, constraints, settings);
-  const fitted = create({
+  const fitted = create(structure, {
     ...options,
     parameters: {
       probabilities: [...result.parameters.probabilities],

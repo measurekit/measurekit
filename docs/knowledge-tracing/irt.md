@@ -14,12 +14,10 @@ Update a learner's posterior of θ with two outcomes, one of a 2PL item and one 
 import { irt } from "@measurekit/knowledge-tracing/irt";
 
 const model = irt({
-  parameters: {
-    items: {
-      q1: { a: 1.2, b: -0.5 },
-      q2: { a: 1.5, b: 0.4, c: 0.2 },
-      essay: { model: "gpcm", a: 0.9, b: [-1, 0, 1.2] },
-    },
+  items: {
+    q1: { a: 1.2, b: -0.5 },
+    q2: { a: 1.5, b: 0.4, c: 0.2 },
+    essay: { model: "gpcm", a: 0.9, b: [-1, 0, 1.2] },
   },
 });
 const attempt = { learner: "ana", item: "q1", skills: [], time: 1 };
@@ -60,9 +58,7 @@ category over K - 1, mirt's `expected.item` over K - 1, which reads the categori
 import { irt } from "@measurekit/knowledge-tracing/irt";
 
 // A multiple-choice item calibrated by nominalResponse: option 3 is the key, option 1 the strongest distractor.
-const model = irt({
-  parameters: { items: { mc: { model: "nominal", a: [-1.2, -0.4, 0.3, 1.3], c: [-0.5, 0.4, 0.6, -0.5] } } },
-});
+const model = irt({ items: { mc: { model: "nominal", a: [-1.2, -0.4, 0.3, 1.3], c: [-0.5, 0.4, 0.6, -0.5] } } });
 const attempt = { learner: "ana", item: "mc", skills: [], time: 1 };
 const start = model.initialState("ana");
 model.ability(model.update(start, { ...attempt, outcome: 1 })); // => { theta: 0.876, standardError: 0.831 }, the key
@@ -160,11 +156,13 @@ into one. Away from the grid's ends, the posterior's variance grows by exactly v
 import { irt } from "@measurekit/knowledge-tracing/irt";
 
 const WEEK = 7 * 24 * 60 * 60 * 1000; // the events' times are epoch milliseconds
-const model = irt({
-  parameters: { items: { q1: { a: 1.2, b: -0.5 }, q2: { a: 1.5, b: 0.4 } } },
-  points: 241,
-  drift: { variance: 0.02, per: WEEK },
-});
+const model = irt(
+  { items: { q1: { a: 1.2, b: -0.5 }, q2: { a: 1.5, b: 0.4 } } },
+  {
+    points: 241,
+    drift: { variance: 0.02, per: WEEK },
+  },
+);
 const monday = Date.UTC(2026, 0, 5, 9);
 const attempt = { learner: "ana", item: "q1", skills: [], time: monday };
 let ana = model.update(model.initialState("ana"), { ...attempt, outcome: 1 });

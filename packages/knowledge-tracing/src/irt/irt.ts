@@ -53,8 +53,6 @@ const IRT_DRIFT_FIELDS: FieldNames<IrtDrift> = { variance: true, per: true };
 
 /** Options of {@link irt}. */
 export interface IrtOptions {
-  /** The items' parameters. */
-  readonly parameters: IrtParameters;
   /**
    * The prior of θ, the population's distribution in the calibration.
    *
@@ -81,7 +79,7 @@ export interface IrtOptions {
   readonly drift?: IrtDrift;
 }
 
-const IRT_OPTIONS: FieldNames<IrtOptions> = { parameters: true, prior: true, points: true, drift: true };
+const IRT_OPTIONS: FieldNames<IrtOptions> = { prior: true, points: true, drift: true };
 
 /** Options of {@link IrtModel.posterior}. */
 export interface PosteriorOptions {
@@ -173,8 +171,8 @@ const CATEGORY_TOLERANCE = 1e-9;
  * variance Δt / per to the posterior's variance away from the grid's ends. A state then keeps the time of its latest
  * event: an event, an attempt or an `at` before it takes no drift, and leaves the time as it was.
  *
- * @param options - The calibrated item parameters, the prior, the grid and the drift of ability; each option has its
- *   default.
+ * @param parameters - The calibrated item parameters.
+ * @param options - The prior, the grid and the drift of ability; each option has its default.
  * @returns The model: `fit` replays a log, `update` and `predict` serve online, and `ability` and `posterior` read a
  *   state.
  * @throws `DataError` when an item's parameters, the prior, the number of points or the drift are invalid, or `drift`
@@ -185,16 +183,16 @@ const CATEGORY_TOLERANCE = 1e-9;
  * ```ts
  * import { irt } from "@measurekit/knowledge-tracing/irt";
  *
- * const model = irt({ parameters: { items: { q1: { a: 1.2, b: -0.5 }, q2: { a: 1.5, b: 0.4, c: 0.2 } } } });
+ * const model = irt({ items: { q1: { a: 1.2, b: -0.5 }, q2: { a: 1.5, b: 0.4, c: 0.2 } } });
  * const attempt = { learner: "ana", item: "q1", skills: [], time: 1 };
  * const ana = model.update(model.initialState("ana"), { ...attempt, outcome: 1 });
  * model.ability(ana); // => { theta: 0.362, standardError: 0.895 }
  * model.predict(ana, { ...attempt, item: "q2", time: 2 }); // => 0.59, the probability of a correct answer to q2
  * ```
  */
-export function irt(options: IrtOptions): IrtModel {
+export function irt(parameters: IrtParameters, options: IrtOptions = {}): IrtModel {
   checkOptions(options, IRT_OPTIONS);
-  const { parameters, prior = DEFAULT_PRIOR, drift } = options;
+  const { prior = DEFAULT_PRIOR, drift } = options;
   const { points = drift === undefined ? DEFAULT_POINTS : undefined } = options;
   checkParameters(parameters);
   checkRecord(prior, "The prior must be an object { mean, sd }");

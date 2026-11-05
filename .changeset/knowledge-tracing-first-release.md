@@ -7,6 +7,10 @@ models, Elo, online IRT and knowledge space theory, including structures from al
 atoms, traces, learning paths and neighbourhoods, with serializable learner state, practice recommendations and
 evaluation by cross-validation and learning curves.
 
+A function takes what it cannot work without as arguments, `irt(parameters, options)`, `kst(structure, options)` and
+`movingAverageMastery(log, decay, threshold)`, and its options hold only what has a default, which a strict reader refuses
+to misspell.
+
 An event may carry no outcome: `outcome: null` is a learning opportunity, such as a lesson or a video, which every model
 accepts. BKT applies the learn and forget rates of the event's `resource` and estimates a lesson's rates from the
 outcomes that follow it, and logistic models count such events as exposures with the features `exposures`,

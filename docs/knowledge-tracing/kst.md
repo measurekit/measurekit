@@ -124,14 +124,13 @@ elements, which are not paths here, and may have no path at all.
 
 ## The model
 
-`kst(options)` is a learner model on a structure: the basic local independence model (Doignon and Falmagne, 1999).
-A learner is in one knowledge state K, with probability π(K) in the population. Given K, answers are independent: an
-item that K masters is answered correctly with probability 1 - slip, β, the careless error; one it does not, with
+`kst(structure, options)` is a learner model on a structure: the basic local independence model (Doignon and Falmagne,
+1999). A learner is in one knowledge state K, with probability π(K) in the population. Given K, answers are independent:
+an item that K masters is answered correctly with probability 1 - slip, β, the careless error; one it does not, with
 probability guess, η, the lucky guess. Outcomes between 0 and 1 count as partial credit.
 
 | Option          | Default           | Meaning                                                                                                                           |
 | --------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `structure`     | required          | The knowledge structure                                                                                                           |
 | `over`          | `"skills"`        | `"skills"`: a state masters an item when it holds all the attempt's skills; `"items"`: when it holds the item                     |
 | `method`        | `"ml"`            | `"ml"`, maximum likelihood by EM; `"md"`, minimum discrepancy; `"mdml"`, maximum likelihood subject to it                         |
 | `tolerance`     | `1e-8`            | The change of the log-likelihood at which EM stops                                                                                |
@@ -179,8 +178,7 @@ inference continues, at learners × states × 8 bytes: 1 GB for 12,500 learners 
 ```ts continues
 import { kst } from "@measurekit/knowledge-tracing/kst";
 
-kst({
-  structure,
+kst(structure, {
   over: "items",
   fixed: { guess: { add: 0 }, slip: { divide: 0.05 } },
   equal: { slip: [["subtract", "multiply"]] },
@@ -239,20 +237,19 @@ const log = buildEventLog(
   ),
 );
 
-const free = kst({ structure, over: "items" }).fit(log);
+const free = kst(structure, { over: "items" }).fit(log);
 free.goodnessOfFit; // => { g2: 2.535, degreesOfFreedom: 2, pValue: 0.282 }
 free.discrepancy; // => 0.068
 const partway = `l${answers.findIndex(({ pattern }) => pattern === "1100")}`;
 free.mostLikelyStates[partway]; // => { state: ["add", "subtract"], probability: 0.816 }: a learner who answered 1100
 
-const equal = kst({ structure, over: "items", equal: { guess: [structure.domain], slip: [structure.domain] } }).fit(
+const equal = kst(structure, { over: "items", equal: { guess: [structure.domain], slip: [structure.domain] } }).fit(
   log,
 );
 compareFits(equal, free); // => { g2: 1.460, degreesOfFreedom: 6, pValue: 0.962 }: one guess and one slip fit as well
 
 free.model.identifiability(); // => { parameters: 13, rank: 11, identifiable: false }
-const held = kst({
-  structure,
+const held = kst(structure, {
   over: "items",
   parameters: free.model.parameters,
   fixed: { guess: { add: 0.05 }, slip: { divide: 0.05 } },
@@ -288,8 +285,7 @@ import { fringes, kst, surmiseStructure } from "@measurekit/knowledge-tracing/ks
 
 const structure = surmiseStructure({ add: [], subtract: ["add"], multiply: ["add"], divide: ["subtract", "multiply"] });
 const rates = { guess: 0.1, slip: 0.1 };
-const model = kst({
-  structure,
+const model = kst(structure, {
   parameters: {
     probabilities: structure.states.map(() => 1 / 6),
     items: { q1: rates, q2: rates, q3: rates, q4: rates },

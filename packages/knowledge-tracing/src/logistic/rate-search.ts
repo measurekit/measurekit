@@ -1,8 +1,10 @@
 import {
   bfgs,
   checkArray,
+  checkFields,
   checkFinite,
   checkOptions,
+  checkRecord,
   checkStopping,
   DataError,
   describe,
@@ -14,14 +16,20 @@ import type { EventLog } from "../data/internal.js";
 import { checkModel } from "../model.js";
 import type { LogisticFit, LogisticModel } from "./logistic.js";
 
-/** Options of {@link searchRates}. */
-export interface RateSearchOptions {
+/** The rates {@link searchRates} looks for: where it starts and the bounds it stays between, for each rate. */
+export interface RateBounds {
   /** The rates to start from, each strictly between its bounds: one per rate the model builder takes. */
   readonly start: readonly number[];
   /** The least value of each rate. */
   readonly lower: readonly number[];
   /** The greatest value of each rate, above its least. */
   readonly upper: readonly number[];
+}
+
+const RATE_BOUNDS_FIELDS: FieldNames<RateBounds> = { start: true, lower: true, upper: true };
+
+/** Options of {@link searchRates}. */
+export interface RateSearchOptions {
   /**
    * The largest absolute component of the gradient of the log-likelihood, over the rates mapped to the whole line, at
    * which the search has converged.
@@ -38,13 +46,7 @@ export interface RateSearchOptions {
   readonly maxIterations?: number;
 }
 
-const RATE_SEARCH_OPTIONS: FieldNames<RateSearchOptions> = {
-  start: true,
-  lower: true,
-  upper: true,
-  tolerance: true,
-  maxIterations: true,
-};
+const RATE_SEARCH_OPTIONS: FieldNames<RateSearchOptions> = { tolerance: true, maxIterations: true };
 
 /** The outcome of {@link searchRates}. */
 export interface RateSearch {
@@ -84,24 +86,29 @@ const DIFFERENCE_STEP = 1e-4;
  *
  * @param build - Builds the model for a list of rates, in the order of `start`.
  * @param log - The log to fit each model to.
- * @param options - The starting rates, their bounds and the stopping rules.
+ * @param rates - The starting rates and their bounds.
+ * @param options - The stopping rules.
  * @returns The best rates, the fit of the model built from them, whether the search converged and the iterations run.
- * @throws `DataError` when the options are out of range, `build` is not a function or does not return a model, or the
- * fit of the model built from `start` is not valid for the log.
+ * @throws `DataError` when the rates or the options are out of range, `build` is not a function or does not return a
+ * model, or the fit of the model built from `start` is not valid for the log.
  * @see {@link https://doi.org/10.1109/TLT.2021.3113067 | Pavlik, Eglington and Harrell-Williams (2021)}
  */
 export function searchRates(
   build: (rates: readonly number[]) => LogisticModel,
   log: EventLog,
-  options: RateSearchOptions,
+  rates: RateBounds,
+  options: RateSearchOptions = {},
 ): RateSearch {
   checkOptions(options, RATE_SEARCH_OPTIONS);
+  checkRecord(rates, "The rates must be an object { start, lower, upper }");
+  checkFields(rates, RATE_BOUNDS_FIELDS, "The rates");
   if (typeof build !== "function") {
     throw new DataError(
       `The argument build must be a function from the rates to a logistic model, found ${describe(build)}.`,
     );
   }
-  const { start, lower, upper, tolerance = DEFAULT_TOLERANCE, maxIterations = DEFAULT_MAX_ITERATIONS } = options;
+  const { start, lower, upper } = rates;
+  const { tolerance = DEFAULT_TOLERANCE, maxIterations = DEFAULT_MAX_ITERATIONS } = options;
   checkStopping(tolerance, maxIterations);
   checkBounds(start, lower, upper);
   const toRates = (x: ArrayLike<number>): number[] =>
@@ -166,10 +173,10 @@ function checkBounds(start: readonly number[], lower: readonly number[], upper: 
     ["lower", lower],
     ["upper", upper],
   ] as const) {
-    checkArray(values, `The option ${name} must be an array of rates`);
+    checkArray(values, `The ${name} of the rates must be an array of rates`);
     if (values.length === 0 || values.length !== start.length) {
       throw new DataError(
-        `The option ${name} must hold one number for each rate, as many as the ${start.length} of start, found ${values.length}.`,
+        `The ${name} of the rates must hold one number for each rate, as many as the ${start.length} of start, found ${values.length}.`,
       );
     }
     values.forEach((value, i) => {

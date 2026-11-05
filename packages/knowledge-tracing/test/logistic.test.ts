@@ -1805,30 +1805,38 @@ describe("rate search", () => {
     );
   });
 
-  it("rejects options out of range or of another type", () => {
-    const options = (patch: Record<string, unknown>) => ({ ...bounds, ...patch }) as typeof bounds;
+  it("rejects rates and options out of range or of another type", () => {
+    const bounded = (patch: Record<string, unknown>) => ({ ...bounds, ...patch }) as typeof bounds;
     expect(() => searchRates(JSON.parse("null"), log, bounds)).toThrow(
       "The argument build must be a function from the rates to a logistic model, found null.",
     );
-    expect(() => searchRates(build, log, JSON.parse("null"))).toThrow("The options must be an object, found null.");
-    expect(() => searchRates(build, log, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
-    expect(() => searchRates(build, log, options({ start: JSON.parse("null") }))).toThrow(
-      "The option start must be an array of rates, found null.",
+    expect(() => searchRates(build, log, JSON.parse("null"))).toThrow(
+      "The rates must be an object { start, lower, upper }, found null.",
     );
-    expect(() => searchRates(build, log, options({ lower: [0.05] }))).toThrow(
-      "The option lower must hold one number for each rate, as many as the 2 of start, found 1.",
+    expect(() => searchRates(build, log, bounded({ step: 1 }))).toThrow(
+      'The rates may hold only start, lower and upper, found "step".',
     );
-    expect(() => searchRates(build, log, options({ start: [], lower: [], upper: [] }))).toThrow(
-      "The option start must hold one number for each rate",
+    expect(() => searchRates(build, log, bounds, JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
     );
-    expect(() => searchRates(build, log, options({ upper: ["a", 3] }))).toThrow(
+    expect(() => searchRates(build, log, bounds, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
+    expect(() => searchRates(build, log, bounded({ start: JSON.parse("null") }))).toThrow(
+      "The start of the rates must be an array of rates, found null.",
+    );
+    expect(() => searchRates(build, log, bounded({ lower: [0.05] }))).toThrow(
+      "The lower of the rates must hold one number for each rate, as many as the 2 of start, found 1.",
+    );
+    expect(() => searchRates(build, log, bounded({ start: [], lower: [], upper: [] }))).toThrow(
+      "The start of the rates must hold one number for each rate",
+    );
+    expect(() => searchRates(build, log, bounded({ upper: ["a", 3] }))).toThrow(
       'The upper of rate 1 must be a finite number, found "a".',
     );
-    expect(() => searchRates(build, log, options({ start: [1, 0.5] }))).toThrow(
+    expect(() => searchRates(build, log, bounded({ start: [1, 0.5] }))).toThrow(
       "The start of rate 1 must lie strictly between its bounds 0.05 and 1, found 1.",
     );
-    expect(() => searchRates(build, log, options({ tolerance: -1 }))).toThrow("The option tolerance");
-    expect(() => searchRates(build, log, options({ maxIterations: 1.5 }))).toThrow("The option maxIterations");
+    expect(() => searchRates(build, log, bounds, { tolerance: -1 })).toThrow("The option tolerance");
+    expect(() => searchRates(build, log, bounds, { maxIterations: 1.5 })).toThrow("The option maxIterations");
     expect(() => searchRates(() => JSON.parse("{}"), log, bounds)).toThrow(
       "The function build must return a logistic model, found an object.",
     );
