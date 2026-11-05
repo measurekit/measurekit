@@ -4,7 +4,8 @@ import { benchmarksOf } from "../../../scripts/bench-harness.js";
  * The most that the fastest sample of each benchmark may take, in milliseconds: five times the fastest sample that the CI
  * runner took, rounded up to one significant digit, as validation/README.md explains. The budgets of irt, multidimensional,
  * cdm, cat, responseTime and sim take the fastest over the six green runs of `bench` of 2026-11-05 from 87fec1e6 to
- * 1c23153c; the others the median over the green runs of 2026-11-03 and 2026-11-04 of each run's fastest. A budget marked
+ * 1c23153c; those of dimensionality, fit, scaling and equating the fastest over the 16 from 2e538dd8 to 1c23153c; the
+ * others the median over the green runs of 2026-11-03 and 2026-11-04 of each run's fastest. A budget marked
  * "laptop" is for a benchmark that the runner has not taken, or took only before its code changed: five times the laptop's
  * fastest sample times the median ratio of the runner's to the laptop's in its module, until the runner's samples replace it.
  */
@@ -79,19 +80,19 @@ const BUDGETS = {
   "cat.proportional": 0.2,
   "cat.simulateClassification": 900,
   "cat.simulateSprt": 800,
-  "fit.itemFit": 30,
-  "fit.personFit": 60,
-  "fit.summedScoreFit": 70,
-  "fit.yenQ3": 60,
-  "fit.yenQ3CriticalValue": 20_000, // laptop
-  "fit.correctedPersonFit": 40,
-  "fit.kernelItemCurves": 200,
-  "fit.limitedInformationFit": 700,
-  "fit.rootMeanSquareDeviation": 90,
-  "fit.localDependenceChiSquare": 70,
-  "fit.andersenTest": 200,
-  "fit.martinLofTest": 200,
-  "fit.raschWaldTest": 60,
+  "fit.itemFit": 20,
+  "fit.personFit": 40,
+  "fit.summedScoreFit": 30,
+  "fit.yenQ3": 40,
+  "fit.yenQ3CriticalValue": 9_000,
+  "fit.correctedPersonFit": 20,
+  "fit.kernelItemCurves": 90,
+  "fit.limitedInformationFit": 400,
+  "fit.rootMeanSquareDeviation": 50,
+  "fit.localDependenceChiSquare": 30,
+  "fit.andersenTest": 70,
+  "fit.martinLofTest": 60,
+  "fit.raschWaldTest": 40,
   "dif.mantelHaenszel": 60,
   "dif.logisticRegression": 700,
   "dif.lordChiSquare": 8_000,
@@ -101,34 +102,34 @@ const BUDGETS = {
   "dif.rajuArea": 3_000,
   "dif.sibtest": 80,
   "equating.linear": 0.005,
-  "equating.equipercentile": 0.03,
-  "equating.presmoothing": 0.3,
-  "equating.bootstrapLinear": 300,
-  "equating.tucker": 0.2,
-  "equating.frequencyEstimation": 0.2,
+  "equating.equipercentile": 0.02,
+  "equating.presmoothing": 0.2,
+  "equating.bootstrapLinear": 200,
+  "equating.tucker": 0.08,
+  "equating.frequencyEstimation": 0.1,
   "equating.chainedEquipercentile": 0.2,
-  "equating.stockingLordLinking": 2,
-  "equating.haebaraLinking": 1,
-  "equating.trueScore": 0.9,
-  "equating.irtObservedScore": 4,
+  "equating.stockingLordLinking": 0.6,
+  "equating.haebaraLinking": 0.6,
+  "equating.trueScore": 0.5,
+  "equating.irtObservedScore": 2,
   "equating.kernel": 20,
-  "equating.linkCovariance": 60,
-  "equating.linkedErrors": 80,
+  "equating.linkCovariance": 30,
+  "equating.linkedErrors": 50,
   "ctt.itemStatistics": 60,
   "ctt.cronbachAlpha": 20,
   "ctt.mcdonaldOmega": 9,
   "ctt.subscoreValue": 20,
-  "dimensionality.polychoricCorrelations": 200,
-  "dimensionality.parallelAnalysis": 2_000,
-  "dimensionality.exploratoryFactorAnalysis": 200,
-  "dimensionality.minimumAveragePartial": 70,
-  "dimensionality.maximumLikelihoodFactors": 200,
-  "dimensionality.omegaHierarchical": 200,
-  "dimensionality.smoothCorrelations25": 0.4, // laptop
-  "dimensionality.smoothCorrelations50": 3, // laptop
-  "dimensionality.smoothCorrelations100": 20, // laptop
-  "dimensionality.smoothCorrelations200": 200, // laptop
-  "dimensionality.smoothCorrelations1000": 20_000, // laptop
+  "dimensionality.polychoricCorrelations": 80,
+  "dimensionality.parallelAnalysis": 800,
+  "dimensionality.exploratoryFactorAnalysis": 60,
+  "dimensionality.minimumAveragePartial": 40,
+  "dimensionality.maximumLikelihoodFactors": 60,
+  "dimensionality.omegaHierarchical": 60,
+  "dimensionality.smoothCorrelations25": 0.2, // laptop
+  "dimensionality.smoothCorrelations50": 0.7, // laptop
+  "dimensionality.smoothCorrelations100": 4, // laptop
+  "dimensionality.smoothCorrelations200": 20, // laptop
+  "dimensionality.smoothCorrelations1000": 2_000, // laptop
   "mokken.scalability": 20,
   "mokken.automatedItemSelection": 6,
   "mokken.monotonicity": 20,
@@ -164,10 +165,10 @@ const BUDGETS = {
   "similarity.m4Index": 200, // laptop
   "similarity.kIndex": 40, // laptop
   "data.scoreResponses": 9,
-  "scaling.conversionTableEapSum": 4,
-  "scaling.conversionTableTrueScore": 8,
-  "scaling.drawJointThetas": 10,
-  "scaling.normStatisticsWeighted": 20, // laptop
+  "scaling.conversionTableEapSum": 2,
+  "scaling.conversionTableTrueScore": 4,
+  "scaling.drawJointThetas": 6,
+  "scaling.normStatisticsWeighted": 9,
   "standardSetting.bookmarkCutScore": 0.4,
   "standardSetting.classificationAccuracy": 6,
   "standardSetting.livingstonLewis": 5,
