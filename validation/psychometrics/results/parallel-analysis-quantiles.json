@@ -1,0 +1,158 @@
+{
+  "source": "parallelAnalysis on psych::bfi, Pearson correlations, 1,000 replications on the seeds 1 to 20, against base R's 2,000 permuted data sets: the distance of the random eigenvalues' means and 0.95 quantiles from base R's, in Monte Carlo standard errors",
+  "replications": 1000,
+  "referenceReplications": 2000,
+  "bounds": {
+    "mean": 4,
+    "componentQuantile": 6,
+    "factorQuantile": 6
+  },
+  "largest": {
+    "mean": 3.4096835071219176,
+    "componentQuantile": 4.126195238291511,
+    "factorQuantile": 4.190594145653709
+  },
+  "within": true,
+  "runs": [
+    {
+      "seed": 1,
+      "componentMean": 2.2380361530828883,
+      "factorMean": 2.1753157815903195,
+      "componentQuantile": 2.172094285171865,
+      "factorQuantile": 3.129429362341077
+    },
+    {
+      "seed": 2,
+      "componentMean": 2.15869830307852,
+      "factorMean": 2.4074345903554706,
+      "componentQuantile": 2.1780869218242556,
+      "factorQuantile": 3.4593526336156604
+    },
+    {
+      "seed": 3,
+      "componentMean": 2.6628875211262826,
+      "factorMean": 2.5461625026370607,
+      "componentQuantile": 1.6036832884640881,
+      "factorQuantile": 2.9294552086056975
+    },
+    {
+      "seed": 4,
+      "componentMean": 2.1196524407043107,
+      "factorMean": 1.9627656967013851,
+      "componentQuantile": 4.126195238291511,
+      "factorQuantile": 3.129851674194024
+    },
+    {
+      "seed": 5,
+      "componentMean": 2.5815325314721984,
+      "factorMean": 2.531761924066308,
+      "componentQuantile": 1.909200828045329,
+      "factorQuantile": 2.7367809513151995
+    },
+    {
+      "seed": 6,
+      "componentMean": 1.9889723105783033,
+      "factorMean": 1.6387383387150658,
+      "componentQuantile": 3.3949445644833296,
+      "factorQuantile": 2.9458898163414737
+    },
+    {
+      "seed": 7,
+      "componentMean": 2.3920141608759242,
+      "factorMean": 2.2868601206094032,
+      "componentQuantile": 2.3746983300363134,
+      "factorQuantile": 3.040545803782803
+    },
+    {
+      "seed": 8,
+      "componentMean": 2.1371450840691995,
+      "factorMean": 2.2320523869299143,
+      "componentQuantile": 1.8018590624871826,
+      "factorQuantile": 3.652485145782492
+    },
+    {
+      "seed": 9,
+      "componentMean": 1.712539762018008,
+      "factorMean": 2.157521284845258,
+      "componentQuantile": 2.5592174819587252,
+      "factorQuantile": 2.6187866198170475
+    },
+    {
+      "seed": 10,
+      "componentMean": 2.3228850411042092,
+      "factorMean": 1.8745146833432227,
+      "componentQuantile": 2.7201856097991683,
+      "factorQuantile": 3.4766423717383645
+    },
+    {
+      "seed": 11,
+      "componentMean": 1.729657244644819,
+      "factorMean": 2.5105986623027157,
+      "componentQuantile": 2.2924097177339227,
+      "factorQuantile": 4.190594145653709
+    },
+    {
+      "seed": 12,
+      "componentMean": 2.421271436268909,
+      "factorMean": 1.8391607198524704,
+      "componentQuantile": 2.2937044771303374,
+      "factorQuantile": 2.6094499441761507
+    },
+    {
+      "seed": 13,
+      "componentMean": 1.7104871838133793,
+      "factorMean": 2.9744978517820053,
+      "componentQuantile": 1.5455273508602883,
+      "factorQuantile": 3.5314076753457075
+    },
+    {
+      "seed": 14,
+      "componentMean": 2.3641579066164042,
+      "factorMean": 2.1263924940491257,
+      "componentQuantile": 3.638746261255764,
+      "factorQuantile": 2.6302045114794024
+    },
+    {
+      "seed": 15,
+      "componentMean": 2.1886772754362784,
+      "factorMean": 1.8825225523871076,
+      "componentQuantile": 2.0041059867571485,
+      "factorQuantile": 2.891541161831566
+    },
+    {
+      "seed": 16,
+      "componentMean": 2.708065267399981,
+      "factorMean": 2.2319853780623107,
+      "componentQuantile": 1.9573185423973833,
+      "factorQuantile": 2.243956381490708
+    },
+    {
+      "seed": 17,
+      "componentMean": 2.235836684993835,
+      "factorMean": 1.9475316817210664,
+      "componentQuantile": 2.128354985806876,
+      "factorQuantile": 3.268545587865506
+    },
+    {
+      "seed": 18,
+      "componentMean": 1.496647150738809,
+      "factorMean": 1.7138598156243419,
+      "componentQuantile": 2.139277967535861,
+      "factorQuantile": 1.4175381953178257
+    },
+    {
+      "seed": 19,
+      "componentMean": 2.4639625182812797,
+      "factorMean": 3.4096835071219176,
+      "componentQuantile": 2.082907852711027,
+      "factorQuantile": 2.3984428177028954
+    },
+    {
+      "seed": 20,
+      "componentMean": 2.2288517129259393,
+      "factorMean": 1.9365798108677905,
+      "componentQuantile": 1.7408175151160488,
+      "factorQuantile": 1.8408793357908197
+    }
+  ]
+}
