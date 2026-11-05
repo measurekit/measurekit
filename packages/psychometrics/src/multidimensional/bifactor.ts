@@ -9,7 +9,7 @@ import {
 } from "../irt/internal.js";
 import { bifactorFit, solveBifactor } from "./bifactor-fit.js";
 import { structureOf } from "./bifactor-structure.js";
-import { assemble, type MultidimensionalCalibration } from "./calibration.js";
+import { assemble, type MultidimensionalCalibration, orientDimensions, turnableDimensions } from "./calibration.js";
 import { checkCorrelatedGroups } from "./groups.js";
 import { type MultidimensionalLogisticParameters, multidimensionalTwoParameterLogistic } from "./logistic.js";
 import type { LoadingPattern, MultidimensionalModel } from "./model.js";
@@ -98,7 +98,8 @@ const DEFAULT_POINTS = [31, 21] as const;
  * specific dimension's nodes, and the cost follows the primary dimensions plus one (Gibbons and Hedeker, 1992). The sum
  * of a group depends only on the responses to its own items, so it is computed once for each distinct pattern of them,
  * and once for each distinct pattern of all responses. The M-step and SQUAREM are those of
- * {@link calibrateMultidimensional}, and the grid is the rectangular rule of mirt, so the estimates are mirt's `bfactor`.
+ * {@link calibrateMultidimensional}, and the grid is the rectangular rule of mirt, so the estimates are mirt's `bfactor`,
+ * except that each dimension is turned so that its slopes sum above 0, as {@link calibrateMultidimensional} turns it.
  *
  * The calibration lists the primary dimensions and then the specific ones, with a slope of 0 on those an item does not
  * load on. {@link multidimensionalEstimates} scores persons from it; the posterior mean integrates over the grid of all
@@ -154,5 +155,6 @@ export function calibrateBifactor(
     maxIterations,
     standardErrors,
   });
-  return assemble(structure.design, solution, respondents);
+  const calibration = assemble(structure.design, solution, respondents);
+  return orientDimensions(calibration, turnableDimensions(solution.items, structure.design));
 }

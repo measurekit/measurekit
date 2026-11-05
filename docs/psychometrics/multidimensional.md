@@ -581,6 +581,10 @@ result, on the grid of all dimensions. The posterior mean integrates over that g
 many specific dimensions; the posterior mode does not. A bifactor or two-tier model takes at most 100 dimensions, the
 primary and the specific ones together, as scoring does, so that every calibration can be scored.
 
+Each dimension, primary or specific, is turned so that its slopes sum above 0, with the exceptions of
+[Orientation](#calibration). mirt's `bfactor` keeps the orientation that its starting slopes of 1 give, and EM from them
+can end with a specific dimension whose slopes sum below 0, such as one of slopes -1.8, 0.5, 0.5 and 0.5.
+
 | Rule                                | Definition                                                                                           |
 | ----------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | Models                              | The multidimensional 2PL, 3PL and graded models, one for all items                                   |

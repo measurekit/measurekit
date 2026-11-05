@@ -20,7 +20,7 @@ import {
   multidimensionalThreeParameterLogistic,
   multidimensionalTwoParameterLogistic,
 } from "../src/multidimensional/index.js";
-import { createWalk, patternsOf, structureOf } from "../src/multidimensional/internal.js";
+import { createWalk, orientDimensions, patternsOf, structureOf } from "../src/multidimensional/internal.js";
 import { simulateMultidimensionalResponses } from "../src/sim/index.js";
 import { defined, expectClose } from "./assertions.js";
 import { readFixture } from "./fixtures.js";
@@ -662,6 +662,35 @@ describe("calibrateBifactor", () => {
       return Math.max(...slopes) - Math.min(...slopes);
     };
     expect(spread(reduced)).toBeLessThan(spread(plain));
+  });
+
+  it("turns a dimension whose slopes sum below zero, as calibrateMultidimensional does, but not with a model of its own", () => {
+    // The slopes of s1 are -1.8, 0.5, 0.5 and 0.5: from slopes of 1, EM ends with the small ones above 0 and the sum below.
+    const random = createRandom(1);
+    const items = Array.from({ length: 8 }, (_, i) => {
+      const a = [0.9 + 0.2 * (i % 4), 0, 0];
+      a[1 + Math.floor(i / 4)] = i < 4 ? (i === 0 ? -1.8 : 0.5) : 0.7 + 0.15 * (i % 4);
+      return {
+        model: multidimensionalTwoParameterLogistic,
+        parameters: { a, intercept: 0.6 * ((i % 4) - 1.5), c: 0, d: 1 },
+      };
+    });
+    const thetas = Array.from({ length: 400 }, () => [random.normal(), random.normal(), random.normal()]);
+    const matrix = simulateMultidimensionalResponses(items, thetas, random);
+    const specific = Object.fromEntries(matrix.itemIds.map((id, i) => [id, i < 4 ? "s1" : "s2"]));
+    const fit = calibrateBifactor(matrix, specific, { points: 9 });
+    const unturned = calibrateBifactor(matrix, specific, {
+      points: 9,
+      model: { ...multidimensionalTwoParameterLogistic },
+    });
+    const sums = (calibration: MultidimensionalCalibration<Parameters>): number[] =>
+      calibration.dimensions.map((_, d) =>
+        calibration.items.reduce((sum, item) => sum + (item.parameters.a[d] ?? 0), 0),
+      );
+    expect(unturned.converged).toBe(true);
+    expect(sums(unturned)[1]).toBeLessThan(-0.5);
+    expect(fit).toEqual(orientDimensions(unturned, [true, true, true]));
+    for (const sum of sums(fit)) expect(sum).toBeGreaterThan(0);
   });
 
   describe("input", () => {

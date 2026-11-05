@@ -348,6 +348,14 @@ export const RULES: readonly Rule[] = [
     titles: "keeps the orientation that fixed items give",
   },
   {
+    rule: "A bifactor or two-tier calibration turns a dimension whose slopes sum below 0, as a multidimensional one does.",
+    file: "packages/psychometrics/src/multidimensional/bifactor.ts",
+    find: "return orientDimensions(calibration, turnableDimensions(solution.items, structure.design));",
+    replace: "return calibration;",
+    test: "packages/psychometrics/test/bifactor.test.ts",
+    titles: "turns a dimension whose slopes sum below zero",
+  },
+  {
     rule: "A fixed items' covariance labels fixed items only, as an earlier covariance says nothing of an estimate made here.",
     file: "packages/psychometrics/src/irt/fixed-error.ts",
     find: "if (item.estimated) {",

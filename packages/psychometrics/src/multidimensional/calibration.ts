@@ -210,7 +210,7 @@ const LINEAR_MODELS: ReadonlySet<unknown> = new Set([
  * that a fixed item or a held slope orients, or whose estimated slopes have bounds or a prior, which the turn would not
  * keep.
  */
-function turnableDimensions<TParameters>(items: readonly ItemState<TParameters>[], design: Design): boolean[] {
+export function turnableDimensions<TParameters>(items: readonly ItemState<TParameters>[], design: Design): boolean[] {
   const dimensions = design.dimensionNames.length;
   const turnable = new Array<boolean>(dimensions).fill(items.every((item) => LINEAR_MODELS.has(item.model)));
   for (const item of items) {
