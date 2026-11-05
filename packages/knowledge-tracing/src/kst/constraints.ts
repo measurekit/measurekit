@@ -91,12 +91,12 @@ function groupsOf(name: RateName, groups: unknown): string[][] {
   if (!Array.isArray(groups)) {
     throw new DataError(`The option equal.${name} must be a list of groups of items, found ${describe(groups)}.`);
   }
-  return groups.map((group: unknown) => {
+  return Array.from(groups, (group: unknown) => {
     if (
       !(
         Array.isArray(group) &&
         group.length >= 2 &&
-        group.every(isNonEmptyString) &&
+        Array.from(group).every(isNonEmptyString) &&
         new Set(group).size === group.length
       )
     ) {

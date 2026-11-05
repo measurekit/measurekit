@@ -886,6 +886,20 @@ describe("structure tools, errors", () => {
     }
   });
 
+  it("rejects a list with a hole, which every() would skip: a domain, the probabilities of the states, a group of items", () => {
+    const holed = <T>(values: readonly T[], length: number): T[] => Object.assign(new Array<T>(length), values);
+    expect(() => structureBase({ domain: holed(["a"], 2), states: [[], ["a"]] })).toThrow(
+      "A knowledge structure needs a domain, a non-empty list of element ids.",
+    );
+    const structure = surmiseStructure({ a: [], b: ["a"] });
+    expect(() =>
+      kst(structure, { over: "items", parameters: { probabilities: holed([0.5, 0.5], 3), items: {} } }),
+    ).toThrow("needs probabilities, 3 numbers of at least 0, one per knowledge state.");
+    expect(() => kst(structure, { over: "items", equal: { guess: [holed(["a", "b"], 3)] } })).toThrow(
+      "Each group of the option equal.guess needs at least 2 distinct item ids",
+    );
+  });
+
   it("rejects a structure that is not a knowledge space where a base is asked", () => {
     expect(structureBase({ domain: ["a", "b"], states: [[], ["a"], ["b"], ["a", "b"]] })).toEqual([["a"], ["b"]]);
     expect(() =>

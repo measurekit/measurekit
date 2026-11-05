@@ -93,7 +93,7 @@ export function seal(structure: KnowledgeStructure): KnowledgeStructure {
 function validate(structure: KnowledgeStructure): CompiledStructure {
   checkRecord(structure, "A knowledge structure must be an object of domain and states");
   const { domain, states } = structure;
-  if (!(Array.isArray(domain) && domain.length > 0 && domain.every(isNonEmptyString))) {
+  if (!(Array.isArray(domain) && domain.length > 0 && Array.from(domain).every(isNonEmptyString))) {
     throw new DataError("A knowledge structure needs a domain, a non-empty list of element ids.");
   }
   const index = new Map(domain.map((element, e) => [element, e]));

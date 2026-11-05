@@ -241,7 +241,7 @@ function checkDichotomous({ a, b, c = 0, d = 1 }: DichotomousItem, label: string
 
 function checkNominal({ a, c }: NominalItem, label: string): void {
   const finite = (values: unknown): values is readonly number[] =>
-    Array.isArray(values) && values.every(Number.isFinite);
+    Array.isArray(values) && Array.from(values).every(Number.isFinite);
   if (!(finite(a) && finite(c) && a.length >= 2 && a.length === c.length)) {
     const shown = (values: unknown): string => (Array.isArray(values) ? `[${values.join(", ")}]` : describe(values));
     throw new DataError(
@@ -259,7 +259,7 @@ function checkPolytomous(item: GradedItem | PartialCreditItem, label: string): v
   }
   const { a, b } = item;
   if (!Number.isFinite(a)) throw new DataError(`${label} needs a, a finite number, found ${describe(a)}.`);
-  if (!(Array.isArray(b) && b.length > 0 && b.every(Number.isFinite))) {
+  if (!(Array.isArray(b) && b.length > 0 && Array.from(b).every(Number.isFinite))) {
     throw new DataError(`${label} needs b, a non-empty array of finite thresholds, found ${describe(b)}.`);
   }
   if (model === "graded" && !hasOrderedThresholds(a, b)) {

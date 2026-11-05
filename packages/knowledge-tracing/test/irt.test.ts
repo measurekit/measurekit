@@ -455,6 +455,11 @@ describe("IRT edge cases", () => {
     expect(build({ model: "nominal", a: [0, Number.NaN], c: [0, 0] })).toThrow("found a = [0, NaN]");
     expect(build(JSON.parse('{"model":"nominal","a":[0,1],"c":"0,0"}'))).toThrow('and c = "0,0".');
     expect(build({ model: "nominal", a: 1, b: [0] })).toThrow("found a = 1 and c = undefined.");
+    // A hole, an index that holds no element, which every() would skip and a read would take as 0.
+    const holed = (values: readonly number[], length: number): number[] =>
+      Object.assign(new Array<number>(length), values);
+    expect(build({ model: "nominal", a: holed([0, 1], 3), c: [0, 0, 0] })).toThrow("arrays of finite numbers");
+    expect(build({ model: "gpcm", a: 1, b: holed([0], 2) })).toThrow("non-empty array of finite thresholds");
     expect(() => irt({ items }, { prior: { mean: 0, sd: 0 } })).toThrow(
       "The sd of the prior must be a positive number, found 0.",
     );

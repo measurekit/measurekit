@@ -24,7 +24,14 @@ const SUM_TOLERANCE = 1e-9;
 
 /** Checks a list of probabilities over the states: non-negative, as many as the states, summing to 1. */
 export function checkDistribution(values: unknown, count: number, label: string): void {
-  if (!(Array.isArray(values) && values.length === count && values.every((p) => typeof p === "number" && p >= 0))) {
+  // Array.from reads a hole, an index that holds no element, as undefined, which every() would skip.
+  if (
+    !(
+      Array.isArray(values) &&
+      values.length === count &&
+      Array.from(values).every((p) => typeof p === "number" && p >= 0)
+    )
+  ) {
     throw new DataError(`${label} needs probabilities, ${count} numbers of at least 0, one per knowledge state.`);
   }
   const total = values.reduce((sum: number, p: number) => sum + p, 0);
