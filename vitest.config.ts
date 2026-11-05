@@ -83,8 +83,7 @@ export default defineConfig({
       // One floor for each package: its branches over the package, and its statements, functions and lines over each
       // module on its own, so that a gap in the tests of a module fails its own floor and no other. CI checks core and knowledge tracing in the job of their project on Node.js 22, with the
       // files of that package alone, and rules.yml checks psychometrics each week and before a release. Psychometrics'
-      // floor is its measure on Node.js 22 rounded down; under coverage its tests take about 36 minutes, 4.6 times as long,
-      // and the timeouts of the slowest calibrations hold that.
+      // floor is its measure on Node.js 22 rounded down; under coverage its tests take about 36 minutes, 4.6 times as long.
       thresholds: {
         ...packageFloors("core", { statements: 94, branches: 74, functions: 96, lines: 95 }),
         ...packageFloors("knowledge-tracing", { statements: 98, branches: 82, functions: 99, lines: 99 }),
@@ -101,13 +100,15 @@ export default defineConfig({
       },
       {
         resolve: { alias: CORE_SOURCE },
-        // Calibrations to a tolerance of 1e-8 take seconds, the testlet, diagnosis and multidimensional models many
-        // times more, on a machine under load longer still.
+        // A test ends within half its timeout on a runner under coverage, which runs two to three times as long as a
+        // developer's machine: 60 s holds the tests of about 10 s there that STANDARDS section 7 allows, and a hook the
+        // same. A test that needs more is cut, never given a longer timeout of its own.
         test: {
           name: "psychometrics",
           include: ["packages/psychometrics/test/**/*.test.ts"],
           setupFiles: ["packages/psychometrics/test/setup.ts"],
-          testTimeout: 120_000,
+          testTimeout: 60_000,
+          hookTimeout: 60_000,
         },
       },
       {
