@@ -49,14 +49,14 @@ test("calibrates the many-facet Rasch model of 200 persons, 10 items and 4 rater
   await benchmark(
     context,
     "rater.manyFacetRasch",
-    () => manyFacetRasch(fixture.scores, { facets: ["item", "rater"] }),
+    () => manyFacetRasch(fixture.scores, ["item", "rater"]),
     SLOW_OPTIONS,
   );
 });
 
 test("calibrates the many-facet Rasch model of 150 persons, 8 items and 3 raters with the interaction of items and raters", async (context) => {
   await benchmark(context, "rater.manyFacetRaschInteractions", () =>
-    manyFacetRasch(interactionsFixture.scores, { facets: ["item", "rater"], interactions: [["item", "rater"]] }),
+    manyFacetRasch(interactionsFixture.scores, ["item", "rater"], { interactions: [["item", "rater"]] }),
   );
 });
 

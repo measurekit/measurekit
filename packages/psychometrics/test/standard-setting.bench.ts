@@ -41,6 +41,6 @@ test("measures the accuracy and consistency of the classification of 2,000 perso
 test("measures the accuracy and consistency of the classification of 3,000 total scores of 40 items by one cut", async (context) => {
   const { scores, reliability, maximum, cut } = classificationFixture;
   await benchmark(context, "standardSetting.livingstonLewis", () =>
-    livingstonLewisClassification(scores, [cut], { reliability, maximum }),
+    livingstonLewisClassification(scores, [cut], reliability, maximum),
   );
 });

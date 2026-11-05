@@ -1520,15 +1520,17 @@ describe("irtLikelihoodRatioDif", () => {
         .filter((item) => !item.id.includes(":") || item.id.endsWith(`:${group}`))
         .map((item) => ({ ...item, id: item.id.replace(`:${group}`, "") }));
     const population = defined(dif.constrained.groups.find((distribution) => distribution.group === "focal"));
-    const functioning = differentialFunctioning(freeOf("reference"), freeOf("focal"), { population });
+    const functioning = differentialFunctioning(freeOf("reference"), freeOf("focal"), population);
     const functioned = defined(functioning.items[2]);
     expect([shown(functioned.ncdif, 3), shown(functioned.cdif, 3), shown(functioning.dtf, 3)]).toEqual([
       0.0276, 0.0219, 0.0263,
     ]);
     const inPassage = (item: TestItem): boolean => ["item3", "item4"].includes(item.id);
-    const passage = differentialFunctioning(freeOf("reference").filter(inPassage), freeOf("focal").filter(inPassage), {
+    const passage = differentialFunctioning(
+      freeOf("reference").filter(inPassage),
+      freeOf("focal").filter(inPassage),
       population,
-    });
+    );
     expect(shown(passage.dtf, 3)).toBe(0.0263);
   });
 
@@ -1602,7 +1604,7 @@ describe("differentialFunctioning", () => {
       parameters.map((each, i) => ({ id: `item${i + 1}`, model, parameters: each }));
 
     it(`matches DFIT's Ncdif, Cdif and Dtf on ${name} items`, () => {
-      const result = differentialFunctioning(items(expected.reference), items(expected.focal), { population });
+      const result = differentialFunctioning(items(expected.reference), items(expected.focal), population);
       result.items.forEach((item, i) => {
         expectClose(item.ncdif, expected.ncdif[i] ?? 0, FUNCTIONING_TOLERANCE, `NCDIF ${i + 1}`);
         expectClose(item.cdif, expected.cdif[i] ?? 0, FUNCTIONING_TOLERANCE, `CDIF ${i + 1}`);
@@ -1616,7 +1618,7 @@ describe("differentialFunctioning", () => {
     // Items 1 and 3: item 3 is equal in both groups, so the bundle's DBF is item 1's NCDIF.
     const items = (parameters: readonly LogisticItem[]): TestItem<LogisticItem>[] =>
       [0, 2].map((i) => ({ id: `item${i + 1}`, model: twoParameterLogistic, parameters: defined(parameters[i]) }));
-    const bundle = differentialFunctioning(items(expected.reference), items(expected.focal), { population });
+    const bundle = differentialFunctioning(items(expected.reference), items(expected.focal), population);
     expectClose(
       bundle.dtf,
       bundle.items.reduce((sum, item) => sum + item.cdif, 0),
@@ -1634,25 +1636,20 @@ describe("differentialFunctioning", () => {
       parameters: { a: 1, b, c: 0, d: 1 },
     });
     const reference = [item("x", 0), item("y", 1)];
-    const options = { population: { nodes: [0], weights: [1] } };
-    expect(() => differentialFunctioning(reference, [item("x", 0)], options)).toThrow(
+    const population = { nodes: [0], weights: [1] };
+    expect(() => differentialFunctioning(reference, [item("x", 0)], population)).toThrow(
       "Found 1 focal items for 2 reference items.",
     );
-    expect(() => differentialFunctioning(reference, [item("y", 1), item("x", 0)], options)).toThrow(
+    expect(() => differentialFunctioning(reference, [item("y", 1), item("x", 0)], population)).toThrow(
       'The focal items must be the reference items in the same order; item 1 is "x" in the reference list and "y" in the focal list.',
     );
-    expect(() => differentialFunctioning(reference, reference, { population: { nodes: [0], weights: [0.5] } })).toThrow(
+    expect(() => differentialFunctioning(reference, reference, { nodes: [0], weights: [0.5] })).toThrow(
       "The weights of the population must sum to 1, found 0.5.",
     );
-    expect(() => differentialFunctioning(reference, reference, JSON.parse("null"))).toThrow(
-      "The options must be an object, found null.",
-    );
-    expect(() => differentialFunctioning(reference, reference, JSON.parse('{"verbose":1}'))).toThrow(
-      'There is no option "verbose"',
-    );
+    expect(() => differentialFunctioning(reference, reference, JSON.parse("null"))).toThrow(DataError);
     expect(() => differentialFunctioning(reference, reference, JSON.parse("{}"))).toThrow(DataError);
-    expect(() => differentialFunctioning(JSON.parse('"x"'), reference, options)).toThrow(DataError);
-    expect(differentialFunctioning([], [], options)).toEqual({ items: [], dtf: 0 });
+    expect(() => differentialFunctioning(JSON.parse('"x"'), reference, population)).toThrow(DataError);
+    expect(differentialFunctioning([], [], population)).toEqual({ items: [], dtf: 0 });
   });
 });
 
@@ -2755,7 +2752,7 @@ describe("properties", () => {
     fc.assert(
       fc.property(fc.array(arbitraryItem, { minLength: 1, maxLength: 5 }), population, (items, distribution) => {
         const tested = items.map((item, i) => ({ ...item, id: `item${i + 1}` }));
-        const result = differentialFunctioning(tested, tested, { population: distribution });
+        const result = differentialFunctioning(tested, tested, distribution);
         expect(result.dtf).toBe(0);
         for (const item of result.items) expect([item.ncdif, item.cdif]).toEqual([0, 0]);
       }),

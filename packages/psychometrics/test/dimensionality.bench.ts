@@ -53,9 +53,7 @@ test("correlates 25 items of 6 categories answered by 2,800 persons", async (con
 });
 
 test("fits five factors to 25 items answered by 2,800 persons and tests how many components they have", async (context) => {
-  await benchmark(context, "dimensionality.exploratoryFactorAnalysis", () =>
-    exploratoryFactorAnalysis(matrix, { factors: 5 }),
-  );
+  await benchmark(context, "dimensionality.exploratoryFactorAnalysis", () => exploratoryFactorAnalysis(matrix, 5));
   await benchmark(context, "dimensionality.minimumAveragePartial", () =>
     minimumAveragePartial(matrix, { maxFactors: 8 }),
   );
@@ -63,7 +61,7 @@ test("fits five factors to 25 items answered by 2,800 persons and tests how many
 
 test("fits five factors to 25 items answered by 2,800 persons by maximum likelihood, and a general factor above them", async (context) => {
   await benchmark(context, "dimensionality.maximumLikelihoodFactors", () =>
-    exploratoryFactorAnalysis(matrix, { factors: 5, extraction: "maximum-likelihood" }),
+    exploratoryFactorAnalysis(matrix, 5, { extraction: "maximum-likelihood" }),
   );
   await benchmark(context, "dimensionality.omegaHierarchical", () => omegaHierarchical(matrix, { factors: 5 }));
 });

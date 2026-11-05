@@ -27,9 +27,6 @@ import {
 } from "../irt/internal.js";
 import { checkFullRank, type Design, designMatrix, type FeatureEffect, type ItemFeatures } from "./features.js";
 
-/** How the standard errors of the effects of an LLTM are computed. */
-export type LltmStandardErrors = "none" | "hessian";
-
 /**
  * The responses an LLTM explains: `"dichotomous"`, items scored 0 or 1; `"partial-credit"`, items of any number of
  * categories, each with thresholds of its own; `"rating-scale"`, items that share one number of categories and one set
@@ -64,7 +61,7 @@ export interface LltmOptions {
    *
    * @defaultValue `"hessian"`
    */
-  readonly standardErrors?: LltmStandardErrors;
+  readonly standardErrors?: "none" | "hessian";
   /**
    * Estimation has converged when no parameter changes by more than this in an EM iteration.
    *
@@ -136,7 +133,7 @@ export interface Lltm<TParameters = LogisticItem> {
 
 const DEFAULT_TOLERANCE = 1e-4;
 const DEFAULT_MAX_ITERATIONS = 500;
-const STANDARD_ERRORS: readonly LltmStandardErrors[] = ["none", "hessian"];
+const STANDARD_ERRORS = ["none", "hessian"] as const;
 const MODELS: readonly LltmModel[] = ["dichotomous", "partial-credit", "rating-scale"];
 /** The model in the messages of the limits of its size. */
 const RASCH_MODEL_NAME = "The Rasch model of an LLTM's comparison";

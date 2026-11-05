@@ -252,7 +252,7 @@ export const READERS: readonly ReaderCase[] = [
         })),
       ).flat(),
     read: (scores: unknown[], { psychometrics }) =>
-      psychometrics.manyFacetRasch(scores, { facets: ["item", "rater"], standardErrors: "none", maxIterations: 1 }),
+      psychometrics.manyFacetRasch(scores, ["item", "rater"], { standardErrors: "none", maxIterations: 1 }),
   },
   {
     name: "personScalability: 2 persons, 1,000,000 items",

@@ -827,7 +827,7 @@ describe("livingstonLewisClassification", () => {
   for (const reference of Object.values(livingstonLewis.cases)) {
     it(`matches betafunctions' fit and base R's indices: ${reference.name}`, () => {
       const { scores, cuts: cutScores, reliability, minimum, maximum } = reference;
-      const result = livingstonLewisClassification(scores, cutScores, { reliability, minimum, maximum });
+      const result = livingstonLewisClassification(scores, cutScores, reliability, maximum, { lowest: minimum });
       const { trueScore } = result;
       expectClose(trueScore.effectiveLength, reference.effectiveLength, PARAMETER_TOLERANCE, "effective length");
       expectClose(trueScore.alpha, reference.trueScore.alpha, PARAMETER_TOLERANCE, "alpha");
@@ -863,7 +863,7 @@ describe("livingstonLewisClassification", () => {
       const second = truth.map((p) => answer(p).reduce((sum, x) => sum + x, 0));
       const scores = first.map((row) => row.reduce((sum, x) => sum + x, 0));
       const reliability = cronbachAlpha(buildResponseMatrix(first));
-      const result = livingstonLewisClassification(scores, [18, 28], { reliability, maximum: 40 });
+      const result = livingstonLewisClassification(scores, [18, 28], reliability, 40);
       const category = (score: number): number => (score >= 28 ? 2 : score >= 18 ? 1 : 0);
       let accurate = 0;
       let consistent = 0;
@@ -881,14 +881,16 @@ describe("livingstonLewisClassification", () => {
 
   it("classifies every person alike by a cut at or below the lowest score, and moves with the scale", () => {
     const { scores, reliability } = defined(livingstonLewis.cases["one cut"]);
-    const below = livingstonLewisClassification(scores, [0], { reliability, maximum: 40 });
+    const below = livingstonLewisClassification(scores, [0], reliability, 40);
     expectClose(below.accuracy, 1, 1e-12, "accuracy");
     expectClose(below.consistency, 1, 1e-12, "consistency");
-    const plain = livingstonLewisClassification(scores, [16, 24], { reliability, maximum: 40 });
+    const plain = livingstonLewisClassification(scores, [16, 24], reliability, 40);
     const shifted = livingstonLewisClassification(
       scores.map((score) => 2 * score + 10),
       [42, 58],
-      { reliability, minimum: 10, maximum: 90 },
+      reliability,
+      90,
+      { lowest: 10 },
     );
     expectClose(shifted.accuracy, plain.accuracy, 1e-12, "accuracy on the doubled scale");
     expectClose(shifted.trueScore.alpha, plain.trueScore.alpha, 1e-9, "alpha on the doubled scale");
@@ -898,7 +900,7 @@ describe("livingstonLewisClassification", () => {
   it("keeps accuracy and consistency within [0, 1] where the quadrature's rounding would carry them past 1", () => {
     // With a cut beyond the highest score every person is below it, and the integrals of the beta came to 1 + 1.2e-13.
     const scores = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-    const beyond = livingstonLewisClassification(scores, [50], { reliability: 0.8, maximum: 10 });
+    const beyond = livingstonLewisClassification(scores, [50], 0.8, 10);
     for (const value of [
       beyond.accuracy,
       beyond.consistency,
@@ -913,75 +915,76 @@ describe("livingstonLewisClassification", () => {
   it("counts a cut a rounding below a whole number of trials as that number", () => {
     // N rounds to 46: a cut at 0.5 of the range scales to 23 trials exactly, so a score of 23 is above it.
     const { scores, reliability } = defined(livingstonLewis.cases["one cut"]);
-    const exact = livingstonLewisClassification(scores, [20], { reliability, maximum: 40 });
-    const nudged = livingstonLewisClassification(scores, [20 - 1e-12], { reliability, maximum: 40 });
+    const exact = livingstonLewisClassification(scores, [20], reliability, 40);
+    const nudged = livingstonLewisClassification(scores, [20 - 1e-12], reliability, 40);
     expectClose(nudged.accuracy, exact.accuracy, 1e-6, "a cut a rounding below");
   });
 
   it("rejects invalid scores, cuts and options", () => {
     const scores = [10, 14, 20, 25, 31];
-    const options = { reliability: 0.8, maximum: 40 };
-    expect(() => livingstonLewisClassification([10], [20], options)).toThrow(
+    expect(() => livingstonLewisClassification([10], [20], 0.8, 40)).toThrow(
       "Livingston and Lewis need at least two scores, found 1.",
     );
-    expect(() => livingstonLewisClassification([10, 41], [20], options)).toThrow(
+    expect(() => livingstonLewisClassification([10, 41], [20], 0.8, 40)).toThrow(
       "Score 2 must be a number from 0 to 40, found 41.",
     );
-    expect(() => livingstonLewisClassification([10, Number.NaN], [20], options)).toThrow(DataError);
-    expect(() => livingstonLewisClassification([12, 12, 12], [20], options)).toThrow(
+    expect(() => livingstonLewisClassification([10, Number.NaN], [20], 0.8, 40)).toThrow(DataError);
+    expect(() => livingstonLewisClassification([12, 12, 12], [20], 0.8, 40)).toThrow(
       "Livingston and Lewis need scores that vary; every score is the same.",
     );
-    expect(() => livingstonLewisClassification(scores, [], options)).toThrow(
+    expect(() => livingstonLewisClassification(scores, [], 0.8, 40)).toThrow(
       "Livingston and Lewis need at least one cut.",
     );
-    expect(() => livingstonLewisClassification(scores, [20, 20], options)).toThrow(
+    expect(() => livingstonLewisClassification(scores, [20, 20], 0.8, 40)).toThrow(
       "The cuts must increase; cut 2 is 20.",
     );
-    expect(() => livingstonLewisClassification(scores, [20], { ...options, reliability: 1 })).toThrow(
-      "The option reliability must be a number between 0 and 1, exclusive, found 1.",
+    expect(() => livingstonLewisClassification(scores, [20], 1, 40)).toThrow(
+      "The reliability must be a number between 0 and 1, exclusive, found 1.",
     );
-    expect(() => livingstonLewisClassification(scores, [20], { reliability: 0.8, maximum: 0 })).toThrow(
-      "The option maximum must be above the minimum 0, found 0.",
+    expect(() => livingstonLewisClassification(scores, [20], 0.8, 0)).toThrow(
+      "The highest score must be above the lowest score 0, found 0.",
     );
-    expect(() => livingstonLewisClassification(scores, [20], { ...options, minimum: Number.NaN })).toThrow(
-      "The option minimum must be a finite number, found NaN.",
+    expect(() => livingstonLewisClassification(scores, [20], 0.8, Number.NaN)).toThrow(
+      "The highest score must be a finite number, found NaN.",
+    );
+    expect(() => livingstonLewisClassification(scores, [20], 0.8, 40, { lowest: Number.NaN })).toThrow(
+      "The option lowest must be a finite number, found NaN.",
     );
   });
 
   it("rejects an effective length outside its limits and scores no beta fits", () => {
     // Scores only at the ends of the range have a variance near the largest, so N = 0.375 at a reliability of 0.6; a
     // reliability of 0.9999 makes N about 97,000.
-    expect(() => livingstonLewisClassification([0, 40, 0, 40], [20], { reliability: 0.6, maximum: 40 })).toThrow(
+    expect(() => livingstonLewisClassification([0, 40, 0, 40], [20], 0.6, 40)).toThrow(
       /Livingston and Lewis need an effective test length from 1 to 10000 after rounding/,
     );
-    expect(() =>
-      livingstonLewisClassification([12, 18, 20, 21, 29], [20], { reliability: 0.9999, maximum: 40 }),
-    ).toThrow(/effective test length from 1 to 10000/);
-    expect(() => livingstonLewisClassification([18, 19, 20, 21, 22], [20], { reliability: 0.01, maximum: 40 })).toThrow(
+    expect(() => livingstonLewisClassification([12, 18, 20, 21, 29], [20], 0.9999, 40)).toThrow(
+      /effective test length from 1 to 10000/,
+    );
+    expect(() => livingstonLewisClassification([18, 19, 20, 21, 22], [20], 0.01, 40)).toThrow(
       /Livingston and Lewis find no true-score beta for these scores/,
     );
   });
 
   it("rejects scores, cuts and options of other types from JavaScript", () => {
-    const options = { reliability: 0.8, maximum: 40 };
-    expect(() => livingstonLewisClassification(JSON.parse("null"), [20], options)).toThrow(
+    expect(() => livingstonLewisClassification(JSON.parse("null"), [20], 0.8, 40)).toThrow(
       "Livingston and Lewis need an array of scores, found null.",
     );
-    expect(() => livingstonLewisClassification([10, JSON.parse('"20"')], [20], options)).toThrow(
+    expect(() => livingstonLewisClassification([10, JSON.parse('"20"')], [20], 0.8, 40)).toThrow(
       'Score 2 must be a number from 0 to 40, found "20".',
     );
-    expect(() => livingstonLewisClassification([10, 20], JSON.parse("{}"), options)).toThrow(
+    expect(() => livingstonLewisClassification([10, 20], JSON.parse("{}"), 0.8, 40)).toThrow(
       "Livingston and Lewis need an array of cuts, found an object.",
     );
-    expect(() => livingstonLewisClassification([10, 20], [JSON.parse('"15"')], options)).toThrow(
+    expect(() => livingstonLewisClassification([10, 20], [JSON.parse('"15"')], 0.8, 40)).toThrow(
       'Cut 1 must be a finite number, found "15".',
     );
-    expect(() => livingstonLewisClassification([10, 20], [15], JSON.parse("null"))).toThrow(
-      "Livingston and Lewis need options { reliability, maximum }, found null.",
+    expect(() => livingstonLewisClassification([10, 20], [15], 0.8, 40, JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
     );
-    expect(() =>
-      livingstonLewisClassification([10, 20], [15], JSON.parse('{"reliability":"0.8","maximum":40}')),
-    ).toThrow('The option reliability must be a number between 0 and 1, exclusive, found "0.8".');
+    expect(() => livingstonLewisClassification([10, 20], [15], JSON.parse('"0.8"'), 40)).toThrow(
+      'The reliability must be a number between 0 and 1, exclusive, found "0.8".',
+    );
   });
 });
 
@@ -1144,7 +1147,7 @@ describe("properties", () => {
   /** Livingston and Lewis's classification, or `null` where the scores and the reliability fit no beta. */
   const classifyOrNull = (scores: readonly number[], cuts: readonly number[], reliability: number) => {
     try {
-      return livingstonLewisClassification(scores, cuts, { reliability, maximum: 30 });
+      return livingstonLewisClassification(scores, cuts, reliability, 30);
     } catch (error) {
       if (!(error instanceof DataError)) throw error;
       return null;

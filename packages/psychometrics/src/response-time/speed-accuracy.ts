@@ -39,13 +39,8 @@ import {
 } from "./speed-accuracy-time.js";
 import { type TimedResponses, timedResponses } from "./timed-responses.js";
 
-/** How the standard errors of {@link calibrateSpeedAccuracy} are computed. */
-export type SpeedAccuracyStandardErrors = "none" | "hessian";
-
 /** Options of {@link calibrateSpeedAccuracy}. */
-export interface SpeedAccuracyOptions<TParameters> {
-  /** The model of every item, or one model per item, in item order. */
-  readonly model: IrtModel<TParameters> | readonly IrtModel<TParameters>[];
+export interface SpeedAccuracyOptions {
   /**
    * Priors by parameter name, such as `{ c: betaPrior(5, 17) }`, applied to that parameter of every item whose model
    * has it, as in `calibrate`.
@@ -65,7 +60,7 @@ export interface SpeedAccuracyOptions<TParameters> {
    *
    * @defaultValue `"none"`
    */
-  readonly standardErrors?: SpeedAccuracyStandardErrors;
+  readonly standardErrors?: "none" | "hessian";
   /**
    * EM has converged when no parameter changes by more than this in an iteration.
    *
@@ -80,8 +75,7 @@ export interface SpeedAccuracyOptions<TParameters> {
   readonly maxIterations?: number;
 }
 
-const SPEED_ACCURACY_OPTIONS: FieldNames<SpeedAccuracyOptions<unknown>> = {
-  model: true,
+const SPEED_ACCURACY_OPTIONS: FieldNames<SpeedAccuracyOptions> = {
   priors: true,
   quadrature: true,
   standardErrors: true,
@@ -142,7 +136,7 @@ export interface SpeedAccuracyEstimate {
 
 const DEFAULT_TOLERANCE = 1e-6;
 const DEFAULT_MAX_ITERATIONS = 1000;
-const STANDARD_ERRORS: readonly SpeedAccuracyStandardErrors[] = ["none", "hessian"];
+const STANDARD_ERRORS = ["none", "hessian"] as const;
 
 /**
  * Calibrates the hierarchical model of speed and accuracy: an IRT model for the responses, ln T_ij ~ N(β_i - τ_j,
@@ -164,8 +158,9 @@ const STANDARD_ERRORS: readonly SpeedAccuracyStandardErrors[] = ["none", "hessia
  * not part of it.
  *
  * @param data - The responses of the persons with their times.
- * @param options - The model, priors and quadrature of the responses, the standard errors and the stopping rules; each
- *   option has its default.
+ * @param model - The model of every item, or one model per item, in item order.
+ * @param options - The priors and quadrature of the responses, the standard errors and the stopping rules; each option
+ *   has its default.
  * @returns The items with their parameters, the standard deviation of the speed, the correlation of speed and ability
  *   with its standard error, the log-likelihood, AIC and BIC, whether the estimation converged and the iterations run.
  * @throws `DataError` when the data are malformed or have no times, an item has fewer than two times or times that do
@@ -176,11 +171,11 @@ const STANDARD_ERRORS: readonly SpeedAccuracyStandardErrors[] = ["none", "hessia
  */
 export function calibrateSpeedAccuracy<TParameters>(
   data: ResponseMatrix | ResponseRecords,
-  options: SpeedAccuracyOptions<TParameters>,
+  model: IrtModel<TParameters> | readonly IrtModel<TParameters>[],
+  options: SpeedAccuracyOptions = {},
 ): SpeedAccuracyCalibration<TParameters> {
   checkOptions(options, SPEED_ACCURACY_OPTIONS);
   const {
-    model,
     priors,
     quadrature,
     standardErrors = "none",
@@ -262,9 +257,9 @@ export function calibrateSpeedAccuracy<TParameters>(
  * not among its items, or a response is not a category of its item.
  * @see {@link https://doi.org/10.1177/0146621609344844 | van der Linden, Klein Entink and Fox (2010)}
  */
-export function speedAccuracyEstimates<TParameters>(
+export function speedAccuracyEstimates(
   data: ResponseMatrix | ResponseRecords,
-  calibration: SpeedAccuracyCalibration<TParameters>,
+  calibration: SpeedAccuracyCalibration<unknown>,
 ): readonly SpeedAccuracyEstimate[] {
   const timed = timedResponses(data, "Speed-accuracy estimation");
   checkCalibration(calibration);
@@ -286,7 +281,7 @@ export function speedAccuracyEstimates<TParameters>(
   const second = conditional(calibration.speedSd, calibration.correlation);
   const logTerms = new Float64Array(timed.personIds.length * nodes.length);
   fillLogTerms(sums, second, nodes, logTerms);
-  const context: EstimationContext<TParameters> = {
+  const context: EstimationContext = {
     timed,
     items,
     tables: logProbabilityTables(items, nodes),
@@ -301,9 +296,9 @@ export function speedAccuracyEstimates<TParameters>(
 }
 
 /** What the estimates of the persons share: the data, the items' log probabilities and the time terms. */
-interface EstimationContext<TParameters> {
+interface EstimationContext {
   readonly timed: TimedResponses;
-  readonly items: readonly SpeedAccuracyItem<TParameters>[];
+  readonly items: readonly SpeedAccuracyItem<unknown>[];
   readonly tables: readonly { categories: number; table: Float64Array }[];
   readonly nodes: Float64Array;
   readonly logWeights: Float64Array;
@@ -315,11 +310,7 @@ interface EstimationContext<TParameters> {
 }
 
 /** Returns one person's estimates: nothing without responses, theta only without times. */
-function estimateOf<TParameters>(
-  context: EstimationContext<TParameters>,
-  id: string,
-  person: number,
-): SpeedAccuracyEstimate {
+function estimateOf(context: EstimationContext, id: string, person: number): SpeedAccuracyEstimate {
   const { timed, nodes, sums, second, posterior } = context;
   if ((timed.offsets[person + 1] ?? 0) === (timed.offsets[person] ?? 0)) {
     return { id, theta: null, thetaStandardError: null, speed: null, speedStandardError: null };
@@ -347,7 +338,7 @@ function estimateOf<TParameters>(
 }
 
 /** Writes a person's posterior over the nodes into `context.posterior`: the prior, the responses and the times. */
-function posteriorOfTheta<TParameters>(context: EstimationContext<TParameters>, person: number): void {
+function posteriorOfTheta(context: EstimationContext, person: number): void {
   const { timed, items, tables, nodes, logWeights, logTerms, posterior } = context;
   for (let q = 0; q < nodes.length; q++) {
     posterior[q] = (logWeights[q] ?? 0) + (logTerms[person * nodes.length + q] ?? 0);
@@ -363,8 +354,8 @@ function posteriorOfTheta<TParameters>(context: EstimationContext<TParameters>, 
 }
 
 /** Returns each item's log probabilities at the nodes, by node, then category, with its number of categories. */
-function logProbabilityTables<TParameters>(
-  items: readonly SpeedAccuracyItem<TParameters>[],
+function logProbabilityTables(
+  items: readonly SpeedAccuracyItem<unknown>[],
   nodes: Float64Array,
 ): { categories: number; table: Float64Array }[] {
   return items.map((item) => {
@@ -382,9 +373,9 @@ function logProbabilityTables<TParameters>(
 }
 
 /** Throws unless response `r` of the person is a category of its item. */
-function checkResponse<TParameters>(
+function checkResponse(
   timed: TimedResponses,
-  items: readonly SpeedAccuracyItem<TParameters>[],
+  items: readonly SpeedAccuracyItem<unknown>[],
   person: number,
   r: number,
 ): void {
@@ -399,7 +390,7 @@ function checkResponse<TParameters>(
 }
 
 /** Throws unless the calibration has items with time parameters, a positive speed SD and a correlation in (-1, 1). */
-function checkCalibration<TParameters>(calibration: SpeedAccuracyCalibration<TParameters>): void {
+function checkCalibration(calibration: SpeedAccuracyCalibration<unknown>): void {
   checkRecord(calibration, "The calibration must be a speed and accuracy calibration");
   checkFinite(calibration.speedSd, "The calibration's speedSd");
   checkPositive(calibration.speedSd, "The calibration's speedSd");

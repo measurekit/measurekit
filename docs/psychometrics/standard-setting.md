@@ -296,8 +296,8 @@ result.persons[1]; // => { category: 1, probabilities: [0.37, 0.63] }: 0.63 = Φ
 
 ## Livingston and Lewis
 
-`livingstonLewisClassification(scores, cuts, options)` takes total scores of any items, their reliability and cuts on
-the score scale, and returns Livingston and Lewis's (1995) accuracy and consistency, as betafunctions' `LL.CA` for one
+`livingstonLewisClassification(scores, cuts, reliability, highest, options)` takes total scores of any items, cuts on
+the score scale, their reliability, above 0 and below 1, and the highest possible score, and returns Livingston and Lewis's (1995) accuracy and consistency, as betafunctions' `LL.CA` for one
 cut and `LL.CA.MC` for several. Testing programs report it with BB-CLASS, which implements it; Rudner's indices above
 suit cuts on theta with estimates and their standard errors, these suit cuts on a total score, which may sum
 polytomous items or weighted parts.
@@ -332,17 +332,15 @@ const answers = [
 ];
 const reliability = cronbachAlpha(buildResponseMatrix(answers)); // => 0.716
 const scores = answers.map((row) => row.reduce((sum, x) => sum + x, 0));
-const result = livingstonLewisClassification(scores, [4], { reliability, maximum: 8 });
+const result = livingstonLewisClassification(scores, [4], reliability, 8);
 result.accuracy; // => 0.811
 result.consistency; // => 0.757
 result.trueScore; // => { alpha: 2.226, beta: 1.964, lower: 0, upper: 1, effectiveLength: 7.959 }: the fail-safe beta
 ```
 
-| Option        | Default  | Meaning                                            |
-| ------------- | -------- | -------------------------------------------------- |
-| `reliability` | required | The reliability of the scores, above 0 and below 1 |
-| `maximum`     | required | The highest possible score                         |
-| `minimum`     | `0`      | The lowest possible score                          |
+| Option   | Default | Meaning                   |
+| -------- | ------- | ------------------------- |
+| `lowest` | `0`     | The lowest possible score |
 
 | Field         | Meaning                                                                                                  |
 | ------------- | -------------------------------------------------------------------------------------------------------- |
@@ -431,7 +429,7 @@ Invalid input throws `DataError` naming the value found, also input of another t
 | Both borderline functions                | A result that is not finite                                                                                        | Rescale the marks, the ratings or the grade, which are too large                                  |
 | `borderlineGroupCutScores`               | A `statistic` other than `"mean"` and `"median"`                                                                   | Choose one of them                                                                                |
 | `classificationAccuracy`                 | No estimates or cuts, a theta that is not finite, a standard error not above 0, or cuts that do not increase       | Give each estimate with its standard error, and the cuts in increasing order                      |
-| `livingstonLewisClassification`          | Fewer than two scores, a score outside `minimum` to `maximum`, or scores that do not vary                          | Give the total scores of the persons and the range of the test                                    |
+| `livingstonLewisClassification`          | Fewer than two scores, a score outside `lowest` to `highest`, or scores that do not vary                           | Give the total scores of the persons and the range of the test                                    |
 | `livingstonLewisClassification`          | A `reliability` not between 0 and 1, or cuts that are not finite and increasing                                    | Give a reliability such as `cronbachAlpha` of the items, and the cuts in increasing order         |
 | `livingstonLewisClassification`          | An effective test length that rounds to below 1 or above 10,000 trials                                             | Check the reliability: a value near 1 or far too low for the scores' variance gives such a length |
 | `livingstonLewisClassification`          | No permissible beta for the true scores                                                                            | Check the reliability against the scores' variance; use Rudner's indices on theta instead         |

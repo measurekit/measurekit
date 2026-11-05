@@ -153,14 +153,14 @@ with it throws `DataError`.
 
 ## Exploratory factor analysis
 
-`exploratoryFactorAnalysis(matrix, options)` fits `factors` common factors to the items by the minimum residual (minres)
-method, as `psych::fa(fm = "minres")`, or by maximum likelihood, as `fa(fm = "ml")`. It takes a
-[response matrix](data.md), correlates the items, smooths the correlations if they are not positive definite, and
-returns the rotated loadings, the communalities, the correlations between the factors and the fit of the factors.
+`exploratoryFactorAnalysis(matrix, factors, options)` fits `factors` common factors to the items by the minimum residual
+(minres) method, as `psych::fa(fm = "minres")`, or by maximum likelihood, as `fa(fm = "ml")`. It takes a
+[response matrix](data.md) and the number of factors, a positive integer that the items identify: 12 items identify at
+most 7. It correlates the items, smooths the correlations if they are not positive definite, and returns the rotated
+loadings, the communalities, the correlations between the factors and the fit of the factors.
 
 | Option          | Default     | Meaning                                                                                                                 |
 | --------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `factors`       | required    | The number of factors, a positive integer that the items identify: 12 items identify at most 7                          |
 | `correlation`   | `"pearson"` | `"pearson"` for scores treated as continuous, over the persons who answered a pair; `"polychoric"` for item responses   |
 | `extraction`    | `"minres"`  | `"minres"`, the least squared residuals; `"maximum-likelihood"`, Jöreskog's likelihood concentrated on the uniquenesses |
 | `rotation`      | `"oblimin"` | `"none"`; `"varimax"`, orthogonal with Kaiser's normalization; `"oblimin"`, oblique. One factor is not rotated          |
@@ -183,7 +183,7 @@ returns the rotated loadings, the communalities, the correlations between the fa
 import { exploratoryFactorAnalysis } from "@measurekit/psychometrics/dimensionality";
 
 // `matrix` is the response matrix of the example above: two independent traits, six items each.
-const fit = exploratoryFactorAnalysis(matrix, { factors: 2, correlation: "polychoric" });
+const fit = exploratoryFactorAnalysis(matrix, 2, { correlation: "polychoric" });
 fit.loadings.slice(0, 2); // => [[0.774, -0.021], [0.753, 0.025]]: items 1 and 2 load on the first factor
 fit.loadings.slice(6, 8); // => [[-0.01, 0.717], [-0.073, 0.718]]: items 7 and 8 on the second
 fit.communalities.slice(0, 3); // => [0.599, 0.569, 0.476]
@@ -235,12 +235,12 @@ With 0 degrees of freedom, as one factor of three items, the significance, the R
 fit, as it is.
 
 ```ts continues
-const ml = exploratoryFactorAnalysis(matrix, { factors: 2, extraction: "maximum-likelihood" });
+const ml = exploratoryFactorAnalysis(matrix, 2, { extraction: "maximum-likelihood" });
 ml.loadings.slice(0, 2); // => [[0.638, -0.018], [0.618, 0.02]]: of Pearson correlations, lower than polychoric
 ml.fit;
 // => { chiSquare: 36.1, degreesOfFreedom: 43, significance: 0.762, rmsea: 0, rmseaInterval: [0, 0.0173], tli: 1.006,
 //   bic: -251.3, srmsr: 0.0172 }
-exploratoryFactorAnalysis(matrix, { factors: 1, extraction: "maximum-likelihood" }).fit?.rmsea; // => 0.133: one factor misfits
+exploratoryFactorAnalysis(matrix, 1, { extraction: "maximum-likelihood" }).fit?.rmsea; // => 0.133: one factor misfits
 ```
 
 **Which function.** `exploratoryFactorAnalysis` works on the correlations of the items, takes milliseconds and returns

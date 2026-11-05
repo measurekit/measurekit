@@ -112,8 +112,8 @@ describe("a facet named as a member of an object", () => {
 
     it(`averages over its elements in an expected rating, and takes a level of it, as ${name}`, () => {
       const scores = withRaterNamed(name);
-      const model = manyFacetRasch(scores, { facets: ["item", name] });
-      const plain = manyFacetRasch(STATIC_RATER_SCORES, { facets: ["item", "rater"] });
+      const model = manyFacetRasch(scores, ["item", name]);
+      const plain = manyFacetRasch(STATIC_RATER_SCORES, ["item", "rater"]);
       expect(expectedRating(model, 0)).toBe(expectedRating(plain, 0));
       expect(expectedRating(model, 0, { levels: record([[name, "r1"]]) })).toBe(
         expectedRating(plain, 0, { levels: { rater: "r1" } }),

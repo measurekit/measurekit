@@ -1,4 +1,4 @@
-import { checkFinite, checkOptions, checkPositive, DataError, type FieldNames } from "@measurekit/core";
+import { checkOptions, checkPositive, DataError, type FieldNames } from "@measurekit/core";
 import {
   type AutomatedScore,
   checkAutomatedScores,
@@ -9,14 +9,6 @@ import {
 
 /** Options of {@link automatedScoreDrift}. */
 export interface AutomatedScoreDriftOptions {
-  /** The width of a window, in the unit of the subjects' `time`, such as 604,800,000 for a week of milliseconds: above 0. */
-  readonly width: number;
-  /**
-   * The start of the first window.
-   *
-   * @defaultValue the earliest `time`
-   */
-  readonly start?: number;
   /**
    * The score scale, as `automatedScoreAgreement` takes it.
    *
@@ -25,7 +17,7 @@ export interface AutomatedScoreDriftOptions {
   readonly scale?: ScoreRange;
 }
 
-const AUTOMATED_SCORE_DRIFT_OPTIONS: FieldNames<AutomatedScoreDriftOptions> = { width: true, start: true, scale: true };
+const AUTOMATED_SCORE_DRIFT_OPTIONS: FieldNames<AutomatedScoreDriftOptions> = { scale: true };
 
 /** The agreement of the machine with people within one window of time. */
 export interface DriftWindow {
@@ -42,37 +34,37 @@ export interface DriftWindow {
  * or of the responses shows.
  *
  * @remarks
- * Windows of the same width follow each other from `start`; a subject belongs to the window that holds its `time`, and
+ * Windows of the same width follow each other from the earliest `time`; a subject belongs to the window that holds its `time`, and
  * a window without a subject is left out. Each window holds the machine-human statistics of `automatedScoreAgreement`,
  * of its subjects alone: compare them with those of the acceptance, or judge each with `validateAutomatedScores`. A
  * window of few subjects gives wide statistics; the guide gives their standard errors.
  *
  * @param scores - The subjects, each with its `time`.
- * @param options - The width of a window, the start and the score scale.
+ * @param width - The width of a window, in the unit of the subjects' `time`, such as 604,800,000 for a week of
+ * milliseconds: above 0.
+ * @param options - The score scale.
  * @returns The windows with a subject, in order of time.
- * @throws `DataError` when there is no subject, a subject has no finite `time` or one before `start`, a score is
- * invalid as `automatedScoreAgreement` says, or the width is not a positive number.
+ * @throws `DataError` when there is no subject, a subject has no finite `time`, a score is invalid as
+ * `automatedScoreAgreement` says, or the width is not a positive number.
  */
 export function automatedScoreDrift(
   scores: readonly AutomatedScore[],
-  options: AutomatedScoreDriftOptions,
+  width: number,
+  options: AutomatedScoreDriftOptions = {},
 ): readonly DriftWindow[] {
   checkOptions(options, AUTOMATED_SCORE_DRIFT_OPTIONS);
-  const { width, start, scale } = options;
-  checkPositive(width, "The option width");
-  if (start !== undefined) checkFinite(start, "The option start");
+  const { scale } = options;
+  checkPositive(width, "The window width");
   const { machine, human, time } = checkAutomatedScores(scores, {
     categories: true,
     minSubjects: 1,
     ...(scale ? { scale } : {}),
   });
-  let earliest = Number.POSITIVE_INFINITY;
+  let origin = Number.POSITIVE_INFINITY;
   time.forEach((at, subject) => {
     if (Number.isNaN(at)) throw new DataError(`Subject ${subject + 1} needs a time for the windows of drift.`);
-    earliest = Math.min(earliest, at);
+    origin = Math.min(origin, at);
   });
-  const origin = start ?? earliest;
-  if (earliest < origin) throw new DataError(`A subject's time, ${earliest}, is before the option start, ${origin}.`);
   const windows = new Map<number, number[]>();
   time.forEach((at, subject) => {
     const index = Math.floor((at - origin) / width);

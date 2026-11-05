@@ -533,7 +533,7 @@ describe("polychoricCorrelations", () => {
       `${analysis} holds a matrix of every pair of items, so it takes at most 1000 items, found 1001.`;
     expect(() => polychoricCorrelations(many)).toThrow(message("Polychoric correlations"));
     expect(() => parallelAnalysis(many, createRandom(1))).toThrow(message("Parallel analysis"));
-    expect(() => exploratoryFactorAnalysis(many, { factors: 1 })).toThrow(message("Exploratory factor analysis"));
+    expect(() => exploratoryFactorAnalysis(many, 1)).toThrow(message("Exploratory factor analysis"));
     expect(() => minimumAveragePartial(many)).toThrow(message("The minimum average partial test"));
     expect(() => omegaHierarchical(many)).toThrow(message("Omega hierarchical"));
   });
@@ -547,7 +547,7 @@ describe("polychoricCorrelations", () => {
       'Polychoric correlations need items of at most 8 observed categories, as psych\'s polychoric does, but item "item1" has 9; use Pearson correlations for items of more.';
     expect(() => polychoricCorrelations(nine)).toThrow(message);
     expect(() => parallelAnalysis(nine, createRandom(1), { replications: 1 })).toThrow(message);
-    expect(() => exploratoryFactorAnalysis(nine, { factors: 1, correlation: "polychoric" })).toThrow(message);
+    expect(() => exploratoryFactorAnalysis(nine, 1, { correlation: "polychoric" })).toThrow(message);
     expect(
       parallelAnalysis(nine, createRandom(1), { correlation: "pearson", replications: 1 }).factors.observed,
     ).toHaveLength(3);
@@ -1049,7 +1049,6 @@ describe("exploratoryFactorAnalysis", () => {
   /** Options of a fixture case; the tolerance is tight so that the fit does not limit the comparison. */
   function optionsOf(c: (typeof cases)[number]): ExploratoryFactorOptions {
     return {
-      factors: c.factors,
       correlation: c.correlation === "polychoric" ? "polychoric" : "pearson",
       rotation: c.rotation as FactorRotation,
       tolerance: 1e-10,
@@ -1086,7 +1085,11 @@ describe("exploratoryFactorAnalysis", () => {
 
   for (const c of withData) {
     it(`matches psych's fa on the responses of ${c.name}`, () => {
-      const fit = exploratoryFactorAnalysis(FACTOR_DATA[c.dataset as keyof typeof FACTOR_DATA], optionsOf(c));
+      const fit = exploratoryFactorAnalysis(
+        FACTOR_DATA[c.dataset as keyof typeof FACTOR_DATA],
+        c.factors,
+        optionsOf(c),
+      );
       expect(fit.converged).toBe(true);
       const polychoricTolerance =
         c.correlation === "polychoric" ? PSYCH_POLYCHORIC_FACTOR_TOLERANCE : PSYCH_FACTOR_TOLERANCE;
@@ -1101,14 +1104,18 @@ describe("exploratoryFactorAnalysis", () => {
 
   it("matches base R to rounding on Pearson correlations, which both compute alike", () => {
     for (const c of withData.filter(({ correlation }) => correlation === "pearson")) {
-      const fit = exploratoryFactorAnalysis(FACTOR_DATA[c.dataset as keyof typeof FACTOR_DATA], optionsOf(c));
+      const fit = exploratoryFactorAnalysis(
+        FACTOR_DATA[c.dataset as keyof typeof FACTOR_DATA],
+        c.factors,
+        optionsOf(c),
+      );
       expectMatrix(fit.loadings, c.base.loadings, FACTOR_TOLERANCE, `${c.name} loading`);
       expectMatrix(fit.correlations, c.base.phi, FACTOR_TOLERANCE, `${c.name} factor correlation`);
     }
   });
 
   it("recovers the loadings 0.7 and 0.6 and the correlation 0.3 of two factors from tetrachoric correlations", () => {
-    const fit = exploratoryFactorAnalysis(FACTOR_DATA.simulated, { factors: 2, correlation: "polychoric" });
+    const fit = exploratoryFactorAnalysis(FACTOR_DATA.simulated, 2, { correlation: "polychoric" });
     const own = fit.loadings.map((row) => Math.max(...row));
     const meanOf = (values: readonly number[]): number => values.reduce((sum, value) => sum + value, 0) / values.length;
     expectClose(meanOf(own.slice(0, 6)), factorFixture.truth.loadings[0] ?? null, 0.05);
@@ -1119,13 +1126,19 @@ describe("exploratoryFactorAnalysis", () => {
 
   it("reports whether the correlations were smoothed, as they are when not positive definite", () => {
     const smoothedCase = defined(cases.find(({ dataset }) => dataset === "sat12"));
-    expect(exploratoryFactorAnalysis(FACTOR_DATA.sat12, optionsOf(smoothedCase)).smoothed).toBe(true);
-    expect(exploratoryFactorAnalysis(FACTOR_DATA.simulated, { factors: 2 }).smoothed).toBe(false);
+    expect(exploratoryFactorAnalysis(FACTOR_DATA.sat12, smoothedCase.factors, optionsOf(smoothedCase)).smoothed).toBe(
+      true,
+    );
+    expect(exploratoryFactorAnalysis(FACTOR_DATA.simulated, 2).smoothed).toBe(false);
   });
 
   it("orders the factors by the variance they account for, with each factor's loadings summing to a positive number", () => {
     for (const c of withData) {
-      const fit = exploratoryFactorAnalysis(FACTOR_DATA[c.dataset as keyof typeof FACTOR_DATA], optionsOf(c));
+      const fit = exploratoryFactorAnalysis(
+        FACTOR_DATA[c.dataset as keyof typeof FACTOR_DATA],
+        c.factors,
+        optionsOf(c),
+      );
       const accounted = fit.correlations.map((row, k) =>
         row.reduce(
           (total, phi, j) =>
@@ -1145,7 +1158,7 @@ describe("exploratoryFactorAnalysis", () => {
 
   it("gives communalities that are the diagonal of the model, Λ Φ Λᵀ, for every rotation", () => {
     for (const rotation of ["none", "varimax", "oblimin"] as const) {
-      const fit = exploratoryFactorAnalysis(FACTOR_DATA.bfi, { factors: 4, rotation, tolerance: 1e-10 });
+      const fit = exploratoryFactorAnalysis(FACTOR_DATA.bfi, 4, { rotation, tolerance: 1e-10 });
       fit.loadings.forEach((row, i) => {
         let model = 0;
         row.forEach((a, j) => {
@@ -1160,26 +1173,25 @@ describe("exploratoryFactorAnalysis", () => {
 
   it("leaves the factors uncorrelated for no rotation and for varimax, and correlated for oblimin", () => {
     for (const rotation of ["none", "varimax"] as const) {
-      const { correlations } = exploratoryFactorAnalysis(FACTOR_DATA.bfi, { factors: 3, rotation });
+      const { correlations } = exploratoryFactorAnalysis(FACTOR_DATA.bfi, 3, { rotation });
       expect(correlations).toEqual([
         [1, 0, 0],
         [0, 1, 0],
         [0, 0, 1],
       ]);
     }
-    const oblique = exploratoryFactorAnalysis(FACTOR_DATA.bfi, { factors: 3 });
+    const oblique = exploratoryFactorAnalysis(FACTOR_DATA.bfi, 3);
     expect(oblique.correlations.some((row, i) => row.some((value, j) => i !== j && Math.abs(value) > 0.05))).toBe(true);
   });
 
   it("does not rotate one factor", () => {
-    const unrotated = exploratoryFactorAnalysis(FACTOR_DATA.bfi, { factors: 1, rotation: "none" });
-    expect(exploratoryFactorAnalysis(FACTOR_DATA.bfi, { factors: 1, rotation: "varimax" })).toEqual(unrotated);
+    const unrotated = exploratoryFactorAnalysis(FACTOR_DATA.bfi, 1, { rotation: "none" });
+    expect(exploratoryFactorAnalysis(FACTOR_DATA.bfi, 1, { rotation: "varimax" })).toEqual(unrotated);
     expect(unrotated.correlations).toEqual([[1]]);
   });
 
   it("uses Pearson correlations, minres and oblimin by default, and polychoric correlations when asked", () => {
-    const explicit = exploratoryFactorAnalysis(FACTOR_DATA.simulated, {
-      factors: 2,
+    const explicit = exploratoryFactorAnalysis(FACTOR_DATA.simulated, 2, {
       correlation: "pearson",
       extraction: "minres",
       rotation: "oblimin",
@@ -1187,11 +1199,10 @@ describe("exploratoryFactorAnalysis", () => {
       maxIterations: 100,
       correction: 0.5,
     });
-    expect(exploratoryFactorAnalysis(FACTOR_DATA.simulated, { factors: 2 })).toEqual(explicit);
-    const polychoricFit = exploratoryFactorAnalysis(FACTOR_DATA.simulated, { factors: 2, correlation: "polychoric" });
+    expect(exploratoryFactorAnalysis(FACTOR_DATA.simulated, 2)).toEqual(explicit);
+    const polychoricFit = exploratoryFactorAnalysis(FACTOR_DATA.simulated, 2, { correlation: "polychoric" });
     expect(polychoricFit.loadings).not.toEqual(explicit.loadings);
-    const uncorrected = exploratoryFactorAnalysis(FACTOR_DATA.simulated, {
-      factors: 2,
+    const uncorrected = exploratoryFactorAnalysis(FACTOR_DATA.simulated, 2, {
       correlation: "polychoric",
       correction: 0,
     });
@@ -1199,7 +1210,7 @@ describe("exploratoryFactorAnalysis", () => {
   });
 
   it("stops at the largest number of iterations and says so", () => {
-    const fit = exploratoryFactorAnalysis(FACTOR_DATA.bfi, { factors: 5, tolerance: 1e-14, maxIterations: 2 });
+    const fit = exploratoryFactorAnalysis(FACTOR_DATA.bfi, 5, { tolerance: 1e-14, maxIterations: 2 });
     expect(fit.converged).toBe(false);
     expect(fit.iterations).toBe(2);
   });
@@ -1210,7 +1221,7 @@ describe("exploratoryFactorAnalysis", () => {
       0,
     );
     expect(missing).toBeGreaterThan(0);
-    expect(exploratoryFactorAnalysis(FACTOR_DATA.bfi, { factors: 5 }).loadings).toHaveLength(25);
+    expect(exploratoryFactorAnalysis(FACTOR_DATA.bfi, 5).loadings).toHaveLength(25);
   });
 
   describe("extraction by maximum likelihood and fit", () => {
@@ -1218,8 +1229,7 @@ describe("exploratoryFactorAnalysis", () => {
     type ReferenceFit = FitCase["base"]["fit"];
 
     function fitOf(c: FitCase): ReturnType<typeof exploratoryFactorAnalysis> {
-      return exploratoryFactorAnalysis(buildResponseMatrix(c.responses, { itemIds: c.itemIds }), {
-        factors: c.factors,
+      return exploratoryFactorAnalysis(buildResponseMatrix(c.responses, { itemIds: c.itemIds }), c.factors, {
         extraction: c.extraction as FactorExtraction,
         rotation: c.rotation as FactorRotation,
         tolerance: 1e-10,
@@ -1302,10 +1312,7 @@ describe("exploratoryFactorAnalysis", () => {
           return Math.round(100 * (loading * trait + Math.sqrt(1 - loading ** 2) * random.normal())) + 1000;
         });
       });
-      const fit = exploratoryFactorAnalysis(buildResponseMatrix(rows), {
-        factors: 2,
-        extraction: "maximum-likelihood",
-      });
+      const fit = exploratoryFactorAnalysis(buildResponseMatrix(rows), 2, { extraction: "maximum-likelihood" });
       const primary = fit.loadings.map((row) => Math.max(...row));
       const meanOf = (items: readonly number[]) =>
         items.reduce((sum, item) => sum + defined(primary[item]), 0) / items.length;
@@ -1317,15 +1324,13 @@ describe("exploratoryFactorAnalysis", () => {
     it("gives the same fit for every rotation, and none for polychoric correlations", () => {
       const data = FACTOR_DATA.bfi;
       const fits = (["none", "varimax", "oblimin"] as const).map((rotation) =>
-        defined(exploratoryFactorAnalysis(data, { factors: 3, rotation }).fit),
+        defined(exploratoryFactorAnalysis(data, 3, { rotation }).fit),
       );
       for (const fit of fits.slice(1)) {
         expectClose(fit.chiSquare, defined(fits[0]).chiSquare, 1e-8, "chi-square");
         expectClose(fit.srmsr, defined(fits[0]).srmsr, 1e-12, "SRMSR");
       }
-      expect(
-        exploratoryFactorAnalysis(FACTOR_DATA.simulated, { factors: 2, correlation: "polychoric" }).fit,
-      ).toBeNull();
+      expect(exploratoryFactorAnalysis(FACTOR_DATA.simulated, 2, { correlation: "polychoric" }).fit).toBeNull();
     });
 
     it("has no fit when the model's correlations are not positive definite", () => {
@@ -1344,13 +1349,13 @@ describe("exploratoryFactorAnalysis", () => {
     const data = FACTOR_DATA.simulated;
 
     it("needs the number of factors, a positive integer that the items identify", () => {
-      expect(() => exploratoryFactorAnalysis(data, JSON.parse("{}"))).toThrow("The option factors");
+      expect(() => exploratoryFactorAnalysis(data, JSON.parse("{}"))).toThrow("The factors");
       for (const factors of [0, 1.5, -1]) {
-        expect(() => exploratoryFactorAnalysis(data, { factors })).toThrow("The option factors");
+        expect(() => exploratoryFactorAnalysis(data, factors)).toThrow("The factors");
       }
       // 12 items identify 7 factors: 66 correlations against 12 · 8 - 28 free parameters of the loadings.
-      expect(() => exploratoryFactorAnalysis(data, { factors: 8 })).toThrow("12 items identify at most 7 factors");
-      expect(exploratoryFactorAnalysis(data, { factors: 7, rotation: "none" }).loadings[0]).toHaveLength(7);
+      expect(() => exploratoryFactorAnalysis(data, 8)).toThrow("12 items identify at most 7 factors");
+      expect(exploratoryFactorAnalysis(data, 7, { rotation: "none" }).loadings[0]).toHaveLength(7);
     });
 
     it("needs at least three items, each with two observed categories, and a correlation for every pair", () => {
@@ -1361,7 +1366,7 @@ describe("exploratoryFactorAnalysis", () => {
             [1, 0],
             [1, 1],
           ]),
-          { factors: 1 },
+          1,
         ),
       ).toThrow("Exploratory factor analysis needs at least 3 items");
       const constant = responses([
@@ -1370,7 +1375,7 @@ describe("exploratoryFactorAnalysis", () => {
         [1, 1, 1],
         [0, 0, 1],
       ]);
-      expect(() => exploratoryFactorAnalysis(constant, { factors: 1 })).toThrow('item "item3" has 1');
+      expect(() => exploratoryFactorAnalysis(constant, 1)).toThrow('item "item3" has 1');
       const apart = responses([
         [0, 1, null],
         [1, 0, null],
@@ -1379,31 +1384,27 @@ describe("exploratoryFactorAnalysis", () => {
         [null, 0, 1],
         [null, 1, 1],
       ]);
-      expect(() => exploratoryFactorAnalysis(apart, { factors: 1 })).toThrow(
-        'gives no correlation of items "item1" and "item3"',
-      );
+      expect(() => exploratoryFactorAnalysis(apart, 1)).toThrow('gives no correlation of items "item1" and "item3"');
     });
 
     it("rejects options of other types", () => {
-      expect(() => exploratoryFactorAnalysis(data, JSON.parse("null"))).toThrow(DataError);
-      expect(() => exploratoryFactorAnalysis(data, JSON.parse('{"factors": "2"}'))).toThrow("The option factors");
-      expect(() => exploratoryFactorAnalysis(data, JSON.parse('{"factors": 2, "rotation": "promax"}'))).toThrow(
+      expect(() => exploratoryFactorAnalysis(data, 2, JSON.parse("null"))).toThrow(DataError);
+      expect(() => exploratoryFactorAnalysis(data, JSON.parse('"2"'))).toThrow("The factors");
+      expect(() => exploratoryFactorAnalysis(data, 2, JSON.parse('{"rotation": "promax"}'))).toThrow(
         "The option rotation",
       );
-      expect(() => exploratoryFactorAnalysis(data, JSON.parse('{"factors": 2, "correlation": 1}'))).toThrow(
+      expect(() => exploratoryFactorAnalysis(data, 2, JSON.parse('{"correlation": 1}'))).toThrow(
         "The option correlation",
       );
-      expect(() => exploratoryFactorAnalysis(data, JSON.parse('{"factors": 2, "extraction": "ml"}'))).toThrow(
+      expect(() => exploratoryFactorAnalysis(data, 2, JSON.parse('{"extraction": "ml"}'))).toThrow(
         "The option extraction",
       );
-      expect(() => exploratoryFactorAnalysis(data, JSON.parse('{"factors": 2, "tolerance": -1}'))).toThrow(DataError);
-      expect(() => exploratoryFactorAnalysis(data, JSON.parse('{"factors": 2, "maxIterations": 1.5}'))).toThrow(
-        DataError,
-      );
-      expect(() => exploratoryFactorAnalysis(data, JSON.parse('{"factors": 2, "correction": -1}'))).toThrow(
+      expect(() => exploratoryFactorAnalysis(data, 2, JSON.parse('{"tolerance": -1}'))).toThrow(DataError);
+      expect(() => exploratoryFactorAnalysis(data, 2, JSON.parse('{"maxIterations": 1.5}'))).toThrow(DataError);
+      expect(() => exploratoryFactorAnalysis(data, 2, JSON.parse('{"correction": -1}'))).toThrow(
         "The option correction",
       );
-      expect(() => exploratoryFactorAnalysis(JSON.parse("null"), { factors: 2 })).toThrow(DataError);
+      expect(() => exploratoryFactorAnalysis(JSON.parse("null"), 2)).toThrow(DataError);
     });
   });
 });
@@ -1447,7 +1448,7 @@ describe("schmidLeiman", () => {
   for (const c of hierarchyFixture.data) {
     it(`transforms the factors of the responses of ${c.name} as base R and psych's schmid do`, () => {
       const matrix = buildResponseMatrix(c.responses, { itemIds: c.itemIds });
-      const result = schmidLeiman(exploratoryFactorAnalysis(matrix, { factors: c.factors, tolerance: 1e-10 }));
+      const result = schmidLeiman(exploratoryFactorAnalysis(matrix, c.factors, { tolerance: 1e-10 }));
       expect(result.itemIds).toEqual(c.itemIds);
       expectTransformation(result, c.base, FACTOR_TOLERANCE, "base");
       expectTransformation(result, c.psych, PSYCH_HIERARCHY_TOLERANCE, "psych");
@@ -1481,15 +1482,15 @@ describe("schmidLeiman", () => {
   });
 
   it("gives no general factor for an orthogonal solution, and keeps its loadings as the group loadings", () => {
-    const fit = exploratoryFactorAnalysis(FACTOR_DATA.bfi, { factors: 3, rotation: "varimax" });
+    const fit = exploratoryFactorAnalysis(FACTOR_DATA.bfi, 3, { rotation: "varimax" });
     const result = schmidLeiman(fit);
     expect(result.general.every((loading) => Math.abs(loading) < 1e-12)).toBe(true);
     expectMatrix(result.specific, fit.loadings, 1e-12, "group");
   });
 
   it("rejects solutions of fewer than three factors and values that are not a solution", () => {
-    const fit = exploratoryFactorAnalysis(FACTOR_DATA.bfi, { factors: 3 });
-    expect(() => schmidLeiman(exploratoryFactorAnalysis(FACTOR_DATA.bfi, { factors: 2 }))).toThrow(
+    const fit = exploratoryFactorAnalysis(FACTOR_DATA.bfi, 3);
+    expect(() => schmidLeiman(exploratoryFactorAnalysis(FACTOR_DATA.bfi, 2))).toThrow(
       "The Schmid-Leiman transformation needs at least 3 group factors, as two do not identify the general factor, found 2.",
     );
     expect(() => schmidLeiman(JSON.parse("null"))).toThrow("The factors must be an object");
@@ -1562,7 +1563,7 @@ describe("omegaHierarchical", () => {
 
   it("is McDonald's omega in total, with the communalities of the group factors", () => {
     const { total, loadings } = omegaHierarchical(matrix);
-    const fit = exploratoryFactorAnalysis(matrix, { factors: 3 });
+    const fit = exploratoryFactorAnalysis(matrix, 3);
     expect(loadings.communalities).toEqual(fit.communalities);
     expect(total).toBeGreaterThan(mcdonaldOmega(matrix).omega);
   });
@@ -1781,13 +1782,13 @@ describe("properties", () => {
             FACTOR_DATA.bfi.responses.map((row) => ids.map((item) => row[item] ?? null)),
             { itemIds: ids.map((item) => `${item}`) },
           );
-        const options = { factors: 2, extraction: "maximum-likelihood", rotation: "none", tolerance: 1e-10 } as const;
-        const forward = exploratoryFactorAnalysis(pick(chosen), options);
+        const options = { extraction: "maximum-likelihood", rotation: "none", tolerance: 1e-10 } as const;
+        const forward = exploratoryFactorAnalysis(pick(chosen), 2, options);
         for (const communality of forward.communalities) {
           expect(communality).toBeGreaterThanOrEqual(0);
           expect(communality).toBeLessThan(1);
         }
-        const backward = exploratoryFactorAnalysis(pick([...chosen].reverse()), options);
+        const backward = exploratoryFactorAnalysis(pick([...chosen].reverse()), 2, options);
         [...backward.loadings].reverse().forEach((row, i) => {
           row.forEach((value, k) => {
             expect(Math.abs(Math.abs(value) - Math.abs(defined(forward.loadings[i]?.[k])))).toBeLessThan(1e-6);
@@ -1960,7 +1961,7 @@ describe("properties", () => {
   const simulatedRows = FACTOR_DATA.simulated.responses;
 
   it("exploratory factor analysis does not depend on the order of the persons", () => {
-    const expected = exploratoryFactorAnalysis(FACTOR_DATA.simulated, { factors: 2, tolerance: 1e-10 });
+    const expected = exploratoryFactorAnalysis(FACTOR_DATA.simulated, 2, { tolerance: 1e-10 });
     fc.assert(
       fc.property(fc.integer(), (seed) => {
         const random = createRandom(seed);
@@ -1973,7 +1974,7 @@ describe("properties", () => {
             itemIds: [...FACTOR_DATA.simulated.itemIds],
           },
         );
-        const fit = exploratoryFactorAnalysis(shuffled, { factors: 2, tolerance: 1e-10 });
+        const fit = exploratoryFactorAnalysis(shuffled, 2, { tolerance: 1e-10 });
         expectMatrix(fit.loadings, expected.loadings, 1e-8, "loading");
         expectMatrix(fit.correlations, expected.correlations, 1e-8, "factor correlation");
       }),
@@ -1982,7 +1983,7 @@ describe("properties", () => {
   });
 
   it("exploratory factor analysis and the minimum average partial test follow the order of the items", () => {
-    const expected = exploratoryFactorAnalysis(FACTOR_DATA.simulated, { factors: 2, tolerance: 1e-10 });
+    const expected = exploratoryFactorAnalysis(FACTOR_DATA.simulated, 2, { tolerance: 1e-10 });
     const expectedMap = minimumAveragePartial(FACTOR_DATA.simulated);
     fc.assert(
       fc.property(fc.integer(), (seed) => {
@@ -1993,7 +1994,7 @@ describe("properties", () => {
           simulatedRows.map((row) => order.map((item) => defined(row[item]))),
           { itemIds: order.map((item) => defined(FACTOR_DATA.simulated.itemIds[item])) },
         );
-        const fit = exploratoryFactorAnalysis(permuted, { factors: 2, tolerance: 1e-10 });
+        const fit = exploratoryFactorAnalysis(permuted, 2, { tolerance: 1e-10 });
         order.forEach((item, row) => {
           expectMatrix([defined(fit.loadings[row])], [defined(expected.loadings[item])], 1e-6, `item ${item + 1}`);
           expectClose(defined(fit.communalities[row]), defined(expected.communalities[item]), 1e-8, "communality");

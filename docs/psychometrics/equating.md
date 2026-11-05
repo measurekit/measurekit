@@ -230,18 +230,18 @@ the score; smooth the distributions first.
 
 ## Bivariate presmoothing
 
-`bivariateLogLinearPresmoothing(distribution, { degrees, crossDegree })` smooths a bivariate distribution (Holland
+`bivariateLogLinearPresmoothing(distribution, degrees, { crossDegree })` smooths a bivariate distribution (Holland
 and Thayer, 2000): the maximum likelihood fit of the Poisson regression
 
 ln m_xv = β₀ + Σ_{i ≤ C_x} β_i xⁱ + Σ_{j ≤ C_v} γ_j vʲ + Σ_{i, j ≤ C_xv} δ_ij xⁱ vʲ
 
 to the counts, as the equate package's `presmoothing(smoothmethod = "loglinear", degrees = list(c(C_x, C_v), C_xv))`.
 The fit keeps the number of persons, the first C_x moments of the total scores, the first C_v of the anchor scores and
-the cross moments E[xⁱ vʲ]. It fills cells without persons, which frequency estimation needs.
+the cross moments E[xⁱ vʲ]. It fills cells without persons, which frequency estimation needs. `degrees` is `[total, anchor]`: integers from 1 to one
+less than the number of total scores and of anchor scores, at most 20.
 
 | Option        | Default | Meaning                                                                                                           |
 | ------------- | ------- | ----------------------------------------------------------------------------------------------------------------- |
-| `degrees`     | none    | `[total, anchor]`: integers from 1 to one less than the number of total scores and of anchor scores, at most 20   |
 | `crossDegree` | `1`     | The highest power of each score in the cross products, an integer from 0, for none, to the smaller of the degrees |
 
 It returns the fitted `distribution`, `converged` and `iterations`, as `logLinearPresmoothing`. `converged` is `false`
@@ -259,7 +259,7 @@ const groupX = [
   [1, 4, 11, 9],
   [0, 1, 4, 7],
 ];
-const smooth = bivariateLogLinearPresmoothing(groupX, { degrees: [3, 2] });
+const smooth = bivariateLogLinearPresmoothing(groupX, [3, 2]);
 smooth.converged; // => true
 smooth.distribution[0]?.map((count) => Math.round(count * 10) / 10); // => [7.8, 3.6, 0.6, 0]: fitted persons at total score 0
 ```

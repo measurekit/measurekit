@@ -20,9 +20,6 @@ import { facetDesign, MODEL_NAME } from "./facet-design.js";
 import type { FacetSummary } from "./facet-summary.js";
 import { type FacetBias, manyFacetParts, type RatingThresholds } from "./many-facet-result.js";
 
-/** How the standard errors of a many-facet model are computed. */
-export type FacetStandardErrors = "none" | "hessian";
-
 /** Options of {@link manyFacetRasch}. */
 export interface ManyFacetRaschOptions {
   /**
@@ -32,12 +29,7 @@ export interface ManyFacetRaschOptions {
    */
   readonly person?: string;
   /**
-   * The other facets, such as `["item", "rater"]`: each score has an element of each. Facets beyond the first, such as
-   * task or occasion, add terms to the model. At least one, none repeated, none the person facet.
-   */
-  readonly facets: readonly string[];
-  /**
-   * A facet whose elements each get their own thresholds, as the partial credit model: one of `facets`.
+   * A facet whose elements each get their own thresholds, as the partial credit model: one of the facets.
    *
    * @defaultValue one rating scale shared by all elements
    */
@@ -45,7 +37,7 @@ export interface ManyFacetRaschOptions {
   /**
    * Pairs of the facets whose interaction to estimate, such as `[["item", "rater"]]`: for each cell of a pair, the
    * elements scored together, a bias that the sum of the elements' measures does not explain. Each name is one of
-   * `facets`, a pair names two different facets, and no pair repeats.
+   * the facets, a pair names two different facets, and no pair repeats.
    *
    * @defaultValue none
    */
@@ -62,7 +54,7 @@ export interface ManyFacetRaschOptions {
    *
    * @defaultValue `"hessian"`
    */
-  readonly standardErrors?: FacetStandardErrors;
+  readonly standardErrors?: "none" | "hessian";
   /**
    * Estimation has converged when no parameter changes by more than this in an EM iteration.
    *
@@ -79,7 +71,6 @@ export interface ManyFacetRaschOptions {
 
 const MANY_FACET_RASCH_OPTIONS: FieldNames<ManyFacetRaschOptions> = {
   person: true,
-  facets: true,
   thresholdFacet: true,
   interactions: true,
   quadrature: true,
@@ -94,12 +85,12 @@ export interface ManyFacetRasch {
   readonly person: string;
   /** The facet whose elements each have thresholds; `null` for one rating scale shared by all. */
   readonly thresholdFacet: string | null;
-  /** The facets other than the person facet, in the order of the option, with their elements. */
+  /** The facets other than the person facet, in the order of `facets`, with their elements. */
   readonly facets: readonly FacetSummary[];
   /** The thresholds of each set: one for the shared scale, or one for each element of the threshold facet. */
   readonly thresholds: readonly RatingThresholds[];
   /**
-   * The bias of every cell of every interaction, one interaction after the other in the order of the option; absent
+   * The bias of every cell of every interaction, one interaction after the other in the order of the option `interactions`; absent
    * without `interactions`.
    */
   readonly interactions?: readonly FacetBias[];
@@ -119,7 +110,7 @@ export interface ManyFacetRasch {
 
 const DEFAULT_TOLERANCE = 1e-4;
 const DEFAULT_MAX_ITERATIONS = 500;
-const STANDARD_ERRORS: readonly FacetStandardErrors[] = ["none", "hessian"];
+const STANDARD_ERRORS = ["none", "hessian"] as const;
 
 /**
  * Estimates the many-facet Rasch model of faceted scores by marginal maximum likelihood: persons, items, raters and
@@ -146,23 +137,29 @@ const STANDARD_ERRORS: readonly FacetStandardErrors[] = ["none", "hessian"];
  * none cannot be put on one scale. Each set's scores must use the categories from 0 to its highest, at least two.
  *
  * @param scores - The scores in long format, each with the element of every facet in `levels`.
- * @param options - The facets, the facet that holds the thresholds, the interactions, the quadrature, the standard
- *   errors and the stopping rules; each option has its default.
+ * @param facets - The facets other than the person facet, such as `["item", "rater"]`: each score has an element of
+ *   each. Facets beyond the first, such as task or occasion, add terms to the model. At least one, none repeated, none
+ *   the person facet.
+ * @param options - The person facet, the facet that holds the thresholds, the interactions, the quadrature, the
+ *   standard errors and the stopping rules; each option has its default.
  * @returns The measures of the facets with their standard errors and summaries, the thresholds, the interactions, the
  *   distribution of the persons, the log-likelihood, AIC and BIC, whether the estimation converged and the iterations
  *   run.
- * @throws `DataError` when the options are invalid, the scores are not objects { levels, score } with an element of
+ * @throws `DataError` when the facets or the options are invalid, the scores are not objects { levels, score } with an element of
  * each facet and an integer score from 0 to 2³¹ - 1, fewer than two persons were scored, the design is not connected, a
  * threshold set uses fewer than two categories or skips one, an interaction has no estimable bias, or the model has
  * more than 1,000 parameters, a rating scale of more than 255 categories, or more than 2^24 expected counts, its
  * virtual items × quadrature points × categories.
  * @see {@link https://doi.org/10.1007/BF02293801 | Bock and Aitkin (1981)}
  */
-export function manyFacetRasch(scores: readonly FacetedScore[], options: ManyFacetRaschOptions): ManyFacetRasch {
+export function manyFacetRasch(
+  scores: readonly FacetedScore[],
+  facets: readonly string[],
+  options: ManyFacetRaschOptions = {},
+): ManyFacetRasch {
   checkOptions(options, MANY_FACET_RASCH_OPTIONS);
   const {
     person = "person",
-    facets,
     thresholdFacet,
     interactions = [],
     quadrature = {},
@@ -228,18 +225,16 @@ function checkFacetNames(person: string, facets: readonly string[]): void {
   if (!isNonEmptyString(person)) {
     throw new DataError(`The option person must be a non-empty string, found ${describe(person)}.`);
   }
-  checkArray(facets, 'The option facets must be an array of facet names, such as ["item", "rater"]');
-  if (facets.length === 0) throw new DataError("The option facets needs at least one facet.");
+  checkArray(facets, 'The facets must be an array of facet names, such as ["item", "rater"]');
+  if (facets.length === 0) throw new DataError("The facets need at least one facet.");
   facets.forEach((facet, index) => {
     if (!isNonEmptyString(facet)) {
-      throw new DataError(
-        `Facet ${index + 1} of the option facets must be a non-empty string, found ${describe(facet)}.`,
-      );
+      throw new DataError(`Facet ${index + 1} of the facets must be a non-empty string, found ${describe(facet)}.`);
     }
   });
   const names = [person, ...facets];
   const repeated = names.find((name, index) => names.indexOf(name) !== index);
   if (repeated !== undefined) {
-    throw new DataError(`The person facet and the option facets need different names, found "${repeated}" twice.`);
+    throw new DataError(`The person facet and the facets need different names, found "${repeated}" twice.`);
   }
 }

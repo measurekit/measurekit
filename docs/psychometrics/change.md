@@ -17,7 +17,7 @@ flowchart LR
 | ------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------- |
 | `simpleGain(pre, post)`                           | How much did each person's score change?                          | Scores of the same persons on two occasions |
 | `residualGain(pre, post)`                         | How far above or below the persons who started alike?             | The same                                    |
-| `normalizedGain(pre, post, options)`              | What share of the possible gain was made, by person and by group? | The same, and the highest possible score    |
+| `normalizedGain(pre, post, highest)`              | What share of the possible gain was made, by person and by group? | The same, and the highest possible score    |
 | `differenceReliability(input)`                    | How reliable is the difference of two scores?                     | The sd and reliability of each, correlation |
 | `reliableChange(pre, post, test, options)`        | Did one person change more than error explains, from test scores? | Two scores, the test's sd and reliability   |
 | `reliableChangeFromTheta(before, after, options)` | The same, from ability estimates                                  | Two estimates with their standard errors    |
@@ -34,7 +34,7 @@ const post = [18, 19, 40, 50, 34];
 
 simpleGain(pre, post); // => [6, -1, 9, 0, 9]
 residualGain(pre, post); // => [-0.097, -6.329, 4.726, -2.451, 4.151]
-normalizedGain(pre, post, { maximum: 50 });
+normalizedGain(pre, post, 50);
 // => { group: 0.205, persons: [0.158, -0.033, 0.474, null, 0.36] }
 ```
 
@@ -55,8 +55,8 @@ the person out of both.
 - A person whose pre score is the maximum cannot gain, so the normalized gain is `null` there. The group's gain is
   (mean post - mean pre) / (maximum - mean pre), which is not the mean of the persons' gains, and is `null` only when
   everyone started at the maximum.
-- A normalized gain is 1 when the person reaches the maximum, and negative for a decline. A score above `maximum` is
-  an error.
+- A normalized gain is 1 when the person reaches the maximum, and negative for a decline. A score above `highest`, the
+  highest possible score, is an error.
 
 ## The reliability of a difference
 
@@ -132,7 +132,7 @@ Invalid input throws `DataError` with the value found.
 | Cause                                                                 | What to do                                                                           |
 | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | Score arrays of different lengths, or a missing or non-finite score   | Pair the scores by person and leave out a person who lacks one                       |
-| A score above `maximum`                                               | Check the maximum of the test, or the scoring                                        |
+| A score above `highest`                                               | Check the maximum of the test, or the scoring                                        |
 | All pre scores equal, in `residualGain`                               | The regression has no slope: use `simpleGain`                                        |
 | A reliability of 1 in `reliableChange`                                | A test without error has no standard error: use the reliability of the test, below 1 |
 | A `level` of 0 or 1, or outside                                       | Use a level between 0 and 1, such as 0.9 or 0.95                                     |

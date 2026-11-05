@@ -55,7 +55,7 @@ whose items are studied. Both groups need persons.
 | `sibtest(matrix, groups, options)`                      | Any, or bundles                    | The total over the anchors, studied items left out              | Per item or bundle: who answered it and every matching item             |
 | `rajuAreaDif(matrix, groups, options)`                  | 2PL; 3PL, 4PL with held asymptotes | Theta, by separate calibrations                                 | All; calibration skips missing responses                                |
 | `irtLikelihoodRatioDif(matrix, groups, options)`        | Any model                          | Theta, by one calibration of both groups                        | All; calibration skips missing responses                                |
-| `differentialFunctioning(reference, focal, options)`    | Any model                          | Theta of the focal group's population                           | None: it takes items                                                    |
+| `differentialFunctioning(reference, focal, population)` | Any model                          | Theta of the focal group's population                           | None: it takes items                                                    |
 
 ## Matching score
 
@@ -587,7 +587,8 @@ const freeOf = (group: string) =>
     .map((item) => ({ ...item, id: item.id.replace(`:${group}`, "") }));
 const focalGroup = dif.constrained.groups.find((distribution) => distribution.group === "focal");
 const functioning = differentialFunctioning(freeOf("reference"), freeOf("focal"), {
-  population: { nodes: focalGroup?.nodes ?? [], weights: focalGroup?.weights ?? [] },
+  nodes: focalGroup?.nodes ?? [],
+  weights: focalGroup?.weights ?? [],
 });
 functioning.items[2]; // => { id: "item3", ncdif: 0.0276, cdif: 0.0219 }
 functioning.dtf; // => 0.0263
@@ -599,7 +600,8 @@ reading passage:
 ```ts continues
 const inPassage = (item: { id: string }) => ["item3", "item4"].includes(item.id);
 differentialFunctioning(freeOf("reference").filter(inPassage), freeOf("focal").filter(inPassage), {
-  population: { nodes: focalGroup?.nodes ?? [], weights: focalGroup?.weights ?? [] },
+  nodes: focalGroup?.nodes ?? [],
+  weights: focalGroup?.weights ?? [],
 }).dtf; // => 0.0263: the free items hold all of the test's DIF, as the anchors are equal in both lists
 ```
 

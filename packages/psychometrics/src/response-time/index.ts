@@ -24,7 +24,6 @@ export {
   type SpeedAccuracyEstimate,
   type SpeedAccuracyItem,
   type SpeedAccuracyOptions,
-  type SpeedAccuracyStandardErrors,
   speedAccuracyEstimates,
 } from "./speed-accuracy.js";
 export type { TimeItem } from "./timed-responses.js";

@@ -13,7 +13,6 @@ export {
   type CdmCalibrationOptions,
   type CdmItem,
   type CdmModel,
-  type CdmStandardErrors,
   calibrateCdm,
   type ProfileProportion,
 } from "./calibration.js";

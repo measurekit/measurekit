@@ -125,8 +125,8 @@ const SLOPE = "a";
  * @see {@link https://doi.org/10.1007/s11336-008-9092-x | De Boeck (2008)}
  * @see {@link https://doi.org/10.3102/10769986030003261 | Viechtbauer (2005)}
  */
-export function itemFeatureRegression<TParameters>(
-  items: readonly CalibratedItem<TParameters>[],
+export function itemFeatureRegression(
+  items: readonly CalibratedItem<unknown>[],
   features: ItemFeatures,
   options: ItemFeatureRegressionOptions = {},
 ): ItemFeatureRegression {
@@ -199,8 +199,8 @@ interface Observation {
  * @throws `DataError` when no item has the parameter, the parameter is shared by the items of its model, ids repeat, a
  * standard error is not positive, or a slope is not positive.
  */
-function observations<TParameters>(
-  items: readonly CalibratedItem<TParameters>[],
+function observations(
+  items: readonly CalibratedItem<unknown>[],
   parameter: string,
   scale: "identity" | "log",
 ): Observation[] {
@@ -222,8 +222,8 @@ function observations<TParameters>(
  * Returns an item's observation of the parameter, `null` for an item without standard errors, and `undefined` for an
  * item whose model has no parameter of that name.
  */
-function observe<TParameters>(
-  item: CalibratedItem<TParameters>,
+function observe(
+  item: CalibratedItem<unknown>,
   parameter: string,
   scale: "identity" | "log",
 ): Observation | null | undefined {

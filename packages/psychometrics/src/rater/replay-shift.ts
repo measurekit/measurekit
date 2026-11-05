@@ -1,17 +1,6 @@
-import { checkNonNegative, checkOptions, type FieldNames, mean } from "@measurekit/core";
+import { checkNonNegative, mean } from "@measurekit/core";
 import { correlation, standardDeviation } from "../math/internal.js";
 import { pairOfRaters } from "./ratings.js";
-
-/** Options of {@link replayShift}. */
-export interface ReplayShiftOptions {
-  /**
-   * The largest mean shift, in standard deviations of the locked scores, either way, at which the replay passes: a
-   * program's policy, required as no source sets it. A third of the 0.15 that acceptance allows a machine's SMD is 0.05.
-   */
-  readonly maxShiftSd: number;
-}
-
-const REPLAY_SHIFT_OPTIONS: FieldNames<ReplayShiftOptions> = { maxShiftSd: true };
 
 /** The shift of a scorer's replayed scores from the locked scores of the same responses. */
 export interface ReplayShift {
@@ -35,7 +24,7 @@ export interface ReplayShift {
 
 /**
  * Returns the shift of an automated scorer's scores on responses rated again, an anchor replay: the mean change from the
- * locked scores in their standard deviations, and whether it stays within the option `maxShiftSd`.
+ * locked scores in their standard deviations, and whether it stays within `maxShiftSd`.
  *
  * @remarks
  * Responses whose scores are locked, those of the machine at its acceptance or those people gave, are scored again by
@@ -46,7 +35,9 @@ export interface ReplayShift {
  * with both scores.
  *
  * @param ratings - One row for each response: the locked score, then the replayed score; `null` when missing.
- * @param options - The largest shift that passes.
+ * @param maxShiftSd - The largest mean shift, in standard deviations of the locked scores, either way, at which the
+ * replay passes: a program's policy, required as no source sets it. A third of the 0.15 that acceptance allows a
+ * machine's SMD is 0.05.
  * @returns The shift, its standard error, the agreement of the replayed with the locked scores and whether the replay passes.
  * @throws `DataError` when the rows do not hold two scores, a score is not a finite number or `null`, fewer than two
  * responses have both, or `maxShiftSd` is not a non-negative number.
@@ -61,19 +52,14 @@ export interface ReplayShift {
  * const replayed = [2, 3, 4, 4, 1, 3, 4, 3];
  * const replay = replayShift(
  *   locked.map((score, i) => [score, replayed[i] ?? null]),
- *   { maxShiftSd: 0.05 },
+ *   0.05,
  * );
  * replay.standardizedShift; // => 0.24, a quarter of an SD higher
  * replay.passed; // => false
  * ```
  */
-export function replayShift(
-  ratings: readonly (readonly (number | null)[])[],
-  options: ReplayShiftOptions,
-): ReplayShift {
-  checkOptions(options, REPLAY_SHIFT_OPTIONS);
-  const { maxShiftSd } = options;
-  checkNonNegative(maxShiftSd, "The option maxShiftSd");
+export function replayShift(ratings: readonly (readonly (number | null)[])[], maxShiftSd: number): ReplayShift {
+  checkNonNegative(maxShiftSd, "The maxShiftSd");
   const { first: locked, second: replayed } = pairOfRaters(ratings, "The replay shift");
   const n = locked.length;
   const differences = replayed.map((score, k) => score - (locked[k] ?? 0));

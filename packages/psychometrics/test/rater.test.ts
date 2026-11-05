@@ -931,7 +931,7 @@ describe("automatedScoreDrift", () => {
   const persuade = subjectsOf(PERSUADE.machine, PERSUADE.human, (subject) => ({ time: time[subject] }));
 
   it("matches base R's statistics of each week of PERSUADE 2.0's essays", () => {
-    const result = automatedScoreDrift(persuade, { width, scale: { lowest: 1, highest: 6 } });
+    const result = automatedScoreDrift(persuade, width, { scale: { lowest: 1, highest: 6 } });
     expect(result.map(({ start, end }) => [start, end])).toEqual(windows.map(({ start, end }) => [start, end]));
     result.forEach(({ agreement }, k) => {
       const reference = defined(windows[k]).agreement;
@@ -950,23 +950,18 @@ describe("automatedScoreDrift", () => {
     });
   });
 
-  it("starts the windows at the option start and leaves empty windows out", () => {
+  it("starts the windows at the earliest time and leaves empty windows out", () => {
     const scores = subjectsOf([1, 2, 2, 3], [1, 2, 3, 3], (subject) => ({ time: [10, 12, 35, 36][subject] }));
-    const result = automatedScoreDrift(scores, { width: 10, start: 5 });
+    const result = automatedScoreDrift(scores, 10);
     expect(result.map(({ start, end, agreement }) => [start, end, agreement.subjects])).toEqual([
-      [5, 15, 2],
-      [35, 45, 2],
+      [10, 20, 2],
+      [30, 40, 2],
     ]);
-    expect(() => automatedScoreDrift(scores, { width: 10, start: 11 })).toThrow(
-      "A subject's time, 10, is before the option start, 11.",
-    );
-    expect(() => automatedScoreDrift(subjectsOf([1, 2], [1, 2]), { width: 10 })).toThrow(
+    expect(() => automatedScoreDrift(subjectsOf([1, 2], [1, 2]), 10)).toThrow(
       "Subject 1 needs a time for the windows of drift.",
     );
-    expect(() => automatedScoreDrift(scores, { width: 0 })).toThrow(
-      "The option width must be a positive number, found 0.",
-    );
-    expect(() => automatedScoreDrift(scores, JSON.parse("{}"))).toThrow("The option width must be a positive number");
+    expect(() => automatedScoreDrift(scores, 0)).toThrow("The window width must be a positive number, found 0.");
+    expect(() => automatedScoreDrift(scores, 10, JSON.parse('{"start":5}'))).toThrow("start");
   });
 });
 
@@ -1047,7 +1042,7 @@ describe("replayShift", () => {
   for (const reference of cases) {
     it(`matches base R on a planted shift of ${reference.shift} SD, which ${reference.passed ? "passes" : "fails"}`, () => {
       const ratings = reference.locked.map((score, k) => [score, reference.replayed[k] ?? null]);
-      const result = replayShift(ratings, { maxShiftSd });
+      const result = replayShift(ratings, maxShiftSd);
       expectClose(result.meanShift, reference.meanShift, 1e-12, "mean shift");
       expectClose(result.lockedSd, reference.lockedSd, 1e-12, "SD");
       expectClose(result.standardizedShift, reference.standardizedShift, 1e-12, "standardized shift");
@@ -1065,7 +1060,7 @@ describe("replayShift", () => {
         [2, 2],
         [3, 4],
       ],
-      { maxShiftSd: 0.7 },
+      0.7,
     );
     expectClose(result.standardizedShift, 2 / 3, 1e-15);
     expectClose(result.standardError, 1 / 3, 1e-15);
@@ -1077,7 +1072,7 @@ describe("replayShift", () => {
           [2, 2],
           [2, 3],
         ],
-        { maxShiftSd: 1 },
+        1,
       ),
     ).toMatchObject({ standardizedShift: null, passed: false });
   });
@@ -1089,9 +1084,9 @@ describe("replayShift", () => {
           [1, 1],
           [2, 2],
         ],
-        { maxShiftSd: -0.1 },
+        -0.1,
       ),
-    ).toThrow("The option maxShiftSd must be a non-negative number, found -0.1.");
+    ).toThrow("The maxShiftSd must be a non-negative number, found -0.1.");
     expect(() =>
       replayShift(
         [
@@ -1100,11 +1095,9 @@ describe("replayShift", () => {
         ],
         JSON.parse("{}"),
       ),
-    ).toThrow("The option maxShiftSd must be a non-negative number");
-    expect(() => replayShift([[1, 1]], { maxShiftSd: 0.05 })).toThrow("The replay shift needs at least 2 subjects");
-    expect(() => replayShift(JSON.parse("null"), { maxShiftSd: 0.05 })).toThrow(
-      "The replay shift needs an array of ratings",
-    );
+    ).toThrow("The maxShiftSd must be a non-negative number");
+    expect(() => replayShift([[1, 1]], 0.05)).toThrow("The replay shift needs at least 2 subjects");
+    expect(() => replayShift(JSON.parse("null"), 0.05)).toThrow("The replay shift needs an array of ratings");
   });
 });
 
@@ -1204,8 +1197,7 @@ describe("manyFacetRasch", () => {
     for (const reference of dataset.models) {
       const label = `${reference.facets.join(" + ")}${reference.thresholdFacet === null ? "" : `, thresholds by ${reference.thresholdFacet}`}`;
       it(`matches the base R maximum of the marginal likelihood on ${dataset.name}: ${label}`, () => {
-        const model = manyFacetRasch(scoresOf(dataset.scores), {
-          facets: reference.facets,
+        const model = manyFacetRasch(scoresOf(dataset.scores), reference.facets, {
           ...(reference.thresholdFacet === null ? {} : { thresholdFacet: reference.thresholdFacet }),
           ...PRECISE,
         });
@@ -1254,7 +1246,7 @@ describe("manyFacetRasch", () => {
   }
 
   it("leaves the standard errors, separation and homogeneity out with standardErrors none", () => {
-    const model = manyFacetRasch(simulatedScores(3, 60), { facets: ["item", "rater"], standardErrors: "none" });
+    const model = manyFacetRasch(simulatedScores(3, 60), ["item", "rater"], { standardErrors: "none" });
     for (const facet of model.facets) {
       expect(facet.separation).toBeNull();
       expect(facet.homogeneity).toBeNull();
@@ -1268,7 +1260,7 @@ describe("manyFacetRasch", () => {
       levels: { ...levels, task: "essay" },
       score: score > 1 ? 1 : 0,
     }));
-    const model = manyFacetRasch(dichotomous, { facets: ["item", "rater", "task"] });
+    const model = manyFacetRasch(dichotomous, ["item", "rater", "task"]);
     expect(model.facets[2]?.elements).toMatchObject([{ id: "essay", measure: 0, standardError: 0 }]);
     expect(model.facets[2]?.separation).toBeNull();
     expect(model.thresholds[0]?.thresholds).toEqual([0]);
@@ -1278,16 +1270,15 @@ describe("manyFacetRasch", () => {
 
   it("takes repeated scores of a person on one combination as independent observations", () => {
     const scores = simulatedScores(9, 60);
-    const model = manyFacetRasch([...scores, ...scores], { facets: ["item", "rater"] });
+    const model = manyFacetRasch([...scores, ...scores], ["item", "rater"]);
     expect(model.converged).toBe(true);
     expect(model.facets[0]?.elements[0]?.count).toBe(2 * scores.filter(({ levels }) => levels.item === "i0").length);
   });
 
   it("accepts the Gauss-Hermite rule and a thresholdFacet of the person's raters", () => {
     const scores = simulatedScores(11, 90);
-    const rectangular = manyFacetRasch(scores, { facets: ["item", "rater"], ...PRECISE });
-    const hermite = manyFacetRasch(scores, {
-      facets: ["item", "rater"],
+    const rectangular = manyFacetRasch(scores, ["item", "rater"], { ...PRECISE });
+    const hermite = manyFacetRasch(scores, ["item", "rater"], {
       quadrature: { method: "gauss-hermite", points: 31 },
       ...PRECISE,
     });
@@ -1296,7 +1287,7 @@ describe("manyFacetRasch", () => {
         expectClose(hermite.facets[f]?.elements[e]?.measure ?? null, element.measure, 0.02, element.id);
       });
     });
-    const byRater = manyFacetRasch(scores, { facets: ["item", "rater"], thresholdFacet: "rater" });
+    const byRater = manyFacetRasch(scores, ["item", "rater"], { thresholdFacet: "rater" });
     expect(byRater.thresholds.map(({ element }) => element)).toEqual(["r0", "r1", "r2"]);
   });
 
@@ -1309,7 +1300,7 @@ describe("manyFacetRasch", () => {
         [0, 1].map((score) => ({ levels: { person, item: "i2", rater: "r2" }, score })),
       ),
     ];
-    expect(() => manyFacetRasch(scores, { facets: ["item", "rater"] })).toThrow(
+    expect(() => manyFacetRasch(scores, ["item", "rater"])).toThrow(
       /^The scores fall into 2 subsets that share no person, item or rater, so their measures are not on one scale \(subset 1: person "a", person "b", item "i1" and 1 more; subset 2: person "c", person "d", item "i2" and 1 more\)\.$/,
     );
   });
@@ -1318,32 +1309,32 @@ describe("manyFacetRasch", () => {
     const base = simulatedScores(2, 20);
     const first = base[0];
     if (first === undefined) return;
-    const options = { facets: ["item", "rater"] };
-    expect(() => manyFacetRasch([...base.slice(0, 2), { ...first, score: 1.5 }], options)).toThrow(
+    const facets = ["item", "rater"];
+    expect(() => manyFacetRasch([...base.slice(0, 2), { ...first, score: 1.5 }], facets)).toThrow(
       "Score 3 needs an integer score from 0 to 2147483647, found 1.5.",
     );
-    expect(() => manyFacetRasch([{ ...first, score: -1 }], options)).toThrow(
+    expect(() => manyFacetRasch([{ ...first, score: -1 }], facets)).toThrow(
       "Score 1 needs an integer score from 0 to 2147483647, found -1.",
     );
-    expect(() => manyFacetRasch([...base.slice(0, 2), { ...first, score: 2 ** 32 + 1 }], options)).toThrow(
+    expect(() => manyFacetRasch([...base.slice(0, 2), { ...first, score: 2 ** 32 + 1 }], facets)).toThrow(
       "Score 3 needs an integer score from 0 to 2147483647, found 4294967297.",
     );
-    expect(() => manyFacetRasch([first, { levels: { person: "p1", item: "i0" }, score: 1 }], options)).toThrow(
+    expect(() => manyFacetRasch([first, { levels: { person: "p1", item: "i0" }, score: 1 }], facets)).toThrow(
       'Score 2 needs a string element for the facet "rater", found undefined.',
     );
-    expect(() => manyFacetRasch([first], options)).toThrow("The scores need at least two persons, found 1.");
+    expect(() => manyFacetRasch([first], facets)).toThrow("The scores need at least two persons, found 1.");
     const skipped = base.map((entry) => ({ ...entry, score: entry.score === 2 ? 3 : entry.score }));
-    expect(() => manyFacetRasch(skipped, options)).toThrow(
+    expect(() => manyFacetRasch(skipped, facets)).toThrow(
       "Category 2 has no scores in the rating scale, but category 3 has: its threshold cannot be estimated.",
     );
     const zeros = base.map((entry) => ({ ...entry, score: 0 }));
-    expect(() => manyFacetRasch(zeros, options)).toThrow(
+    expect(() => manyFacetRasch(zeros, facets)).toThrow(
       "The scores of the rating scale need at least two categories, found only category 0.",
     );
     const gap = base.map((entry) =>
       entry.levels.rater === "r1" && entry.score === 1 ? { ...entry, score: 2 } : entry,
     );
-    expect(() => manyFacetRasch(gap, { ...options, thresholdFacet: "rater" })).toThrow(
+    expect(() => manyFacetRasch(gap, facets, { thresholdFacet: "rater" })).toThrow(
       'Category 1 has no scores in the thresholds of the rater "r1", but category 3 has: its threshold cannot be estimated.',
     );
   });
@@ -1352,24 +1343,20 @@ describe("manyFacetRasch", () => {
     const capped = simulatedScores(4, 90).map((entry) =>
       entry.levels.rater === "r0" ? { ...entry, score: Math.min(entry.score, 1) } : entry,
     );
-    const model = manyFacetRasch(capped, { facets: ["item", "rater"], thresholdFacet: "rater" });
+    const model = manyFacetRasch(capped, ["item", "rater"], { thresholdFacet: "rater" });
     expect(model.thresholds.map(({ thresholds }) => thresholds.length)).toEqual([1, 3, 3]);
     expect(model.thresholds[0]?.thresholds[0]).toBeCloseTo(0, 12);
-    expect(() => manyFacetRasch(capped, { facets: ["item", "rater"] })).not.toThrow();
+    expect(() => manyFacetRasch(capped, ["item", "rater"])).not.toThrow();
   });
 
   it("reports that EM has not converged when it runs out of iterations", () => {
-    const model = manyFacetRasch(simulatedScores(6, 60), {
-      facets: ["item", "rater"],
-      tolerance: 1e-14,
-      maxIterations: 3,
-    });
+    const model = manyFacetRasch(simulatedScores(6, 60), ["item", "rater"], { tolerance: 1e-14, maxIterations: 3 });
     expect(model.converged).toBe(false);
     expect(model.iterations).toBe(3);
   });
 
   it("refuses a model of more than 1,000 parameters or a scale of more than 255 categories", () => {
-    const options = { facets: ["item", "rater"], standardErrors: "none", maxIterations: 1 } as const;
+    const options = { standardErrors: "none", maxIterations: 1 } as const;
     // Person p is scored by raters p and p + 1, round 1,000 raters: 999 measures, 1 threshold, the mean and the SD.
     const raters = Array.from({ length: 1000 }, (_, person) =>
       [0, 1].map((step) => ({
@@ -1377,14 +1364,14 @@ describe("manyFacetRasch", () => {
         score: (person + step) % 3,
       })),
     ).flat();
-    expect(() => manyFacetRasch(raters, options)).toThrow(
+    expect(() => manyFacetRasch(raters, ["item", "rater"], options)).toThrow(
       "A many-facet model takes at most 1000 parameters, as its estimation inverts a matrix of every pair of them; found 1002.",
     );
     const wide = Array.from({ length: 256 }, (_, s) => ({
       levels: { person: `p${s % 2}`, item: `i${Math.floor(s / 34)}`, rater: `r${s % 34}` },
       score: s,
     }));
-    expect(() => manyFacetRasch(wide, options)).toThrow(
+    expect(() => manyFacetRasch(wide, ["item", "rater"], options)).toThrow(
       "A many-facet model takes at most 255 categories in a rating scale, found 256.",
     );
   });
@@ -1396,8 +1383,8 @@ describe("manyFacetRasch", () => {
       levels: { person: `p${cell % 2}`, item: `i${Math.floor(cell / 92)}`, rater: `r${cell % 92}` },
       score: cell % 2,
     }));
-    const options = { facets: ["item", "rater"], standardErrors: "none", maxIterations: 1 } as const;
-    expect(() => manyFacetRasch(cells, { ...options, quadrature: { points: 1000 } })).toThrow(
+    const options = { standardErrors: "none", maxIterations: 1 } as const;
+    expect(() => manyFacetRasch(cells, ["item", "rater"], { ...options, quadrature: { points: 1000 } })).toThrow(
       "A many-facet model holds at most 16777216 expected counts, its items × quadrature points × categories, found 16928000.",
     );
   });
@@ -1408,8 +1395,8 @@ describe("manyFacetRasch", () => {
       levels: { person: `p${cell % 3}`, item: `i${Math.floor(cell / 30)}`, rater: `r${cell % 30}` },
       score: cell % 2,
     }));
-    const options = { facets: ["item", "rater"], interactions: [["item", "rater"]], standardErrors: "none" } as const;
-    expect(() => manyFacetRasch(scores, { ...options, maxIterations: 1 })).toThrow(
+    const options = { interactions: [["item", "rater"]], standardErrors: "none" } as const;
+    expect(() => manyFacetRasch(scores, ["item", "rater"], { ...options, maxIterations: 1 })).toThrow(
       "A many-facet model takes at most 1000 parameters, as its estimation inverts a matrix of every pair of them; found 1201.",
     );
   });
@@ -1417,37 +1404,39 @@ describe("manyFacetRasch", () => {
   it("rejects invalid options", () => {
     const scores = simulatedScores(2, 20);
     const facets = ["item", "rater"];
-    expect(() => manyFacetRasch(scores, JSON.parse("null"))).toThrow("The options must be an object, found null.");
-    expect(() => manyFacetRasch(scores, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
-    expect(() => manyFacetRasch(scores, { facets: JSON.parse('"item"') })).toThrow(
-      'The option facets must be an array of facet names, such as ["item", "rater"], found "item".',
+    expect(() => manyFacetRasch(scores, facets, JSON.parse("null"))).toThrow(
+      "The options must be an object, found null.",
     );
-    expect(() => manyFacetRasch(scores, { facets: [] })).toThrow("The option facets needs at least one facet.");
-    expect(() => manyFacetRasch(scores, { facets: ["item", "item"] })).toThrow(
-      'The person facet and the option facets need different names, found "item" twice.',
+    expect(() => manyFacetRasch(scores, facets, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
+    expect(() => manyFacetRasch(scores, JSON.parse('"item"'))).toThrow(
+      'The facets must be an array of facet names, such as ["item", "rater"], found "item".',
     );
-    expect(() => manyFacetRasch(scores, { facets: ["person", "rater"] })).toThrow(
-      'The person facet and the option facets need different names, found "person" twice.',
+    expect(() => manyFacetRasch(scores, [])).toThrow("The facets need at least one facet.");
+    expect(() => manyFacetRasch(scores, ["item", "item"])).toThrow(
+      'The person facet and the facets need different names, found "item" twice.',
     );
-    expect(() => manyFacetRasch(scores, { facets: JSON.parse('["item", 3]') })).toThrow(
-      "Facet 2 of the option facets must be a non-empty string, found 3.",
+    expect(() => manyFacetRasch(scores, ["person", "rater"])).toThrow(
+      'The person facet and the facets need different names, found "person" twice.',
     );
-    expect(() => manyFacetRasch(scores, { facets, person: JSON.parse("3") })).toThrow(
+    expect(() => manyFacetRasch(scores, JSON.parse('["item", 3]'))).toThrow(
+      "Facet 2 of the facets must be a non-empty string, found 3.",
+    );
+    expect(() => manyFacetRasch(scores, facets, { person: JSON.parse("3") })).toThrow(
       "The option person must be a non-empty string, found 3.",
     );
-    expect(() => manyFacetRasch(scores, { facets, thresholdFacet: "task" })).toThrow(
+    expect(() => manyFacetRasch(scores, facets, { thresholdFacet: "task" })).toThrow(
       'The option thresholdFacet must be "item" or "rater", found "task".',
     );
-    expect(() => manyFacetRasch(scores, { facets, standardErrors: JSON.parse('"exact"') })).toThrow(
+    expect(() => manyFacetRasch(scores, facets, { standardErrors: JSON.parse('"exact"') })).toThrow(
       'The option standardErrors must be "none" or "hessian", found "exact".',
     );
-    expect(() => manyFacetRasch(scores, { facets, tolerance: -1 })).toThrow(DataError);
-    expect(() => manyFacetRasch(scores, { facets, maxIterations: JSON.parse('"many"') })).toThrow(DataError);
-    expect(() => manyFacetRasch(scores, { facets, quadrature: JSON.parse("null") })).toThrow(DataError);
-    expect(() => manyFacetRasch(scores, { facets, quadrature: { points: 1 } })).toThrow(
+    expect(() => manyFacetRasch(scores, facets, { tolerance: -1 })).toThrow(DataError);
+    expect(() => manyFacetRasch(scores, facets, { maxIterations: JSON.parse('"many"') })).toThrow(DataError);
+    expect(() => manyFacetRasch(scores, facets, { quadrature: JSON.parse("null") })).toThrow(DataError);
+    expect(() => manyFacetRasch(scores, facets, { quadrature: { points: 1 } })).toThrow(
       "The quadrature points must be an integer from 2, found 1.",
     );
-    expect(() => manyFacetRasch(JSON.parse("null"), { facets })).toThrow(DataError);
+    expect(() => manyFacetRasch(JSON.parse("null"), facets)).toThrow(DataError);
   });
 });
 
@@ -1510,7 +1499,7 @@ function storedModel(biases: readonly { levels: [string, string]; bias: number }
 
 describe("manyFacetRasch with interactions", () => {
   const interactions = [["item", "rater"]] as const;
-  const model = manyFacetRasch(biasFixture.scores, { facets: ["item", "rater"], interactions, ...PRECISE });
+  const model = manyFacetRasch(biasFixture.scores, ["item", "rater"], { interactions, ...PRECISE });
 
   it("matches the biases, their standard errors and the likelihood of the base R maximum", () => {
     expect(model.converged).toBe(true);
@@ -1558,7 +1547,7 @@ describe("manyFacetRasch with interactions", () => {
     for (const position of [0, 1] as const) {
       for (const [id, sum] of sumsByElement(cells, position)) expectClose(sum, 0, 1e-9, id);
     }
-    const without = manyFacetRasch(biasFixture.scores, { facets: ["item", "rater"] });
+    const without = manyFacetRasch(biasFixture.scores, ["item", "rater"]);
     expect(without.interactions).toBeUndefined();
     expect(model.facets.map(({ facet }) => facet)).toEqual(without.facets.map(({ facet }) => facet));
     expect(model.logLikelihood).toBeGreaterThan(without.logLikelihood);
@@ -1572,8 +1561,7 @@ describe("manyFacetRasch with interactions", () => {
   });
 
   it("gives the same biases whichever facet of the pair comes first", () => {
-    const reversed = manyFacetRasch(biasFixture.scores, {
-      facets: ["item", "rater"],
+    const reversed = manyFacetRasch(biasFixture.scores, ["item", "rater"], {
       interactions: [["rater", "item"]],
       ...PRECISE,
     });
@@ -1585,8 +1573,7 @@ describe("manyFacetRasch with interactions", () => {
   });
 
   it("leaves the standard errors and the Wald statistics out with standardErrors none", () => {
-    const cells = manyFacetRasch(biasFixture.scores, {
-      facets: ["item", "rater"],
+    const cells = manyFacetRasch(biasFixture.scores, ["item", "rater"], {
       interactions,
       standardErrors: "none",
     }).interactions;
@@ -1599,8 +1586,7 @@ describe("manyFacetRasch with interactions", () => {
       levels: { ...levels, task: Number(levels.person?.slice(1)) % 2 === 0 ? "t1" : "t2" },
       score,
     }));
-    const result = manyFacetRasch(scores, {
-      facets: ["item", "rater", "task"],
+    const result = manyFacetRasch(scores, ["item", "rater", "task"], {
       interactions: [
         ["item", "rater"],
         ["rater", "task"],
@@ -1615,13 +1601,13 @@ describe("manyFacetRasch with interactions", () => {
 
   it("estimates the cells that scores fill, with as many free biases as the cells have cycles", () => {
     const scores = simulatedScores(21, 90).filter(({ levels }) => !(levels.item === "i0" && levels.rater === "r2"));
-    const result = manyFacetRasch(scores, { facets: ["item", "rater"], interactions, ...PRECISE });
+    const result = manyFacetRasch(scores, ["item", "rater"], { interactions, ...PRECISE });
     const cells = result.interactions ?? [];
     expect(cells).toHaveLength(5);
     for (const position of [0, 1] as const) {
       for (const [id, sum] of sumsByElement(cells, position)) expectClose(sum, 0, 1e-9, id);
     }
-    const without = manyFacetRasch(scores, { facets: ["item", "rater"], ...PRECISE });
+    const without = manyFacetRasch(scores, ["item", "rater"], { ...PRECISE });
     expectClose(
       result.aic - without.aic,
       -2 * (result.logLikelihood - without.logLikelihood) + 2,
@@ -1636,7 +1622,7 @@ describe("manyFacetRasch with interactions", () => {
       scores.push({ levels: { person: `p${person}`, item: "i0", rater: "r0" }, score: person % 3 });
       scores.push({ levels: { person: `p${person}`, item: "i1", rater: "r1" }, score: (person + 1) % 3 });
     }
-    expect(() => manyFacetRasch(scores, { facets: ["item", "rater"], interactions })).toThrow(
+    expect(() => manyFacetRasch(scores, ["item", "rater"], { interactions })).toThrow(
       'The interaction of the facets "item" and "rater" cannot be estimated: its 2 cells are fixed by the 2 item and 2 rater elements, so every bias would be 0.',
     );
   });
@@ -1644,25 +1630,24 @@ describe("manyFacetRasch with interactions", () => {
   it("rejects interactions that are not pairs of two different facets, or that repeat", () => {
     const scores = simulatedScores(2, 20);
     const facets = ["item", "rater"];
-    expect(() => manyFacetRasch(scores, { facets, interactions: JSON.parse("null") })).toThrow(DataError);
-    expect(() => manyFacetRasch(scores, { facets, interactions: JSON.parse('"item"') })).toThrow(
+    expect(() => manyFacetRasch(scores, facets, { interactions: JSON.parse("null") })).toThrow(DataError);
+    expect(() => manyFacetRasch(scores, facets, { interactions: JSON.parse('"item"') })).toThrow(
       'The option interactions must be an array of pairs of facet names, such as [["item", "rater"]], found "item".',
     );
-    expect(() => manyFacetRasch(scores, { facets, interactions: JSON.parse('["item"]') })).toThrow(
+    expect(() => manyFacetRasch(scores, facets, { interactions: JSON.parse('["item"]') })).toThrow(
       'Interaction 1 of the option interactions must be a pair of facet names, such as ["item", "rater"], found "item".',
     );
-    expect(() => manyFacetRasch(scores, { facets, interactions: JSON.parse('[["item"]]') })).toThrow(
+    expect(() => manyFacetRasch(scores, facets, { interactions: JSON.parse('[["item"]]') })).toThrow(
       "Interaction 1 of the option interactions needs two facet names, found 1.",
     );
-    expect(() => manyFacetRasch(scores, { facets, interactions: [["item", "task"]] })).toThrow(
+    expect(() => manyFacetRasch(scores, facets, { interactions: [["item", "task"]] })).toThrow(
       'Interaction 1 of the option interactions must be "item" or "rater", found "task".',
     );
-    expect(() => manyFacetRasch(scores, { facets, interactions: [["item", "item"]] })).toThrow(
+    expect(() => manyFacetRasch(scores, facets, { interactions: [["item", "item"]] })).toThrow(
       'Interaction 1 of the option interactions pairs the facet "item" with itself; it needs two different facets.',
     );
     expect(() =>
-      manyFacetRasch(scores, {
-        facets,
+      manyFacetRasch(scores, facets, {
         interactions: [
           ["item", "rater"],
           ["rater", "item"],
@@ -2126,9 +2111,8 @@ describe("properties", () => {
     fc.assert(
       fc.property(fc.integer({ min: 1, max: 1_000_000 }), (seed) => {
         const scores = simulatedScores(seed, 40);
-        const options = { facets: ["item", "rater"], ...PRECISE };
-        const forward = measuresOf(manyFacetRasch(scores, options));
-        const backward = measuresOf(manyFacetRasch([...scores].reverse(), options));
+        const forward = measuresOf(manyFacetRasch(scores, ["item", "rater"], PRECISE));
+        const backward = measuresOf(manyFacetRasch([...scores].reverse(), ["item", "rater"], PRECISE));
         for (const [key, measure] of forward) expectClose(backward.get(key) ?? null, measure, 1e-7, key);
       }),
       { numRuns: 5 },
@@ -2139,11 +2123,12 @@ describe("properties", () => {
     fc.assert(
       fc.property(fc.integer({ min: 1, max: 1_000_000 }), (seed) => {
         const scores = simulatedScores(seed, 40);
-        const options = { facets: ["item", "rater"], ...PRECISE };
-        const model = manyFacetRasch(scores, options);
+        const facets = ["item", "rater"];
+        const model = manyFacetRasch(scores, facets, PRECISE);
         const reversed = manyFacetRasch(
           scores.map(({ levels, score }) => ({ levels, score: 3 - score })),
-          options,
+          facets,
+          PRECISE,
         );
         for (const [key, measure] of measuresOf(model))
           expectClose(measuresOf(reversed).get(key) ?? null, -measure, 1e-6, key);
@@ -2161,7 +2146,7 @@ describe("properties", () => {
   it("many-facet measures sum to 0 within each facet, and fair averages lie between the categories", () => {
     fc.assert(
       fc.property(fc.integer({ min: 1, max: 1_000_000 }), (seed) => {
-        const model = manyFacetRasch(simulatedScores(seed, 40), { facets: ["item", "rater"], standardErrors: "none" });
+        const model = manyFacetRasch(simulatedScores(seed, 40), ["item", "rater"], { standardErrors: "none" });
         for (const facet of model.facets) {
           expectClose(
             facet.elements.reduce((sum, { measure }) => sum + measure, 0),

@@ -687,7 +687,7 @@ describe("logLinearPresmoothing", () => {
       message,
     );
     const table = Array.from({ length: 30 }, (_, x) => Array.from({ length: 30 }, (__, v) => 1 + ((x + 2 * v) % 3)));
-    expect(() => bivariateLogLinearPresmoothing(table, { degrees: [21, 2] })).toThrow(
+    expect(() => bivariateLogLinearPresmoothing(table, [21, 2])).toThrow(
       "The degree of the total scores must be an integer from 1 to 20, one less than the number of scores and at most 20, found 21.",
     );
   });
@@ -1008,7 +1008,7 @@ describe("equipercentile equating through an anchor", () => {
     expect(() => frequencyEstimationEquating(to, from)).toThrow(
       "Frequency estimation needs persons with the anchor score 1 in both distributions or neither, but the from distribution has none.",
     );
-    const smoothed = bivariateLogLinearPresmoothing(to, { degrees: [2, 2] }).distribution;
+    const smoothed = bivariateLogLinearPresmoothing(to, [2, 2]).distribution;
     expect(frequencyEstimationEquating(from, smoothed).every(Number.isFinite)).toBe(true);
   });
 
@@ -1036,10 +1036,7 @@ describe("bivariateLogLinearPresmoothing", () => {
     it(`matches a Poisson glm on ${fixture.name}`, () => {
       for (const { degrees, crossDegree, distribution } of fixture.fits) {
         const [total = 0, anchor = 0] = degrees;
-        const result = bivariateLogLinearPresmoothing(fixture.distribution, {
-          degrees: [total, anchor],
-          crossDegree,
-        });
+        const result = bivariateLogLinearPresmoothing(fixture.distribution, [total, anchor], { crossDegree });
         expect(result.converged).toBe(true);
         result.distribution.forEach((row, x) => {
           row.forEach((count, v) => {
@@ -1063,10 +1060,7 @@ describe("bivariateLogLinearPresmoothing", () => {
     });
     fc.assert(
       fc.property(counts, fc.integer({ min: 0, max: 2 }), (distribution, crossDegree) => {
-        const { distribution: fitted } = bivariateLogLinearPresmoothing(distribution, {
-          degrees: [3, 2],
-          crossDegree,
-        });
+        const { distribution: fitted } = bivariateLogLinearPresmoothing(distribution, [3, 2], { crossDegree });
         const moment = (cells: BivariateDistribution, i: number, j: number): number =>
           cells.reduce(
             (sum, row, x) => sum + row.reduce((rowSum, count, v) => rowSum + count * (x / 6) ** i * (v / 5) ** j, 0),
@@ -1100,7 +1094,7 @@ describe("bivariateLogLinearPresmoothing", () => {
         const row = defined(table[anchor + score(theta)]);
         row[anchor] = (row[anchor] ?? 0) + 1;
       }
-      const fit = bivariateLogLinearPresmoothing(table, { degrees: [3, 3], crossDegree: 1 });
+      const fit = bivariateLogLinearPresmoothing(table, [3, 3], { crossDegree: 1 });
       expect(fit.converged, `seed ${seed}`).toBe(true);
       expect(fit.iterations, `seed ${seed}`).toBeLessThan(20);
     }
@@ -1114,7 +1108,7 @@ describe("bivariateLogLinearPresmoothing", () => {
         [0, 2, 6, 2],
         [0, 0, 3, 7],
       ],
-      { degrees: [2, 2] },
+      [2, 2],
     );
     expect(distribution.every((row) => row.every((count) => count > 0))).toBe(true);
   });
@@ -1126,31 +1120,29 @@ describe("bivariateLogLinearPresmoothing", () => {
       [1, 3, 8],
       [2, 2, 2],
     ];
-    expect(() => bivariateLogLinearPresmoothing(groups, { degrees: [4, 2] })).toThrow(
+    expect(() => bivariateLogLinearPresmoothing(groups, [4, 2])).toThrow(
       "The degree of the total scores must be an integer from 1 to 3, one less than the number of scores and at most 20, found 4.",
     );
-    expect(() => bivariateLogLinearPresmoothing(groups, { degrees: [2, 3] })).toThrow(
+    expect(() => bivariateLogLinearPresmoothing(groups, [2, 3])).toThrow(
       "The degree of the anchor scores must be an integer from 1 to 2, one less than the number of scores and at most 20, found 3.",
     );
-    expect(() => bivariateLogLinearPresmoothing(groups, { degrees: [2, 2], crossDegree: 3 })).toThrow(
+    expect(() => bivariateLogLinearPresmoothing(groups, [2, 2], { crossDegree: 3 })).toThrow(
       "The option crossDegree must be an integer from 0 to 2, the smaller of the degrees, found 3.",
     );
-    expect(() => bivariateLogLinearPresmoothing(groups, { degrees: [2, 2], crossDegree: JSON.parse('"1"') })).toThrow(
-      DataError,
+    expect(() => bivariateLogLinearPresmoothing(groups, [2, 2], { crossDegree: JSON.parse('"1"') })).toThrow(DataError);
+    expect(() => bivariateLogLinearPresmoothing(groups, JSON.parse("[2]"))).toThrow(
+      "The degrees must have the degrees of the total and the anchor scores, found 1.",
     );
-    expect(() => bivariateLogLinearPresmoothing(groups, { degrees: JSON.parse("[2]") })).toThrow(
-      "The option degrees must have the degrees of the total and the anchor scores, found 1.",
-    );
-    expect(() => bivariateLogLinearPresmoothing(groups, { degrees: JSON.parse('"22"') })).toThrow(DataError);
-    expect(() => bivariateLogLinearPresmoothing(groups, { degrees: JSON.parse('[2, "2"]') })).toThrow(DataError);
-    expect(() => bivariateLogLinearPresmoothing(groups, JSON.parse("null"))).toThrow(DataError);
-    expect(() => bivariateLogLinearPresmoothing(JSON.parse("null"), { degrees: [1, 1] })).toThrow(DataError);
+    expect(() => bivariateLogLinearPresmoothing(groups, JSON.parse('"22"'))).toThrow(DataError);
+    expect(() => bivariateLogLinearPresmoothing(groups, JSON.parse('[2, "2"]'))).toThrow(DataError);
+    expect(() => bivariateLogLinearPresmoothing(groups, [1, 1], JSON.parse("null"))).toThrow(DataError);
+    expect(() => bivariateLogLinearPresmoothing(JSON.parse("null"), [1, 1])).toThrow(DataError);
   });
 });
 
 describe("bootstrapEquating", () => {
   const smooth = (distribution: BivariateDistribution): BivariateDistribution =>
-    bivariateLogLinearPresmoothing(distribution, { degrees: [4, 3] }).distribution;
+    bivariateLogLinearPresmoothing(distribution, [4, 3]).distribution;
 
   /** Expects standard errors within BOOTSTRAP_TOLERANCE of equate's where equate's are above BOOTSTRAP_FLOOR. */
   function expectErrors(actual: readonly number[], expected: readonly number[], label: string): void {

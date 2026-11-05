@@ -25,12 +25,11 @@ test("calibrates the lognormal model of the times of 1,000 persons on 20 items",
 });
 
 test("calibrates the joint model of speed and accuracy of 1,000 persons on 20 items", async (context) => {
-  const options = { model: twoParameterLogistic };
-  expect(calibrateSpeedAccuracy(matrix, options).converged).toBe(true);
+  expect(calibrateSpeedAccuracy(matrix, twoParameterLogistic).converged).toBe(true);
   await benchmark(
     context,
     "responseTime.calibrateSpeedAccuracy",
-    () => calibrateSpeedAccuracy(matrix, options),
+    () => calibrateSpeedAccuracy(matrix, twoParameterLogistic),
     SLOW_OPTIONS,
   );
 });

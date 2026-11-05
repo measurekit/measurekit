@@ -45,7 +45,7 @@ export function bivariateSmoothedTable(
 ): SmoothedTable {
   const table = bivariateTable(distribution, label);
   checkPersons(table.persons, label);
-  const fit = bivariateLogLinearPresmoothing(distribution, { degrees, crossDegree });
+  const fit = bivariateLogLinearPresmoothing(distribution, degrees, { crossDegree });
   const { basis, terms } = bivariateBasis(table.rows, table.columns, degrees[0], degrees[1], crossDegree);
   return smoothedTable(fit.distribution.flat(), table.persons, basis, terms, table.columns, fit.converged);
 }

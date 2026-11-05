@@ -4,7 +4,7 @@ import { type ExploratoryFactorOptions, exploratoryFactors } from "./exploratory
 import { MIN_GROUP_FACTORS, type SchmidLeiman, transformation } from "./schmid-leiman.js";
 
 /** Options of {@link omegaHierarchical}: those of `exploratoryFactorAnalysis`, its rotation always oblimin. */
-export interface OmegaHierarchicalOptions extends Omit<ExploratoryFactorOptions, "factors" | "rotation"> {
+export interface OmegaHierarchicalOptions extends Omit<ExploratoryFactorOptions, "rotation"> {
   /**
    * The number of group factors, at least 3.
    *
@@ -55,14 +55,14 @@ const DEFAULT_FACTORS = 3;
  */
 export function omegaHierarchical(matrix: ResponseMatrix, options: OmegaHierarchicalOptions = {}): OmegaHierarchical {
   checkOptions(options, OMEGA_HIERARCHICAL_OPTIONS);
-  const { factors = DEFAULT_FACTORS } = options;
+  const { factors = DEFAULT_FACTORS, ...rest } = options;
   checkPositiveInteger(factors, "The option factors");
   if (factors < MIN_GROUP_FACTORS) {
     throw new DataError(
       `Omega hierarchical needs at least ${MIN_GROUP_FACTORS} group factors, as two do not identify the general factor, found ${factors}.`,
     );
   }
-  const solved = exploratoryFactors(matrix, { ...options, factors, rotation: "oblimin" }, "Omega hierarchical");
+  const solved = exploratoryFactors(matrix, factors, { ...rest, rotation: "oblimin" }, "Omega hierarchical");
   const loadings = transformation(solved.factors);
   // Σ R is the variance of the total of the standardized items, positive for a positive definite R.
   const variance = solved.correlations.reduce((sum, value) => sum + value, 0);

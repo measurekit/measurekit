@@ -27,9 +27,6 @@ import { checkIncompleteSize, incompleteCovariances } from "./standard-errors.js
  */
 export type CdmModel = "gdina" | "dina" | "dino" | "acdm" | "llm" | "rrum";
 
-/** How the standard errors of a cognitive diagnosis calibration are computed. */
-export type CdmStandardErrors = "none" | "incomplete";
-
 /** Options of {@link calibrateCdm}. */
 export interface CdmCalibrationOptions {
   /**
@@ -51,7 +48,7 @@ export interface CdmCalibrationOptions {
    *
    * @defaultValue `"none"`
    */
-  readonly standardErrors?: CdmStandardErrors;
+  readonly standardErrors?: "none" | "incomplete";
   /**
    * The most EM iterations.
    *
@@ -135,7 +132,7 @@ export interface CdmCalibration {
 }
 
 export const MODELS: readonly CdmModel[] = ["gdina", "dina", "dino", "acdm", "llm", "rrum"];
-const STANDARD_ERRORS: readonly CdmStandardErrors[] = ["none", "incomplete"];
+const STANDARD_ERRORS = ["none", "incomplete"] as const;
 /** The link of each additive model (de la Torre, 2011): the identity for the A-CDM, the logit for the LLM, the log for the R-RUM. */
 export const LINKS: Readonly<Partial<Record<CdmModel, CdmLink>>> = { acdm: "identity", llm: "logit", rrum: "log" };
 const DEFAULT_TOLERANCE = 1e-4;

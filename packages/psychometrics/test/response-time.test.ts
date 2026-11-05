@@ -444,7 +444,7 @@ function simulateJoint<TParameters>(
 /** Expects the estimates of simulated data to be within four standard errors of the simulated values. */
 function expectRecovery<TParameters>(model: IrtModel<TParameters>, categoryCount: number, seed: number): void {
   const { matrix, sigma, intensity, discrimination, pool } = simulateJoint(model, seed, 1500, 6, categoryCount, 0.5);
-  const result = calibrateSpeedAccuracy(matrix, { model, standardErrors: "hessian" });
+  const result = calibrateSpeedAccuracy(matrix, model, { standardErrors: "hessian" });
   expect(result.converged).toBe(true);
   expect(Math.abs(result.correlation - 0.5)).toBeLessThan(4 * defined(result.correlationStandardError));
   expect(Math.abs(result.speedSd - sigma)).toBeLessThan(0.03);
@@ -465,8 +465,7 @@ function expectRecovery<TParameters>(model: IrtModel<TParameters>, categoryCount
 describe("calibrateSpeedAccuracy", () => {
   for (const reference of jointFixture.cases) {
     it(`matches the base R maximum of the marginal likelihood on ${reference.name}`, () => {
-      const result = calibrateSpeedAccuracy(jointData(reference), {
-        model: twoParameterLogistic,
+      const result = calibrateSpeedAccuracy(jointData(reference), twoParameterLogistic, {
         standardErrors: "hessian",
         ...PRECISE,
       });
@@ -503,7 +502,7 @@ describe("calibrateSpeedAccuracy", () => {
     });
 
     it(`gives the correlation and the time parameters of LNIRT's Gibbs sampler within its Monte Carlo error on ${reference.name}`, () => {
-      const result = calibrateSpeedAccuracy(jointData(reference), { model: twoParameterLogistic });
+      const result = calibrateSpeedAccuracy(jointData(reference), twoParameterLogistic);
       const { lnirt } = reference;
       expectClose(result.speedSd, lnirt.speedSd, LNIRT_TOLERANCE, "speed SD");
       result.items.forEach((item, i) => {
@@ -516,7 +515,7 @@ describe("calibrateSpeedAccuracy", () => {
 
   it("gives LNIRT's correlation where the normal ogive and the logistic model agree", () => {
     const reference = defined(jointFixture.cases.find(({ name }) => name === "simLNIRT"));
-    const result = calibrateSpeedAccuracy(jointData(reference), { model: twoParameterLogistic });
+    const result = calibrateSpeedAccuracy(jointData(reference), twoParameterLogistic);
     expectClose(result.correlation, reference.lnirt.correlation, LNIRT_TOLERANCE, "correlation");
   });
 
@@ -543,8 +542,8 @@ describe("calibrateSpeedAccuracy", () => {
       ),
       { personIds: matrix.personIds, itemIds: reference.itemIds },
     );
-    expect(calibrateSpeedAccuracy(records, { model: twoParameterLogistic })).toEqual(
-      calibrateSpeedAccuracy(matrix, { model: twoParameterLogistic }),
+    expect(calibrateSpeedAccuracy(records, twoParameterLogistic)).toEqual(
+      calibrateSpeedAccuracy(matrix, twoParameterLogistic),
     );
   });
 
@@ -558,11 +557,12 @@ describe("calibrateSpeedAccuracy", () => {
 
   it("estimates the items as calibrate does when ability and speed are uncorrelated, and gives the same estimates in a model list", () => {
     const { matrix } = simulateJoint(twoParameterLogistic, 31, 1200, 5, 2, 0);
-    const joint = calibrateSpeedAccuracy(matrix, { model: twoParameterLogistic, ...PRECISE });
-    const listed = calibrateSpeedAccuracy(matrix, {
-      model: Array.from({ length: 5 }, () => twoParameterLogistic),
-      ...PRECISE,
-    });
+    const joint = calibrateSpeedAccuracy(matrix, twoParameterLogistic, PRECISE);
+    const listed = calibrateSpeedAccuracy(
+      matrix,
+      Array.from({ length: 5 }, () => twoParameterLogistic),
+      { ...PRECISE },
+    );
     expect(listed).toEqual(joint);
     const separate = calibrate(matrix, { model: twoParameterLogistic, tolerance: 1e-10 });
     expect(Math.abs(joint.correlation)).toBeLessThan(0.15);
@@ -586,7 +586,7 @@ describe("calibrateSpeedAccuracy", () => {
       })),
     ).flat();
     expect(() =>
-      calibrateSpeedAccuracy(buildResponseRecords(records), { model: twoParameterLogistic, standardErrors: "hessian" }),
+      calibrateSpeedAccuracy(buildResponseRecords(records), twoParameterLogistic, { standardErrors: "hessian" }),
     ).toThrow(
       'Standard errors take at most 2000 estimated parameters, as their information holds every pair of them; found 2402. Leave standardErrors "none", or calibrate fewer items at a time.',
     );
@@ -594,9 +594,9 @@ describe("calibrateSpeedAccuracy", () => {
 
   it("shrinks the estimates with a prior, and leaves the standard errors out unless asked", () => {
     const { matrix } = simulateJoint(twoParameterLogistic, 41, 300, 5, 2, 0.4);
-    const plain = calibrateSpeedAccuracy(matrix, { model: twoParameterLogistic });
+    const plain = calibrateSpeedAccuracy(matrix, twoParameterLogistic);
     const priors = { a: logNormalPrior(0, 0.05) };
-    const shrunk = calibrateSpeedAccuracy(matrix, { model: twoParameterLogistic, priors });
+    const shrunk = calibrateSpeedAccuracy(matrix, twoParameterLogistic, { priors });
     const distance = (calibration: SpeedAccuracyCalibration<LogisticItem>): number =>
       Math.max(...calibration.items.map((item) => Math.abs(item.parameters.a - 1)));
     expect(distance(shrunk)).toBeLessThan(distance(plain));
@@ -610,7 +610,7 @@ describe("calibrateSpeedAccuracy", () => {
       row.map((time, i) => (p % 7 === 0 || (p + i) % 11 === 0 ? null : time)),
     );
     const sparse = buildResponseMatrix(matrix.responses, times === undefined ? {} : { times });
-    const fit = calibrateSpeedAccuracy(sparse, { model: twoParameterLogistic });
+    const fit = calibrateSpeedAccuracy(sparse, twoParameterLogistic);
     expect(fit.converged).toBe(true);
     const estimates = speedAccuracyEstimates(sparse, fit);
     expect(estimates[0]).toMatchObject({ speed: null, speedStandardError: null });
@@ -620,7 +620,7 @@ describe("calibrateSpeedAccuracy", () => {
 
   it("rejects data without times, an item with fewer than two times, and an item every person answered correctly", () => {
     const model = twoParameterLogistic;
-    expect(() => calibrateSpeedAccuracy(buildResponseMatrix([[1, 0]]), { model })).toThrow(
+    expect(() => calibrateSpeedAccuracy(buildResponseMatrix([[1, 0]]), model)).toThrow(
       "Speed-accuracy calibration needs response times.",
     );
     const rows = [
@@ -635,7 +635,7 @@ describe("calibrateSpeedAccuracy", () => {
         [14, null],
       ].map((row) => row.map((time) => time)),
     });
-    expect(() => calibrateSpeedAccuracy(single, { model })).toThrow('Item "item2" needs at least two response times.');
+    expect(() => calibrateSpeedAccuracy(single, model)).toThrow('Item "item2" needs at least two response times.');
     const constant = buildResponseMatrix(
       [
         [1, 1],
@@ -650,7 +650,7 @@ describe("calibrateSpeedAccuracy", () => {
         ],
       },
     );
-    expect(() => calibrateSpeedAccuracy(constant, { model })).toThrow(
+    expect(() => calibrateSpeedAccuracy(constant, model)).toThrow(
       'Item "item1" has no response in category 0; calibration needs responses in every category up to the highest.',
     );
   });
@@ -658,29 +658,31 @@ describe("calibrateSpeedAccuracy", () => {
   it("rejects options of the wrong type or value", () => {
     const { matrix } = simulateJoint(twoParameterLogistic, 61, 40, 3, 2, 0.3);
     const model = twoParameterLogistic;
-    expect(() => calibrateSpeedAccuracy(matrix, JSON.parse("null"))).toThrow(
+    expect(() => calibrateSpeedAccuracy(matrix, model, JSON.parse("null"))).toThrow(
       "The options must be an object, found null.",
     );
-    expect(() => calibrateSpeedAccuracy(matrix, JSON.parse('{"verbose":1}'))).toThrow('There is no option "verbose"');
-    expect(() => calibrateSpeedAccuracy(matrix, JSON.parse("{}"))).toThrow(
-      "The option model must be an IRT model such as twoParameterLogistic, found undefined.",
+    expect(() => calibrateSpeedAccuracy(matrix, model, JSON.parse('{"verbose":1}'))).toThrow(
+      'There is no option "verbose"',
     );
-    expect(() => calibrateSpeedAccuracy(matrix, { model, standardErrors: JSON.parse('"exact"') })).toThrow(
+    expect(() => calibrateSpeedAccuracy(matrix, JSON.parse("{}"))).toThrow(
+      "The option model must be an IRT model such as twoParameterLogistic, found an object.",
+    );
+    expect(() => calibrateSpeedAccuracy(matrix, model, { standardErrors: JSON.parse('"exact"') })).toThrow(
       'The option standardErrors must be "none" or "hessian", found "exact".',
     );
-    expect(() => calibrateSpeedAccuracy(matrix, { model, tolerance: -1 })).toThrow(DataError);
-    expect(() => calibrateSpeedAccuracy(matrix, { model, maxIterations: JSON.parse('"many"') })).toThrow(DataError);
-    expect(() => calibrateSpeedAccuracy(matrix, { model, quadrature: { points: 1 } })).toThrow(
+    expect(() => calibrateSpeedAccuracy(matrix, model, { tolerance: -1 })).toThrow(DataError);
+    expect(() => calibrateSpeedAccuracy(matrix, model, { maxIterations: JSON.parse('"many"') })).toThrow(DataError);
+    expect(() => calibrateSpeedAccuracy(matrix, model, { quadrature: { points: 1 } })).toThrow(
       "The quadrature points must be an integer from 2, found 1.",
     );
-    expect(() => calibrateSpeedAccuracy(matrix, { model, priors: JSON.parse('{"a": 3}') })).toThrow(DataError);
-    expect(() => calibrateSpeedAccuracy(matrix, { model: [model] })).toThrow("Found 1 models for 3 items.");
-    expect(() => calibrateSpeedAccuracy(JSON.parse("null"), { model })).toThrow(DataError);
+    expect(() => calibrateSpeedAccuracy(matrix, model, { priors: JSON.parse('{"a": 3}') })).toThrow(DataError);
+    expect(() => calibrateSpeedAccuracy(matrix, [model])).toThrow("Found 1 models for 3 items.");
+    expect(() => calibrateSpeedAccuracy(JSON.parse("null"), model)).toThrow(DataError);
   });
 
   it("reports that EM has not converged when it runs out of iterations", () => {
     const { matrix } = simulateJoint(twoParameterLogistic, 71, 200, 4, 2, 0.5);
-    const result = calibrateSpeedAccuracy(matrix, { model: twoParameterLogistic, tolerance: 1e-14, maxIterations: 3 });
+    const result = calibrateSpeedAccuracy(matrix, twoParameterLogistic, { tolerance: 1e-14, maxIterations: 3 });
     expect(result.converged).toBe(false);
     expect(result.iterations).toBe(3);
   });
@@ -885,10 +887,9 @@ describe("properties", () => {
         const order = Array.from({ length: 200 }, (_, i) => (i * 13 + seed) % 200);
         const pick = <T>(rows: readonly T[]): T[] => order.map((p) => defined(rows[p]));
         const shuffled = buildResponseMatrix(pick(matrix.responses), { times: pick(matrix.times ?? []) });
-        const options = { model: twoParameterLogistic, ...PRECISE };
         expectClose(
-          calibrateSpeedAccuracy(shuffled, options).logLikelihood,
-          calibrateSpeedAccuracy(matrix, options).logLikelihood,
+          calibrateSpeedAccuracy(shuffled, twoParameterLogistic, PRECISE).logLikelihood,
+          calibrateSpeedAccuracy(matrix, twoParameterLogistic, PRECISE).logLikelihood,
           1e-7,
         );
       }),

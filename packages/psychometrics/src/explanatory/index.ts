@@ -23,7 +23,6 @@ export {
   type Lltm,
   type LltmModel,
   type LltmOptions,
-  type LltmStandardErrors,
   lltm,
   type RaschComparison,
 } from "./lltm.js";

@@ -6,11 +6,6 @@ import { MAX_LOG_LINEAR_DEGREE, orthonormalPolynomials } from "./presmoothing.js
 /** Options of {@link bivariateLogLinearPresmoothing}. */
 export interface BivariatePresmoothingOptions {
   /**
-   * The degrees C of the polynomials of the total and the anchor scores: integers from 1 to one less than the number of
-   * scores of each, and at most 20.
-   */
-  readonly degrees: readonly [total: number, anchor: number];
-  /**
    * The highest power of each score in the cross products: the terms are x^i v^j for i and j from 1 to it. An integer
    * from 0, for none, to the smaller of the degrees.
    *
@@ -19,7 +14,7 @@ export interface BivariatePresmoothingOptions {
   readonly crossDegree?: number;
 }
 
-const BIVARIATE_PRESMOOTHING_OPTIONS: FieldNames<BivariatePresmoothingOptions> = { degrees: true, crossDegree: true };
+const BIVARIATE_PRESMOOTHING_OPTIONS: FieldNames<BivariatePresmoothingOptions> = { crossDegree: true };
 
 /** A bivariate distribution smoothed by a log-linear model. */
 export interface BivariateLogLinearPresmoothing {
@@ -44,22 +39,25 @@ export interface BivariateLogLinearPresmoothing {
  * and anchor score.
  *
  * @param distribution - The persons at each total score and anchor score.
- * @param options - The degrees of the log-linear model.
+ * @param degrees - The degrees C of the polynomials of the total and the anchor scores: integers from 1 to one less
+ * than the number of scores of each, and at most 20.
+ * @param options - The degree of the cross products.
  * @returns The smoothed distribution, whether the fit converged and the iterations run.
  * @throws `DataError` when the distribution is invalid, or a degree is outside its range.
  * @see {@link https://doi.org/10.3102/10769986025002133 | Holland and Thayer (2000)}
  */
 export function bivariateLogLinearPresmoothing(
   distribution: BivariateDistribution,
-  options: BivariatePresmoothingOptions,
+  degrees: readonly [total: number, anchor: number],
+  options: BivariatePresmoothingOptions = {},
 ): BivariateLogLinearPresmoothing {
   checkOptions(options, BIVARIATE_PRESMOOTHING_OPTIONS);
   const table = bivariateTable(distribution, "presmoothed");
-  const { degrees, crossDegree = 1 } = options;
-  checkArray(degrees, "The option degrees must be an array of the degrees of the total and the anchor scores");
+  const { crossDegree = 1 } = options;
+  checkArray(degrees, "The degrees must be an array of the degrees of the total and the anchor scores");
   if (degrees.length !== 2) {
     throw new DataError(
-      `The option degrees must have the degrees of the total and the anchor scores, found ${degrees.length}.`,
+      `The degrees must have the degrees of the total and the anchor scores, found ${degrees.length}.`,
     );
   }
   const [totalDegree, anchorDegree] = degrees;

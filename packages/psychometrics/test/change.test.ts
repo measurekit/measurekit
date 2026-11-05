@@ -171,65 +171,60 @@ describe("residualGain", () => {
 describe("normalizedGain", () => {
   it("matches Hake's gains in base R, with null for a person at the maximum", () => {
     for (const { maximum, pre, post, normalized } of gains.cases) {
-      const gain = normalizedGain(pre, post, { maximum });
+      const gain = normalizedGain(pre, post, maximum);
       expectClose(gain.group, normalized.group, GAIN_TOLERANCE);
       expect(gain.persons).toHaveLength(pre.length);
       expectAllClose(gain.persons, normalized.persons, GAIN_TOLERANCE);
     }
     const raw = defined(gains.cases[0]);
-    expect(
-      normalizedGain(raw.pre, raw.post, { maximum: raw.maximum }).persons.filter((value) => value === null),
-    ).toHaveLength(raw.pre.filter((score) => score === raw.maximum).length);
+    expect(normalizedGain(raw.pre, raw.post, raw.maximum).persons.filter((value) => value === null)).toHaveLength(
+      raw.pre.filter((score) => score === raw.maximum).length,
+    );
   });
 
   it("takes the group's gain from the means, not from the persons' gains", () => {
-    expect(normalizedGain([10, 30, 50], [30, 40, 50], { maximum: 50 })).toEqual({
+    expect(normalizedGain([10, 30, 50], [30, 40, 50], 50)).toEqual({
       group: 0.5,
       persons: [0.5, 0.5, null],
     });
-    const spread = normalizedGain([10, 40], [20, 50], { maximum: 50 });
+    const spread = normalizedGain([10, 40], [20, 50], 50);
     expect(spread.persons).toEqual([0.25, 1]);
     expectClose(spread.group, 0.4, 1e-15);
   });
 
   it("is 1 for a person who reaches the maximum and negative for a decline", () => {
-    expect(normalizedGain([20, 20], [50, 10], { maximum: 50 }).persons).toEqual([1, -1 / 3]);
+    expect(normalizedGain([20, 20], [50, 10], 50).persons).toEqual([1, -1 / 3]);
   });
 
   it("gives the group's gain where the mean of pre scores just below the maximum rounds to it", () => {
     // The pre scores' mean, (4 - 2⁻⁵³) / 4, rounds to 1: the gain of the means would be 0 / 0.
     const nearly = 1 - 2 ** -53;
-    expect(normalizedGain([1, 1, 1, nearly], [1, 1, 1, 1], { maximum: 1 })).toEqual({
+    expect(normalizedGain([1, 1, 1, nearly], [1, 1, 1, 1], 1)).toEqual({
       group: 1,
       persons: [null, null, null, 1],
     });
   });
 
   it("has no gain for a group that starts at the maximum", () => {
-    expect(normalizedGain([50, 50], [50, 50], { maximum: 50 })).toEqual({ group: null, persons: [null, null] });
-    expect(normalizedGain([0.1, 0.1, 0.1], [0.1, 0.1, 0.1], { maximum: 0.1 }).group).toBeNull();
+    expect(normalizedGain([50, 50], [50, 50], 50)).toEqual({ group: null, persons: [null, null] });
+    expect(normalizedGain([0.1, 0.1, 0.1], [0.1, 0.1, 0.1], 0.1).group).toBeNull();
   });
 
-  it("rejects a score above the maximum, and an invalid maximum or options", () => {
-    expect(() => normalizedGain([10, 55], [12, 20], { maximum: 50 })).toThrow(
-      new DataError("The pre score of person 2 is 55, above the maximum 50."),
+  it("rejects a score above the highest score, and an invalid highest score", () => {
+    expect(() => normalizedGain([10, 55], [12, 20], 50)).toThrow(
+      new DataError("The pre score of person 2 is 55, above the highest score 50."),
     );
-    expect(() => normalizedGain([10, 20], [12, 51], { maximum: 50 })).toThrow(
-      new DataError("The post score of person 2 is 51, above the maximum 50."),
+    expect(() => normalizedGain([10, 20], [12, 51], 50)).toThrow(
+      new DataError("The post score of person 2 is 51, above the highest score 50."),
     );
     expect(() => normalizedGain([10], [12], JSON.parse("null"))).toThrow(
-      new DataError("The options must be an object, found null."),
+      new DataError("The highest score must be a finite number, found null."),
     );
-    expect(() => normalizedGain([10], [12], JSON.parse("{}"))).toThrow(
-      new DataError("The option maximum must be a finite number, found undefined."),
+    expect(() => normalizedGain([10], [12], JSON.parse('"50"'))).toThrow(
+      new DataError('The highest score must be a finite number, found "50".'),
     );
-    expect(() => normalizedGain([10], [12], JSON.parse('{"maximum":"50"}'))).toThrow(
-      new DataError('The option maximum must be a finite number, found "50".'),
-    );
-    expect(() => normalizedGain([], [], { maximum: 50 })).toThrow(
-      new DataError("The scores need at least 1 person, found 0."),
-    );
-    expect(() => normalizedGain(JSON.parse("null"), [1], { maximum: 50 })).toThrow(
+    expect(() => normalizedGain([], [], 50)).toThrow(new DataError("The scores need at least 1 person, found 0."));
+    expect(() => normalizedGain(JSON.parse("null"), [1], 50)).toThrow(
       new DataError("The pre scores must be an array of scores, found null."),
     );
   });
@@ -495,7 +490,7 @@ describe("properties", () => {
   it("a normalized gain is at most 1, for a person and for the group", () => {
     fc.assert(
       fc.property(pairs, ({ pre, post }) => {
-        const { group, persons } = normalizedGain(pre, post, { maximum: 50 });
+        const { group, persons } = normalizedGain(pre, post, 50);
         for (const gain of persons) expect(gain === null || gain <= 1).toBe(true);
         expect(group === null || group <= 1 + 1e-12).toBe(true);
       }),

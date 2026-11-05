@@ -8,7 +8,6 @@
  * @module @measurekit/psychometrics/dif
  */
 export {
-  type DifferentialFunctioningOptions,
   differentialFunctioning,
   type ItemFunctioning,
   type TestFunctioning,

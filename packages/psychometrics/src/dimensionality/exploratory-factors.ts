@@ -29,8 +29,6 @@ export type FactorExtraction = "minres" | "maximum-likelihood";
 
 /** Options of {@link exploratoryFactorAnalysis}. */
 export interface ExploratoryFactorOptions extends PolychoricOptions {
-  /** The number of factors, a positive integer, at most what the number of items identifies. */
-  readonly factors: number;
   /**
    * The correlation of the items: `"pearson"` for scores treated as continuous, over the persons who answered both
    * items of each pair, or `"polychoric"` for item responses.
@@ -67,7 +65,6 @@ export interface ExploratoryFactorOptions extends PolychoricOptions {
 }
 
 const EXPLORATORY_FACTOR_OPTIONS: FieldNames<ExploratoryFactorOptions> = {
-  factors: true,
   correlation: true,
   rotation: true,
   extraction: true,
@@ -124,8 +121,8 @@ const DEFAULT_MAX_ITERATIONS = 100;
  * more slowly, and gives the item parameters of the model.
  *
  * @param data - The responses of the persons.
- * @param options - The number of factors, the correlation, the extraction, the rotation, the stopping rules and the
- *   correction for continuity.
+ * @param factors - The number of factors, a positive integer, at most what the number of items identifies.
+ * @param options - The correlation, the extraction, the rotation, the stopping rules and the correction for continuity.
  * @returns The loadings and communalities of the items, the correlations of the factors, whether the extraction
  *   converged, the iterations run and the fit.
  * @throws `DataError` when the matrix is invalid, has fewer than three items or more than 1,000, or an item with fewer
@@ -134,8 +131,12 @@ const DEFAULT_MAX_ITERATIONS = 100;
  * @see {@link https://doi.org/10.1037/1082-989X.4.3.272 | Fabrigar et al. (1999)}
  * @see {@link https://doi.org/10.1007/BF02289658 | Jöreskog (1967)}
  */
-export function exploratoryFactorAnalysis(data: ResponseMatrix, options: ExploratoryFactorOptions): ExploratoryFactors {
-  return exploratoryFactors(data, options, "Exploratory factor analysis").factors;
+export function exploratoryFactorAnalysis(
+  data: ResponseMatrix,
+  factors: number,
+  options: ExploratoryFactorOptions = {},
+): ExploratoryFactors {
+  return exploratoryFactors(data, factors, options, "Exploratory factor analysis").factors;
 }
 
 /** The factors of a response matrix, with the correlations of the items that they fit. */
@@ -153,12 +154,12 @@ interface FactorsOfData {
  */
 export function exploratoryFactors(
   data: ResponseMatrix,
+  factors: number,
   options: ExploratoryFactorOptions,
   analysis: string,
 ): FactorsOfData {
   checkOptions(options, EXPLORATORY_FACTOR_OPTIONS);
   const {
-    factors,
     correlation = "pearson",
     extraction = "minres",
     rotation = "oblimin",
@@ -166,7 +167,7 @@ export function exploratoryFactors(
     maxIterations = DEFAULT_MAX_ITERATIONS,
     correction = DEFAULT_CORRECTION,
   } = options;
-  checkPositiveInteger(factors, "The option factors");
+  checkPositiveInteger(factors, "The factors");
   checkChoice(correlation, "The option correlation", ITEM_CORRELATIONS);
   checkChoice(extraction, "The option extraction", EXTRACTIONS);
   checkChoice(rotation, "The option rotation", ROTATIONS);

@@ -124,9 +124,10 @@ memory that grow with the times alone.
 
 ## Speed and accuracy
 
-`calibrateSpeedAccuracy(data, options)` estimates the hierarchical model of speed and accuracy (van der Linden, 2007) by
-marginal maximum likelihood: an [IRT model](irt.md) for the responses, the lognormal model for the times, and ability
-and speed correlated in the population.
+`calibrateSpeedAccuracy(data, model, options)` estimates the hierarchical model of speed and accuracy (van der Linden,
+2007) by marginal maximum likelihood: an [IRT model](irt.md) for the responses, the lognormal model for the times, and
+ability and speed correlated in the population. `model` is an [IRT model](irt.md#models) for every item, or one for each
+item in the data's item order.
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
@@ -143,7 +144,7 @@ const speeds = thetas.map((theta) => 0.4 * (0.6 * theta + 0.8 * random.normal())
 const times = speeds.map((speed) => items.map((_, i) => Math.exp(3 + i / 8 - speed + random.normal() / 1.5)));
 const data = buildResponseMatrix(simulateResponses(items, thetas, random).responses, { times });
 
-const calibration = calibrateSpeedAccuracy(data, { model: twoParameterLogistic, standardErrors: "hessian" });
+const calibration = calibrateSpeedAccuracy(data, twoParameterLogistic, { standardErrors: "hessian" });
 calibration.correlation; // => 0.63, standard error 0.05: the true value is 0.6
 calibration.speedSd; // => 0.41
 calibration.items[0];
@@ -167,7 +168,6 @@ items' M-step is `calibrate`'s, and β, α, σ_τ and ρ follow in closed form f
 
 | Option           | Default               | Meaning                                                                                                                                                         |
 | ---------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `model`          | required              | An [IRT model](irt.md#models) for every item, or one for each item in the data's item order                                                                     |
 | `priors`         | none                  | Priors of the items' parameters by name, as [calibrate](irt.md#calibration)                                                                                     |
 | `quadrature`     | 61 rectangular points | The rule over θ, as `calibrate`                                                                                                                                 |
 | `standardErrors` | `"none"`              | `"hessian"` computes them from the Hessian of the marginal log-likelihood, by central differences of its exact gradient, for at most 2,000 estimated parameters |

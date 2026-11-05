@@ -1,4 +1,4 @@
-import { checkOptions, DataError, type FieldNames, type ThetaDistribution } from "@measurekit/core";
+import { DataError, type ThetaDistribution } from "@measurekit/core";
 import {
   checkThetaDistribution,
   expectedScore,
@@ -6,17 +6,6 @@ import {
   largestCategoryCount,
   type TestItem,
 } from "../irt/internal.js";
-
-/** Options of {@link differentialFunctioning}. */
-export interface DifferentialFunctioningOptions {
-  /**
-   * The focal group's distribution of theta on the reference scale: nodes and weights, such as a calibration group's,
-   * or the focal persons' estimates with equal weights.
-   */
-  readonly population: ThetaDistribution;
-}
-
-const DIFFERENTIAL_FUNCTIONING_OPTIONS: FieldNames<DifferentialFunctioningOptions> = { population: true };
 
 /** The differential functioning of one item. */
 export interface ItemFunctioning {
@@ -50,7 +39,8 @@ export interface TestFunctioning {
  *
  * @param reference - The items with the reference group's parameters.
  * @param focal - The same items with the focal group's parameters, in the same order.
- * @param options - The focal group's distribution of theta.
+ * @param population - The focal group's distribution of theta on the reference scale: nodes and weights, such as a
+ * calibration group's, or the focal persons' estimates with equal weights.
  * @returns The functioning of each item and of the test.
  * @throws `DataError` when an item list is not an array of valid items with unique string ids, the lists differ in
  * their ids or their order, or the population is not a distribution with finite nodes and weights summing to 1.
@@ -60,11 +50,10 @@ export interface TestFunctioning {
 export function differentialFunctioning(
   reference: readonly TestItem[],
   focal: readonly TestItem[],
-  options: DifferentialFunctioningOptions,
+  population: ThetaDistribution,
 ): TestFunctioning {
   indexItems(reference);
   indexItems(focal);
-  checkOptions(options, DIFFERENTIAL_FUNCTIONING_OPTIONS);
   if (focal.length !== reference.length) {
     throw new DataError(`Found ${focal.length} focal items for ${reference.length} reference items.`);
   }
@@ -75,7 +64,7 @@ export function differentialFunctioning(
       );
     }
   });
-  const { nodes, weights } = checkThetaDistribution(options.population, "population");
+  const { nodes, weights } = checkThetaDistribution(population, "population");
   const count = reference.length;
   const scratch = new Float64Array(Math.max(largestCategoryCount(reference), largestCategoryCount(focal)));
   const pairs = focal.map((item, i) => ({ focal: item, reference: reference[i] ?? item }));

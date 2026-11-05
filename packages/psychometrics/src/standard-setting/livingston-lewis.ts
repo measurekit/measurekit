@@ -2,7 +2,6 @@ import {
   checkArray,
   checkFinite,
   checkOptions,
-  checkRecord,
   DataError,
   describe,
   type FieldNames,
@@ -15,23 +14,15 @@ import { checkCuts } from "./classification.js";
 
 /** Options of {@link livingstonLewisClassification}. */
 export interface LivingstonLewisOptions {
-  /** The reliability of the scores, above 0 and below 1, such as `cronbachAlpha` of their items. Required. */
-  readonly reliability: number;
-  /** The highest possible score. Required. */
-  readonly maximum: number;
   /**
    * The lowest possible score.
    *
    * @defaultValue `0`
    */
-  readonly minimum?: number;
+  readonly lowest?: number;
 }
 
-const LIVINGSTON_LEWIS_OPTIONS: FieldNames<LivingstonLewisOptions> = {
-  reliability: true,
-  maximum: true,
-  minimum: true,
-};
+const LIVINGSTON_LEWIS_OPTIONS: FieldNames<LivingstonLewisOptions> = { lowest: true };
 
 /** The accuracy and consistency of the classification into the scores below a cut and those at or above it. */
 export interface CutClassification {
@@ -84,7 +75,7 @@ const MAX_EFFECTIVE_LENGTH = 10_000;
  * four-parameter beta distribution of true scores and a binomial error at the effective test length.
  *
  * @remarks
- * The scores, of any items, are rescaled to proportions of the range from `minimum` to `maximum`. The effective test
+ * The scores, of any items, are rescaled to proportions of the range from `lowest` to `highest`. The effective test
  * length N = ((μ - min)(max - μ) - r σ²) / (σ² (1 - r)), from the mean μ, the variance σ² (denominator n - 1) and the
  * reliability r, is the number of dichotomous items of a test as reliable. The first four raw moments of the true
  * proportion follow from the scores times N by Lord's binomial relation, m₁ = mean(x′) / N and m_i = mean(x′₍ᵢ₎) / N₍ᵢ₎
@@ -101,13 +92,15 @@ const MAX_EFFECTIVE_LENGTH = 10_000;
  * 1e-12. Rudner's indices of `classificationAccuracy` suit cuts on theta with estimates and their standard errors;
  * these suit cuts on a total score.
  *
- * @param scores - The total scores of the persons, from `minimum` to `maximum`.
+ * @param scores - The total scores of the persons, from `lowest` to `highest`.
  * @param cuts - The cuts on the score scale, increasing.
- * @param options - The reliability and the range of the scores.
+ * @param reliability - The reliability of the scores, above 0 and below 1, such as `cronbachAlpha` of their items.
+ * @param highest - The highest possible score.
+ * @param options - The lowest possible score.
  * @returns Each cut's accuracy and consistency, those over all categories, and the true-score distribution.
  * @throws `DataError` when there are fewer than two scores, a score is not finite or outside the range, the scores do
- * not vary, there are no cuts or they are not finite and increasing, the options are not an object, `reliability` is not
- * between 0 and 1, `minimum` or `maximum` is not finite or `maximum` is not above `minimum`; when the effective length
+ * not vary, there are no cuts or they are not finite and increasing, `reliability` is not between 0 and 1, `lowest` or
+ * `highest` is not finite or `highest` is not above `lowest`; when the effective length
  * rounds to fewer than 1 trial or more than 10,000; or when neither beta is permissible, as when the
  * reliability is too low for the scores' variance.
  * @see {@link https://doi.org/10.1111/j.1745-3984.1995.tb00462.x | Livingston and Lewis (1995)}
@@ -116,20 +109,21 @@ const MAX_EFFECTIVE_LENGTH = 10_000;
 export function livingstonLewisClassification(
   scores: readonly number[],
   cuts: readonly number[],
-  options: LivingstonLewisOptions,
+  reliability: number,
+  highest: number,
+  options: LivingstonLewisOptions = {},
 ): ScoreClassification {
-  checkRecord(options, "Livingston and Lewis need options { reliability, maximum }");
   checkOptions(options, LIVINGSTON_LEWIS_OPTIONS);
-  const { reliability, maximum, minimum = 0 } = options;
-  checkOpenUnitInterval(reliability, "The option reliability");
-  checkFinite(maximum, "The option maximum");
-  checkFinite(minimum, "The option minimum");
-  if (!(maximum > minimum)) {
-    throw new DataError(`The option maximum must be above the minimum ${minimum}, found ${maximum}.`);
+  const { lowest = 0 } = options;
+  checkOpenUnitInterval(reliability, "The reliability");
+  checkFinite(highest, "The highest score");
+  checkFinite(lowest, "The option lowest");
+  if (!(highest > lowest)) {
+    throw new DataError(`The highest score must be above the lowest score ${lowest}, found ${highest}.`);
   }
-  const proportions = checkScores(scores, minimum, maximum);
+  const proportions = checkScores(scores, lowest, highest);
   checkCuts(cuts, "Livingston and Lewis need");
-  const effectiveLength = lengthOf(scores, minimum, maximum, reliability);
+  const effectiveLength = lengthOf(scores, lowest, highest, reliability);
   const trials = roundHalfToEven(effectiveLength);
   if (!(trials >= 1 && trials <= MAX_EFFECTIVE_LENGTH)) {
     throw new DataError(
@@ -137,7 +131,7 @@ export function livingstonLewisClassification(
     );
   }
   const shape = trueScoreBeta(proportions, effectiveLength, reliability);
-  const trueCuts = cuts.map((cut) => (cut - minimum) / (maximum - minimum));
+  const trueCuts = cuts.map((cut) => (cut - lowest) / (highest - lowest));
   const binomial = binomialProbabilities(trials);
   const perCut = trueCuts.map((cut, k) => ({ cut: cuts[k] ?? 0, ...indices(shape, binomial, [cut]) }));
   const [single] = perCut;

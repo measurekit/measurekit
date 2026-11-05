@@ -242,10 +242,10 @@ flowchart LR
 | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | `automatedScoreAgreement(scores, options)`    | `machineHuman`, `humanHuman`, `degradation`, `disattenuatedCorrelation` and `groups`                           |
 | `validateAutomatedScores(agreement, options)` | `{ accepted, failures }`: each rule of acceptance broken, with its value and threshold                         |
-| `automatedScoreDrift(scores, options)`        | The machine-human agreement of each window of time with a subject                                              |
+| `automatedScoreDrift(scores, width, options)` | The machine-human agreement of each window of time with a subject                                              |
 | `routingCurve(scores, options)`               | For each confidence, the share of subjects at or above it and their agreement                                  |
 | `scoreMapping(scores, options)`               | A line or an isotonic function from machine to human scores; `mappedScore(mapping, score)` applies it          |
-| `replayShift(ratings, options)`               | The shift of replayed scores from locked ones in SDs, its standard error and whether it is within `maxShiftSd` |
+| `replayShift(ratings, maxShiftSd)`            | The shift of replayed scores from locked ones in SDs, its standard error and whether it is within `maxShiftSd` |
 
 Each subject is an `AutomatedScore`: `machine`, the engine's score, any finite number; `human`, a person's score, a
 category, an integer from 0; and where it has them, `second`, a second person's score, `group`, the writer's subgroup,
@@ -339,9 +339,9 @@ validateAutomatedScores(agreement, { thresholds: { smd: 0.2, groupSmd: null } })
 
 ### Drift, routing and mapping
 
-`automatedScoreDrift(scores, { width, start, scale })` puts each subject in the window of `width` that holds its `time`,
-from `start`, by default the earliest time, and gives each window with a subject its machine-human `ScoreAgreement`.
-Compare the windows with the acceptance, or judge each with `validateAutomatedScores`; a window of few subjects gives
+`automatedScoreDrift(scores, width, { scale })` puts each subject in the window of `width` that holds its `time`, from
+the earliest time, and gives each window with a subject its machine-human `ScoreAgreement`. For calendar windows, group
+the scores and call `automatedScoreAgreement` for each group. Compare the windows with the acceptance, or judge each with `validateAutomatedScores`; a window of few subjects gives
 wide statistics, so choose a width that holds as many subjects as the acceptance did.
 
 `routingCurve(scores, { scale })` gives a point for each distinct `confidence`, from the highest: the subjects at or
@@ -363,7 +363,7 @@ as R's `approx` with `rule = 2`. Round the result to the scale, as `automatedSco
 ```ts continues
 import { automatedScoreDrift, mappedScore, routingCurve, scoreMapping } from "@measurekit/psychometrics/rater";
 
-automatedScoreDrift(scores, { width: 7 * day, scale }).map(({ agreement }) => agreement.quadraticKappa);
+automatedScoreDrift(scores, 7 * day, { scale }).map(({ agreement }) => agreement.quadraticKappa);
 // => [0.67, 0.81, 0.625]: weeks of 4, 3 and 3 essays
 routingCurve(scores, { scale }).map(({ minConfidence, coverage }) => [minConfidence, coverage]);
 // => [[0.95, 0.1], [0.9, 0.3], [0.85, 0.4], ...]: the QWK of the 30% at or above 0.9 is 1
@@ -375,16 +375,15 @@ mappedScore(scoreMapping(scores, { method: "isotonic" }), 3.5); // => 3.25, betw
 ### Replay
 
 Responses whose scores are locked, the engine's at its acceptance or people's, are scored again after a change of model,
-prompt or pipeline, or on a schedule. `replayShift(ratings, { maxShiftSd })` takes rows `[locked, replayed]` and returns
+prompt or pipeline, or on a schedule. `replayShift(ratings, maxShiftSd)` takes rows `[locked, replayed]` and returns
 the mean shift, `meanShift`, the SD of the locked scores, `lockedSd`, the shift in those SDs, `standardizedShift`, its
 standard error, that of a paired mean, the exact agreement and the correlation of the two, and `passed`, whether the
 absolute standardized shift is at most `maxShiftSd`. The standard error is √(2 (1 - r) / n) for n responses whose two
 scores have the same SD and correlate at r: 0.035 for 200 responses at r = 0.88. People's scores of new responses cannot
 tell a changed engine from changed responses; the replay holds the responses still.
 
-| Option       | Default  | Meaning                                                                                                         |
-| ------------ | -------- | --------------------------------------------------------------------------------------------------------------- |
-| `maxShiftSd` | required | The largest absolute shift, in SDs of the locked scores, that passes: a program's policy, as no source sets one |
+`maxShiftSd`, required, is the largest absolute shift, in SDs of the locked scores, that passes: a program's policy, as no
+source sets one.
 
 ```ts continues
 import { replayShift } from "@measurekit/psychometrics/rater";
@@ -393,13 +392,13 @@ const locked = [2, 3, 3, 4, 1, 2, 4, 3];
 const replayed = [2, 3, 4, 4, 1, 3, 4, 3];
 replayShift(
   locked.map((score, i) => [score, replayed[i] ?? null]),
-  { maxShiftSd: 0.05 },
+  0.05,
 ); // => { standardizedShift: 0.24, standardError: 0.16, passed: false, ... }
 ```
 
 ## Many-facet Rasch model
 
-`manyFacetRasch(scores, options)` estimates the many-facet Rasch model (Linacre, 1989) by marginal maximum likelihood.
+`manyFacetRasch(scores, facets, options)` estimates the many-facet Rasch model (Linacre, 1989) by marginal maximum likelihood.
 Each score names the element of every facet it was given at: the person, the item or task, the rater, and any further
 facet such as the occasion. The model says how much each element adds to the score, in logits.
 
@@ -438,7 +437,7 @@ const scores = rows.flatMap(([person, rater, content, style]) => [
   { levels: { person, item: "style", rater }, score: style },
 ]);
 
-const model = manyFacetRasch(scores, { facets: ["item", "rater"] });
+const model = manyFacetRasch(scores, ["item", "rater"]);
 model.facets[1]?.elements.map(({ id, measure }) => [id, measure]); // => [["r1", 0.77], ["r2", -0.31], ["r3", -0.46]]
 model.facets[1]?.elements.map(({ fairAverage }) => fairAverage); // => [1.15, 1.87, 1.96]: r1 is the severe rater
 model.facets[1]?.reliability; // => 0.68
@@ -448,7 +447,7 @@ const persons = manyFacetEstimates(scores, model); // => [{ id: "e1", theta: 0.0
 manyFacetFit(scores, model, persons).find(({ id }) => id === "r3")?.infitMeanSquare; // => 1.22
 
 // A bias for each rater on each item, [item, rater, bias]: no pair stands out in these few scores.
-const biased = manyFacetRasch(scores, { facets: ["item", "rater"], interactions: [["item", "rater"]] });
+const biased = manyFacetRasch(scores, ["item", "rater"], { interactions: [["item", "rater"]] });
 biased.interactions?.map(({ levels, bias }) => [...levels, Math.round(bias * 100) / 100]);
 // => [["content", "r1", -0.13], ["style", "r1", 0.13], ["content", "r2", 0.07], ["style", "r2", -0.07], ["content", "r3", 0.05], ["style", "r3", -0.05]]
 ```
@@ -460,7 +459,7 @@ biased.interactions?.map(({ levels, bias }) => [...levels, Math.round(bias * 100
 
 | Rule                                 | Meaning                                                                                                                     |
 | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| One element of each facet            | The person facet and the facets in `facets`; other keys of `levels` are ignored                                             |
+| One element of each facet            | The person facet and the `facets`; other keys of `levels` are ignored                                                       |
 | Connected                            | Each score links its person to its elements; all persons and elements must form one set, or the measures are not comparable |
 | Categories 0 to the highest, no gaps | In each rating scale, at least two categories, and every category up to the highest used                                    |
 | Two persons                          | At least two persons                                                                                                        |
@@ -485,10 +484,12 @@ The model is estimated by the EM algorithm of `calibrate`, over partial credit i
 for all measures, thresholds, μ and σ together, and the extrapolation SQUAREM on the iterations. Standard errors come from the Hessian of the marginal log-likelihood,
 and, for the element each facet's constraint leaves out and for the last threshold, from the delta method.
 
+`facets` is required: the facets other than the person facet, such as `["item", "rater"]`, at least one and none repeated;
+facets beyond two add terms.
+
 | Option           | Default                 | Meaning                                                                                                 |
 | ---------------- | ----------------------- | ------------------------------------------------------------------------------------------------------- |
 | `person`         | `"person"`              | The facet that names the persons                                                                        |
-| `facets`         | required                | The other facets, such as `["item", "rater"]`: at least one, none repeated; facets beyond two add terms |
 | `thresholdFacet` | one scale shared by all | A facet whose elements each get their own thresholds, as the partial credit model: one of `facets`      |
 | `interactions`   | none                    | Pairs of `facets` with a bias for each cell, such as `[["item", "rater"]]`; none repeated               |
 | `quadrature`     | 61 rectangular points   | The rule over theta, as `calibrate`                                                                     |
@@ -580,7 +581,7 @@ flowchart LR
 
 | Field of a cell | Meaning                                                                                          |
 | --------------- | ------------------------------------------------------------------------------------------------ |
-| `facets`        | The two facets, in the order of the option                                                       |
+| `facets`        | The two facets, in the order of the pair                                                         |
 | `levels`        | The ids of the cell's elements in them                                                           |
 | `bias`          | The bias in logits                                                                               |
 | `standardError` | From the same Hessian as the measures, by the delta method; `null` with `standardErrors: "none"` |

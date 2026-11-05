@@ -1,13 +1,5 @@
-import { checkFinite, checkOptions, DataError, type FieldNames } from "@measurekit/core";
+import { checkFinite, DataError } from "@measurekit/core";
 import { checkPairedScores } from "./paired-scores.js";
-
-/** Options of {@link normalizedGain}. */
-export interface NormalizedGainOptions {
-  /** The highest possible score of the test, which no score exceeds. */
-  readonly maximum: number;
-}
-
-const NORMALIZED_GAIN_OPTIONS: FieldNames<NormalizedGainOptions> = { maximum: true };
 
 /** The normalized gain of a group and of each of its persons. */
 export interface NormalizedGain {
@@ -31,39 +23,33 @@ export interface NormalizedGain {
  *
  * @param pre - The scores of the first occasion.
  * @param post - The scores of the second occasion, one for each person.
- * @param options - The highest possible score.
+ * @param highest - The highest possible score of the test, which no score exceeds.
  * @returns The gain of the group and of each person; `null` where a gain is undefined.
  *
  * @example
  * ```ts
  * import { normalizedGain } from "@measurekit/psychometrics/change";
  *
- * normalizedGain([10, 30, 50], [30, 40, 50], { maximum: 50 }); // => { group: 0.5, persons: [0.5, 0.5, null] }
+ * normalizedGain([10, 30, 50], [30, 40, 50], 50); // => { group: 0.5, persons: [0.5, 0.5, null] }
  * ```
  * @throws `DataError` when the scores are not arrays of the same length with at least one finite number each, the
- * options are not an object, the maximum is not a finite number, or a score exceeds it.
+ * highest score is not a finite number, or a score exceeds it.
  * @see {@link https://doi.org/10.1119/1.18809 | Hake (1998)}
  */
-export function normalizedGain(
-  pre: readonly number[],
-  post: readonly number[],
-  options: NormalizedGainOptions,
-): NormalizedGain {
+export function normalizedGain(pre: readonly number[], post: readonly number[], highest: number): NormalizedGain {
   checkPairedScores(pre, post, 1);
-  checkOptions(options, NORMALIZED_GAIN_OPTIONS);
-  const { maximum } = options;
-  checkFinite(maximum, "The option maximum");
+  checkFinite(highest, "The highest score");
   pre.forEach((score, person) => {
-    checkAtMost(score, maximum, `The pre score of person ${person + 1}`);
-    checkAtMost(post[person] ?? 0, maximum, `The post score of person ${person + 1}`);
+    checkAtMost(score, highest, `The pre score of person ${person + 1}`);
+    checkAtMost(post[person] ?? 0, highest, `The post score of person ${person + 1}`);
   });
   let gained = 0;
   let possible = 0;
   const persons = pre.map((score, person) => {
     const change = (post[person] ?? 0) - score;
     gained += change;
-    possible += maximum - score;
-    return score === maximum ? null : change / (maximum - score);
+    possible += highest - score;
+    return score === highest ? null : change / (highest - score);
   });
   // (mean post - mean pre) / (maximum - mean pre) as sums over the persons: each maximum - pre is above 0 unless the
   // person started at the maximum, so the denominator is 0 only when everyone did, where the mean of pre scores just
@@ -71,7 +57,7 @@ export function normalizedGain(
   return { group: possible > 0 ? gained / possible : null, persons };
 }
 
-/** Checks that a score does not exceed the maximum. */
-function checkAtMost(score: number, maximum: number, label: string): void {
-  if (score > maximum) throw new DataError(`${label} is ${score}, above the maximum ${maximum}.`);
+/** Checks that a score does not exceed the highest score. */
+function checkAtMost(score: number, highest: number, label: string): void {
+  if (score > highest) throw new DataError(`${label} is ${score}, above the highest score ${highest}.`);
 }

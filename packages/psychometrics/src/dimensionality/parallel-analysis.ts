@@ -14,7 +14,13 @@ import type { ResponseMatrix } from "../data/internal.js";
 import { sampleQuantile } from "../math/internal.js";
 import { codeItems } from "./coded-items.js";
 import { correlationEigenvalues } from "./eigenvalues.js";
-import { checkedMatrix, checkItems, correlateItems, ITEM_CORRELATIONS } from "./item-correlations.js";
+import {
+  checkedMatrix,
+  checkItems,
+  correlateItems,
+  ITEM_CORRELATIONS,
+  type ItemCorrelation,
+} from "./item-correlations.js";
 import { pearsonMatrix } from "./pearson.js";
 import { DEFAULT_CORRECTION, type PolychoricOptions } from "./polychoric.js";
 
@@ -26,7 +32,7 @@ export interface ParallelAnalysisOptions extends PolychoricOptions {
    *
    * @defaultValue `"polychoric"`
    */
-  readonly correlation?: "pearson" | "polychoric";
+  readonly correlation?: ItemCorrelation;
   /**
    * The random data: `"resampled"`, each item's responses permuted among the persons, which keeps its distribution and
    * its missing responses; `"normal"`, standard normal data for every person and item, with `correlation: "pearson"`.

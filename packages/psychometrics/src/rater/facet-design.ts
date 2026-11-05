@@ -26,9 +26,9 @@ export interface DesignFacet {
 export interface FacetDesign {
   /** The person ids, in order of first appearance. */
   readonly personIds: readonly string[];
-  /** The facets other than the person facet, in the order of the option. */
+  /** The facets other than the person facet, in the order of `facets`. */
   readonly facets: readonly DesignFacet[];
-  /** The interactions of pairs of facets, in the order of the option. */
+  /** The interactions of pairs of facets, in the order of the option `interactions`. */
   readonly interactions: readonly DesignInteraction[];
   /** The element of the threshold facet that owns each threshold set; `null` for the one shared set. */
   readonly sets: readonly (string | null)[];

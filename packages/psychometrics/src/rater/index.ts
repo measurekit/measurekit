@@ -35,7 +35,6 @@ export { type CohenKappaOptions, cohenKappa, fleissKappa } from "./kappa.js";
 export { type ManyFacetEstimatesOptions, manyFacetEstimates } from "./many-facet-estimates.js";
 export { type FacetFit, manyFacetFit } from "./many-facet-fit.js";
 export {
-  type FacetStandardErrors,
   type ManyFacetRasch,
   type ManyFacetRaschOptions,
   manyFacetRasch,
@@ -47,7 +46,7 @@ export {
   standardizedMeanDifference,
 } from "./mean-difference.js";
 export { ratingCorrelation } from "./rating-correlation.js";
-export { type ReplayShift, type ReplayShiftOptions, replayShift } from "./replay-shift.js";
+export { type ReplayShift, replayShift } from "./replay-shift.js";
 export { type RoutingCurveOptions, type RoutingPoint, routingCurve } from "./routing-curve.js";
 export {
   type IsotonicScoreMapping,

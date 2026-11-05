@@ -6,7 +6,7 @@
 
 export type { ReliableChangeOptions } from "./critical-value.js";
 export { type DifferenceReliabilityInput, differenceReliability } from "./difference-reliability.js";
-export { type NormalizedGain, type NormalizedGainOptions, normalizedGain } from "./normalized-gain.js";
+export { type NormalizedGain, normalizedGain } from "./normalized-gain.js";
 export { type ReliableChange, reliableChange, reliableChangeFromTheta, type ThetaEstimate } from "./reliable-change.js";
 export { residualGain } from "./residual-gain.js";
 export type { ScoreReliability } from "./score-reliability.js";
