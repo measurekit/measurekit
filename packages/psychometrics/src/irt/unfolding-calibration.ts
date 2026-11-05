@@ -65,8 +65,10 @@ export interface UnfoldingCalibration extends Calibration<UnfoldingParameters> {
 const DEFAULT_TOLERANCE = 1e-4;
 const DEFAULT_MAX_ITERATIONS = 500;
 /**
- * The most items of an unfolding calibration: its starts decompose the correlations of every pair of items, in time that
- * grows with the cube of the items, about 0.3 seconds at 500 and 3 at 1,000, from data of any size.
+ * The most items of an unfolding calibration: its first stage shares the thresholds among the items, so each Newton step
+ * of its M-step solves for the locations of every item at once, in time that grows with the cube of the items. On the
+ * responses of two persons, the calibration takes about 12 s at 500 items and 77 s at 1,000; its starts, which decompose
+ * the correlations of every pair of items, 0.3 s and 3 s.
  */
 const MAX_ITEMS = 500;
 
@@ -112,7 +114,7 @@ export function calibrateUnfolding(
   const all = compressResponses(data);
   if (all.itemIds.length > MAX_ITEMS) {
     throw new DataError(
-      `Unfolding calibration takes at most ${MAX_ITEMS} items, as its starts decompose the correlations of every pair of items; found ${all.itemIds.length}.`,
+      `Unfolding calibration takes at most ${MAX_ITEMS} items, as its first stage estimates the locations of every item at once; found ${all.itemIds.length}.`,
     );
   }
   const allTallies = categoryTallies(all);

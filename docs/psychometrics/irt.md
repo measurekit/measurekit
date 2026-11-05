@@ -767,12 +767,12 @@ agreement at 0 or above, which cannot place the sign of a location, so it may st
 to `calibrateUnfolding`. Ability estimation, information, fit and adaptive tests take the calibrated items as they take
 any; linking, equating, the Bookmark method, `simulateItems` and the conversions to mirt do not take GGUM items.
 
-| `DataError`                                                                 | What to do                                                                            |
-| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| More than 500 items: the starts decompose the correlations of every pair    | Calibrate the items in sets of up to 500 that share anchors, or a sample of them      |
-| An item has responses in fewer than two categories                          | Leave the item out                                                                    |
-| An item has no response in a category below its highest                     | Merge the empty category with a neighbor                                              |
-| An item has no response in a category from a person who agrees with an item | Merge the category with a neighbor: only persons who disagree with every item used it |
+| `DataError`                                                                   | What to do                                                                            |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| More than 500 items: the first stage solves for every item's location at once | Calibrate the items in sets of up to 500 that share anchors, or a sample of them      |
+| An item has responses in fewer than two categories                            | Leave the item out                                                                    |
+| An item has no response in a category below its highest                       | Merge the empty category with a neighbor                                              |
+| An item has no response in a category from a person who agrees with an item   | Merge the category with a neighbor: only persons who disagree with every item used it |
 
 ## Joint maximum likelihood
 

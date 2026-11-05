@@ -148,7 +148,7 @@ export const RULES: readonly Rule[] = [
     titles: "many groups",
   },
   {
-    rule: "An unfolding calibration takes at most 500 items, as its starts decompose the correlations of every pair in time that grows with their cube.",
+    rule: "An unfolding calibration takes at most 500 items, as its first stage solves for the locations of every item at once, in time that grows with their cube.",
     file: "packages/psychometrics/src/irt/unfolding-calibration.ts",
     find: "if (all.itemIds.length > MAX_ITEMS) {",
     replace: "if (false) {",

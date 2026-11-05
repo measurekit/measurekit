@@ -4685,13 +4685,13 @@ describe("calibrateUnfolding", () => {
     );
   });
 
-  it("rejects more than 500 items, whose starts would take minutes from data of a few kilobytes", () => {
+  it("rejects more than 500 items, whose first stage would take minutes from data of a few kilobytes", () => {
     // Four persons answer each of 501 items in each of its four categories: a design of 2,004 records.
     const records = Array.from({ length: 501 }, (_, j) =>
       Array.from({ length: 4 }, (_, k) => ({ person: `p${4 * j + k}`, item: `i${j}`, response: k })),
     ).flat();
     expect(() => calibrateUnfolding(buildResponseRecords(records))).toThrow(
-      "Unfolding calibration takes at most 500 items, as its starts decompose the correlations of every pair of items; found 501.",
+      "Unfolding calibration takes at most 500 items, as its first stage estimates the locations of every item at once; found 501.",
     );
   });
 
