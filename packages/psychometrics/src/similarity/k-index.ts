@@ -207,7 +207,7 @@ function numberIncorrectGroups(matrix: ResponseMatrix, key: Int32Array, guessing
   weights.forEach((_, index) => {
     const group = Math.floor(index / items);
     const correct = counts[group * width + (keyCells[index - group * items] ?? 0)] ?? 0;
-    weights[index] = Math.exp((decay * correct) / (sizes[group] ?? 1));
+    weights[index] = weightAt(decay, correct / (sizes[group] ?? 1));
   });
   return {
     responses,
@@ -393,9 +393,17 @@ function sharedSums(
  * times the proportion correct.
  */
 function ownWeight(rates: SourceRates, column: number, proportion: number, decay: number): number {
-  const weight = Math.exp(decay * proportion);
+  const weight = weightAt(decay, proportion);
   rates.ownWeights[column] = weight;
   return weight * proportion;
+}
+
+/**
+ * Returns S2's weight of an item answered correctly by a share `proportion` of a group, e^(decay × proportion): 1 at a
+ * share of 0 whatever the decay, which a guessing near 5e-324 makes infinite.
+ */
+function weightAt(decay: number, proportion: number): number {
+  return proportion === 0 ? 1 : Math.exp(decay * proportion);
 }
 
 function writeFitted(out: Float64Array, groups: readonly number[], fitted: ArrayLike<number>): void {

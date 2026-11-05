@@ -319,6 +319,26 @@ describe("kIndex", () => {
     expect(defined(pair).k).toBeCloseTo(1 / 9, 14);
   });
 
+  it("gives S2 at the least guessing the weights of its limit, 1 for an item no one answers correctly, never NaN", () => {
+    // At a guessing of 5e-324 the exponent of S2's weights per unit of proportion correct is -Infinity, and at a
+    // proportion of 0 their product would be NaN; at 1e-300 it is finite, and the weights are already 0 and 1.
+    const matrix = buildResponseMatrix([
+      [1, 0, 1, 0],
+      [1, 0, 1, 0],
+      [0, 1, 1, 1],
+      [1, 1, 0, 0],
+      [0, 0, 0, 1],
+      [1, 1, 1, 0],
+    ]);
+    const tested: PersonPair[] = [
+      ["person1", "person2"],
+      ["person3", "person6"],
+    ];
+    const least = kIndex(matrix, tested, { guessing: Number.MIN_VALUE });
+    expect(least).toEqual(kIndex(matrix, tested, { guessing: 1e-300 }));
+    expect(least.every(({ s2 }) => s2 !== null && s2 > 0 && s2 <= 1)).toBe(true);
+  });
+
   it("needs the key when a response is above 1, and refuses invalid options", () => {
     const matrix = buildResponseMatrix([
       [0, 2],
