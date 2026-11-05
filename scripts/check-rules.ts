@@ -1263,10 +1263,18 @@ export const RULES: readonly Rule[] = [
   {
     rule: "A keyed category is a category of its item, so that no probability is read beyond the item's.",
     file: "packages/psychometrics/src/similarity/inputs.ts",
-    find: "if (!(Number.isSafeInteger(category) && category >= 0 && category < count)) {",
+    find: "if (!(Number.isSafeInteger(category) && category >= 0 && category <= highest)) {",
     replace: "if (false) {",
     test: "packages/psychometrics/test/similarity.test.ts",
     titles: "refuses keys that are not categories|needs the key when a response is above 1",
+  },
+  {
+    rule: "A key of the K index is at most the largest response, so that no key wraps in 32 bits onto a category that responses give.",
+    file: "packages/psychometrics/src/similarity/inputs.ts",
+    find: "?? MAX_RESPONSE + 1",
+    replace: "?? Number.POSITIVE_INFINITY",
+    test: "packages/psychometrics/test/similarity.test.ts",
+    titles: "needs the key when a response is above 1",
   },
   {
     rule: "An index that counts identical correct responses needs the key of items of more than two categories, so that category 1 is not taken for it.",

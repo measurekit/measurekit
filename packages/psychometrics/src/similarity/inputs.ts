@@ -1,5 +1,5 @@
 import { checkArray, DataError, describe } from "@measurekit/core";
-import type { ResponseMatrix } from "../data/internal.js";
+import { MAX_RESPONSE, type ResponseMatrix } from "../data/internal.js";
 import { checkItemsOfMatrix, checkPersonThetas, type IrtItem, largestCategoryCount } from "../irt/internal.js";
 import { type PersonPair, readPairs } from "./pairs.js";
 
@@ -96,7 +96,7 @@ export function matchProbability(p: Float64Array, q: Float64Array, from: number,
  * Reads the keyed category of each item: the option `key`, or category 1 of every item when it is absent.
  *
  * @param categories - The number of categories of each item, or `null` when only the responses tell them; a keyed
- * category must be below it.
+ * category must be below it, and a response, at most {@link MAX_RESPONSE}, without it.
  * @param absent - Says why the key is needed when the option is absent and some item is not dichotomous, or `null`
  * when every item is.
  * @throws `DataError` when the key is not an array of one category per item, or is absent while `absent` is not null.
@@ -116,11 +116,11 @@ export function readKey(
     throw new DataError(`The option key has ${key.length} categories for ${itemIds.length} items.`);
   }
   return Int32Array.from(key, (category, column) => {
-    const count = categories(column) ?? Number.POSITIVE_INFINITY;
-    if (!(Number.isSafeInteger(category) && category >= 0 && category < count)) {
-      const range = Number.isFinite(count) ? `from 0 to ${count - 1}` : "from 0";
+    // A key above the largest response would wrap in 32 bits onto a category that responses give.
+    const highest = (categories(column) ?? MAX_RESPONSE + 1) - 1;
+    if (!(Number.isSafeInteger(category) && category >= 0 && category <= highest)) {
       throw new DataError(
-        `The key of item "${itemIds[column]}" must be a category, an integer ${range}, found ${describe(category)}.`,
+        `The key of item "${itemIds[column]}" must be a category, an integer from 0 to ${highest}, found ${describe(category)}.`,
       );
     }
     return category;

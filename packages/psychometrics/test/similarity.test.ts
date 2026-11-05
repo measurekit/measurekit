@@ -328,7 +328,11 @@ describe("kIndex", () => {
       "The K index needs the option key when a response is above 1.",
     );
     expect(() => kIndex(matrix, [["person1", "person2"]], { key: [0, -1] })).toThrow(
-      'The key of item "item2" must be a category, an integer from 0, found -1.',
+      'The key of item "item2" must be a category, an integer from 0 to 2147483647, found -1.',
+    );
+    // 2^32 is no response a matrix holds; in 32 bits it would be 0, and the responses 0 would count as correct.
+    expect(() => kIndex(matrix, [["person1", "person2"]], { key: [2 ** 32, 2] })).toThrow(
+      'The key of item "item1" must be a category, an integer from 0 to 2147483647, found 4294967296.',
     );
     expect(() => kIndex(matrix, [["person1", "person2"]], { key: [0, 0], guessing: 1 })).toThrow(
       "The option guessing must be a number between 0 and 1, exclusive, found 1.",
