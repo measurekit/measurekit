@@ -985,6 +985,19 @@ describe("automatedScoreDrift", () => {
     expect(() => automatedScoreDrift(scores, 0)).toThrow("The window width must be a positive number, found 0.");
     expect(() => automatedScoreDrift(scores, 10, JSON.parse('{"start":5}'))).toThrow("start");
   });
+
+  it("refuses times whose windows pass the largest number, which would start at Infinity", () => {
+    const far = subjectsOf([1, 2], [1, 2], (subject) => ({ time: subject === 0 ? -1e308 : 1e308 }));
+    expect(() => automatedScoreDrift(far, 1)).toThrow(
+      "The windows of drift are not finite: the times span too many widths; rescale them.",
+    );
+    expect(() =>
+      automatedScoreDrift(
+        subjectsOf([1, 2], [1, 2], (subject) => ({ time: subject })),
+        1e-320,
+      ),
+    ).toThrow("The windows of drift are not finite");
+  });
 });
 
 describe("scoreMapping and mappedScore", () => {
@@ -1056,6 +1069,17 @@ describe("scoreMapping and mappedScore", () => {
       "The mapping must be one that scoreMapping returns, found null.",
     );
   });
+
+  it("refuses scores so large that the mapping or the mapped score is not finite, never giving NaN", () => {
+    const message = "The score mapping is not finite: the scores are too large; rescale them.";
+    // Pooled, the two machine scores sum 2e308 and -2e308 of human scores: Infinity less Infinity.
+    const pooled = subjectsOf([1, 1, 2, 2], [1e308, 1e308, -1e308, -1e308]);
+    expect(() => scoreMapping(pooled, { method: "isotonic" })).toThrow(message);
+    expect(() => scoreMapping(subjectsOf([1, 2], [1e308, -1e308]))).toThrow(message);
+    expect(() => mappedScore({ method: "linear", slope: 1e10, intercept: 0 }, 1e300)).toThrow(
+      "The mapped score of 1e+300 is not finite: the score or the slope is too large; rescale them.",
+    );
+  });
 });
 
 describe("replayShift", () => {
@@ -1120,6 +1144,29 @@ describe("replayShift", () => {
     ).toThrow("The maxShiftSd must be a non-negative number");
     expect(() => replayShift([[1, 1]], 0.05)).toThrow("The replay shift needs at least 2 subjects");
     expect(() => replayShift(JSON.parse("null"), 0.05)).toThrow("The replay shift needs an array of ratings");
+  });
+
+  it("refuses scores so large that the shift is not finite, never giving NaN", () => {
+    const message = "The replay shift is not finite: the scores are too large; rescale them.";
+    expect(() =>
+      replayShift(
+        [
+          [1e308, -1e308],
+          [-1e308, 1e308],
+        ],
+        0.05,
+      ),
+    ).toThrow(message);
+    expect(() =>
+      replayShift(
+        [
+          [1e308, 1e308],
+          [-1e308, -1e308],
+          [0, 0],
+        ],
+        0.05,
+      ),
+    ).toThrow(message);
   });
 });
 

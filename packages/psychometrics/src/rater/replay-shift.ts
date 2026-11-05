@@ -1,4 +1,4 @@
-import { checkNonNegative, mean } from "@measurekit/core";
+import { checkNonNegative, DataError, mean } from "@measurekit/core";
 import { correlation, standardDeviation } from "../math/internal.js";
 import { pairOfRaters } from "./ratings.js";
 
@@ -40,7 +40,8 @@ export interface ReplayShift {
  * machine's SMD is 0.05.
  * @returns The shift, its standard error, the agreement of the replayed with the locked scores and whether the replay passes.
  * @throws `DataError` when the rows do not hold two scores, a score is not a finite number or `null`, fewer than two
- * responses have both, or `maxShiftSd` is not a non-negative number.
+ * responses have both, `maxShiftSd` is not a non-negative number, or the scores are so large that a statistic is not
+ * finite.
  * @see {@link https://doi.org/10.1111/j.1745-3992.2011.00223.x | Williamson, Xi and Breyer (2012)}
  *
  * @example
@@ -69,6 +70,10 @@ export function replayShift(ratings: readonly (readonly (number | null)[])[], ma
   const lockedSd = standardDeviation(locked);
   const standardizedShift = lockedSd > 0 ? meanShift / lockedSd : null;
   const standardError = lockedSd > 0 ? standardDeviation(differences) / Math.sqrt(n) / lockedSd : null;
+  const r = correlation(locked, replayed);
+  if (![meanShift, lockedSd, standardError ?? 0, r ?? 0].every(Number.isFinite)) {
+    throw new DataError("The replay shift is not finite: the scores are too large; rescale them.");
+  }
   return {
     subjects: n,
     meanShift,
@@ -76,7 +81,7 @@ export function replayShift(ratings: readonly (readonly (number | null)[])[], ma
     standardizedShift,
     standardError,
     exactAgreement: exact / n,
-    correlation: correlation(locked, replayed),
+    correlation: r,
     passed: standardizedShift !== null && Math.abs(standardizedShift) <= maxShiftSd,
   };
 }

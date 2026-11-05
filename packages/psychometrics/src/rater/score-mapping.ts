@@ -73,8 +73,9 @@ export type ScoreMapping = LinearScoreMapping | IsotonicScoreMapping;
  * @param scores - The subjects: each one's machine and human score.
  * @param options - The method.
  * @returns The slope and intercept of the line, or the knots of the isotonic function.
- * @throws `DataError` when there are fewer than two subjects, a score is not a finite number, the method is unknown, or,
- * for `"linear"`, the machine or the human scores are all equal.
+ * @throws `DataError` when there are fewer than two subjects, a score is not a finite number, the method is unknown,
+ * for `"linear"`, the machine or the human scores are all equal, or the scores are so large that the mapping is not
+ * finite.
  * @see {@link https://doi.org/10.1111/j.1745-3992.2011.00223.x | Williamson, Xi and Breyer (2012)}
  * @see {@link https://doi.org/10.1214/aoms/1177728423 | Ayer et al. (1955)}
  *
@@ -101,14 +102,25 @@ export function scoreMapping(scores: readonly AutomatedScore[], options: ScoreMa
   const { method = "linear" } = options;
   checkChoice(method, "The option method", ["linear", "isotonic"]);
   const { machine, human } = checkAutomatedScores(scores, { categories: false, minSubjects: 2 });
-  if (method === "isotonic") return { method, knots: isotonicKnots(machine, human) };
+  if (method === "isotonic") {
+    const knots = isotonicKnots(machine, human);
+    if (!knots.every(({ human: value }) => Number.isFinite(value))) throw notFinite();
+    return { method, knots };
+  }
   const machineSd = standardDeviation(machine);
   const humanSd = standardDeviation(human);
   if (!(machineSd > 0 && humanSd > 0)) {
     throw new DataError("A linear mapping needs machine and human scores that vary.");
   }
   const slope = humanSd / machineSd;
-  return { method, slope, intercept: mean(human) - slope * mean(machine) };
+  const intercept = mean(human) - slope * mean(machine);
+  if (!(Number.isFinite(slope) && Number.isFinite(intercept))) throw notFinite();
+  return { method, slope, intercept };
+}
+
+/** Returns the error of a mapping whose sums of scores overflow. */
+function notFinite(): DataError {
+  return new DataError("The score mapping is not finite: the scores are too large; rescale them.");
 }
 
 /**
@@ -182,7 +194,8 @@ function mergeable(sums: readonly number[], counts: readonly number[]): boolean 
  * @param score - The machine score, a finite number.
  * @returns The mapped score, unrounded.
  * @throws `DataError` when the mapping is not one that `scoreMapping` returns, with knots of finite numbers ascending in
- * the machine score and not descending in the human score, or the score is not finite.
+ * the machine score and not descending in the human score, the score is not finite, or the line maps it beyond the
+ * largest number.
  */
 export function mappedScore(mapping: ScoreMapping, score: number): number {
   checkRecord(mapping, "The mapping must be one that scoreMapping returns");
@@ -190,7 +203,13 @@ export function mappedScore(mapping: ScoreMapping, score: number): number {
   if (mapping.method === "linear") {
     checkFinite(mapping.slope, "The mapping's slope");
     checkFinite(mapping.intercept, "The mapping's intercept");
-    return mapping.slope * score + mapping.intercept;
+    const mapped = mapping.slope * score + mapping.intercept;
+    if (!Number.isFinite(mapped)) {
+      throw new DataError(
+        `The mapped score of ${score} is not finite: the score or the slope is too large; rescale them.`,
+      );
+    }
+    return mapped;
   }
   // A mapping from JSON may name another method, which the type does not allow.
   const method: unknown = mapping.method;

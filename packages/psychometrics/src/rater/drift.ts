@@ -45,7 +45,7 @@ export interface DriftWindow {
  * @param options - The score scale.
  * @returns The windows with a subject, in order of time.
  * @throws `DataError` when there is no subject, a subject has no finite `time`, a score is invalid as
- * `automatedScoreAgreement` says, or the width is not a positive number.
+ * `automatedScoreAgreement` says, the width is not a positive number, or the times span more widths than a number holds.
  */
 export function automatedScoreDrift(
   scores: readonly AutomatedScore[],
@@ -61,10 +61,16 @@ export function automatedScoreDrift(
     ...(scale ? { scale } : {}),
   });
   let origin = Number.POSITIVE_INFINITY;
+  let latest = Number.NEGATIVE_INFINITY;
   time.forEach((at, subject) => {
     if (Number.isNaN(at)) throw new DataError(`Subject ${subject + 1} needs a time for the windows of drift.`);
     origin = Math.min(origin, at);
+    latest = Math.max(latest, at);
   });
+  // The end of the last window is the largest number of the windows.
+  if (!Number.isFinite(origin + (Math.floor((latest - origin) / width) + 1) * width)) {
+    throw new DataError("The windows of drift are not finite: the times span too many widths; rescale them.");
+  }
   const windows = new Map<number, number[]>();
   time.forEach((at, subject) => {
     const index = Math.floor((at - origin) / width);
