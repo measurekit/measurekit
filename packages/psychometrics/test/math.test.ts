@@ -29,6 +29,7 @@ import {
   rotateLoadingMatrix,
   roundHalfToEven,
   symmetricEigen,
+  symmetricEigenvalues,
   symmetrized,
   trace,
   traceOfProduct,
@@ -252,6 +253,11 @@ describe("symmetricEigen", () => {
         });
       });
       expectEigenpairs(a, size, result);
+      expect(symmetricEigenvalues(a, size)).toEqual({
+        values: result.values,
+        iterations: result.iterations,
+        converged: result.converged,
+      });
     });
   }
 
@@ -306,6 +312,25 @@ describe("symmetricEigen", () => {
         expectClose(defined(scaled.values[k]) / scale, value, 1e-12 * defined(values[0]), `value ${k}`);
       });
     }
+  });
+
+  it("gives the eigenvalues alone as the decomposition gives them, to the last bit, for any symmetric matrix", () => {
+    const symmetric = fc
+      .integer({ min: 1, max: 12 })
+      .chain((size) =>
+        fc.array(fc.double({ min: -10, max: 10, noNaN: true }), { minLength: size * size, maxLength: size * size }),
+      );
+    fc.assert(
+      fc.property(symmetric, (values) => {
+        const size = Math.sqrt(values.length);
+        const a = symmetrizedOf(values, size);
+        const { vectors: _, ...withoutVectors } = symmetricEigen(a, size);
+        expect(symmetricEigenvalues(a, size)).toEqual(withoutVectors);
+      }),
+    );
+    const notFinite = symmetricEigenvalues(Float64Array.of(1, Number.NaN, Number.NaN, 1), 2);
+    expect(notFinite).toMatchObject({ converged: false, iterations: 0 });
+    expect([...notFinite.values].every(Number.isNaN)).toBe(true);
   });
 
   it("decomposes no matrix with an entry that is not finite, at once, and leaves it unchanged", () => {

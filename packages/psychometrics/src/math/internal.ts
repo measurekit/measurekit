@@ -1,7 +1,7 @@
 // Helpers that the modules and tests of this package share. They are not exported from the package.
 
 export { checkCorrelationMatrix } from "./correlation-matrix.js";
-export { symmetricEigen } from "./eigen.js";
+export { symmetricEigen, symmetricEigenvalues } from "./eigen.js";
 export { numericalHessian } from "./hessian.js";
 export {
   addPairDerivatives,

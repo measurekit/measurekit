@@ -1,8 +1,8 @@
-# The eigendecomposition of a correlation matrix of 25 to 1,000 items, the most that the analyses of dimensionality take:
-# smoothing finds each matrix positive definite and returns it as it is, against psych's cor.smooth, which takes the
-# eigendecomposition by base R's eigen, LAPACK's dsyevr. Each matrix holds the correlations of five factors whose loadings
-# are multiples of 1/1024, so that their products and the sums of five are exact, and R and measurekit build the same
-# matrix from the first rows of the loadings.
+# The smoothing of a correlation matrix of 25 to 1,000 items, the most that the analyses of dimensionality take:
+# measurekit finds each matrix positive definite from its eigenvalues alone and returns it as it is, against psych's
+# cor.smooth, which takes the eigendecomposition by base R's eigen, LAPACK's dsyevr. Each matrix holds the correlations
+# of five factors whose loadings are multiples of 1/1024, so that their products and the sums of five are exact, and R
+# and measurekit build the same matrix from the first rows of the loadings.
 
 suppressPackageStartupMessages(library(psych))
 
@@ -23,8 +23,11 @@ for (items in SIZES) {
   diag(r) <- 1
   stopifnot(min(eigen(r, symmetric = TRUE, only.values = TRUE)$values) > .Machine$double.eps)
   bench_task(sprintf("dimensionality.smoothCorrelations%d", items),
-             "Smoothing of a positive definite correlation matrix: its eigendecomposition",
+             "Smoothing of a positive definite correlation matrix, which its eigenvalues find so",
              sprintf("%s items", count(items)), reference("psych", "cor.smooth"), function() cor.smooth(r),
-             note = if (items == max(SIZES)) paste("base R's eigen runs LAPACK's dsyevr on OpenBLAS, a reduction in blocks and MRRR in",
-                                                   "native code, and measurekit Householder's reduction and the QL rotations in JavaScript"))
+             note = if (items == max(SIZES)) {
+               paste("cor.smooth takes the eigenvectors too, by base R's eigen, which runs LAPACK's dsyevr on",
+                     "OpenBLAS, a reduction in blocks and MRRR in native code; measurekit takes the eigenvalues",
+                     "alone, by Householder's reduction and the QL iterations in JavaScript")
+             })
 }

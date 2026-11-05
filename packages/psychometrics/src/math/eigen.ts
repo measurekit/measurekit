@@ -51,9 +51,7 @@ export function symmetricEigen(a: Float64Array, size: number): SymmetricEigen {
   const { diagonal, offDiagonal, norms } = tridiagonalize(work, size);
   const basis = reflectionProduct(work, size, norms);
   const { iterations, converged } = diagonalize(diagonal, offDiagonal, basis, size);
-  const order = Array.from({ length: size }, (_, k) => k).sort(
-    (x, y) => (diagonal[y] ?? 0) - (diagonal[x] ?? 0) || x - y,
-  );
+  const order = descendingOrder(diagonal);
   const values = Float64Array.from(order, (k) => diagonal[k] ?? 0);
   // The reflections in `work` are spent: it receives the eigenvectors, so that no third matrix is allocated. The method
   // leaves the sign of each arbitrary, and a start or a seeded draw that reads the vectors must not depend on it.
@@ -63,6 +61,26 @@ export function symmetricEigen(a: Float64Array, size: number): SymmetricEigen {
     for (let i = 0; i < size; i++) work[row * size + i] = sign * (vector[i] ?? 0);
   });
   return { values, vectors: work, iterations, converged };
+}
+
+/**
+ * Returns the eigenvalues of the symmetric `size` by `size` matrix `a`, stored by rows, largest first, as
+ * {@link symmetricEigen} gives them, to the last bit, without the eigenvectors: the reduction alone, about (4/3) size³
+ * operations, a sixth of the decomposition's.
+ */
+export function symmetricEigenvalues(a: Float64Array, size: number): Omit<SymmetricEigen, "vectors"> {
+  const work = Float64Array.from(a);
+  if (!work.every(Number.isFinite)) {
+    return { values: new Float64Array(size).fill(Number.NaN), iterations: 0, converged: false };
+  }
+  const { diagonal, offDiagonal } = tridiagonalize(work, size);
+  const { iterations, converged } = diagonalize(diagonal, offDiagonal, null, size);
+  return { values: Float64Array.from(descendingOrder(diagonal), (k) => diagonal[k] ?? 0), iterations, converged };
+}
+
+/** Returns the indices of the eigenvalues from the largest, ties in index order. */
+function descendingOrder(diagonal: Float64Array): number[] {
+  return Array.from(diagonal.keys()).sort((x, y) => (diagonal[y] ?? 0) - (diagonal[x] ?? 0) || x - y);
 }
 
 /** A symmetric tridiagonal matrix Qᵀ A Q, and the reflections whose product is Q. */
@@ -191,13 +209,13 @@ function reflectRows(product: Float64Array, size: number, u: Float64Array, norm:
 
 /**
  * Diagonalizes the symmetric tridiagonal matrix of `diagonal` and `offDiagonal` by the implicit QL algorithm, as
- * EISPACK's imtql2, and turns the rows of `vectors` with each rotation, so that they end as the eigenvectors. The
- * diagonal receives the eigenvalues, unordered.
+ * EISPACK's imtql2, and turns the rows of `vectors`, unless it is `null`, with each rotation, so that they end as the
+ * eigenvectors. The diagonal receives the eigenvalues, unordered.
  */
 function diagonalize(
   diagonal: Float64Array,
   offDiagonal: Float64Array,
-  vectors: Float64Array,
+  vectors: Float64Array | null,
   size: number,
 ): { iterations: number; converged: boolean } {
   let iterations = 0;
@@ -234,7 +252,7 @@ function blockEnd(diagonal: Float64Array, offDiagonal: Float64Array, start: numb
 function chaseShift(
   diagonal: Float64Array,
   offDiagonal: Float64Array,
-  vectors: Float64Array,
+  vectors: Float64Array | null,
   size: number,
   start: number,
   end: number,
@@ -265,7 +283,7 @@ function chaseShift(
     shift = sine * t;
     diagonal[i + 1] = g + shift;
     g = cosine * t - b;
-    rotateRows(vectors, size, i, cosine, sine);
+    if (vectors !== null) rotateRows(vectors, size, i, cosine, sine);
   }
   diagonal[start] = first - shift;
   offDiagonal[start] = g;

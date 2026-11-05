@@ -1,4 +1,4 @@
-import { minresLoadings, symmetricEigen } from "../math/internal.js";
+import { minresLoadings, symmetricEigenvalues } from "../math/internal.js";
 
 /** The eigenvalues of the correlation matrix of items and of its reduced matrix. */
 export interface CorrelationEigenvalues {
@@ -24,11 +24,11 @@ const MAX_LOADING = Math.sqrt(1 - 0.005);
  * positive definite, so that negative eigenvalues are reported.
  */
 export function correlationEigenvalues(r: Float64Array, size: number): CorrelationEigenvalues {
-  const components = symmetricEigen(r, size).values;
+  const components = symmetricEigenvalues(r, size).values;
   const { loadings } = minresLoadings(r, size, MAX_LOADING);
   const reduced = Float64Array.from(r);
   loadings.forEach((loading, i) => {
     reduced[i * size + i] = loading * loading;
   });
-  return { components, factors: symmetricEigen(reduced, size).values };
+  return { components, factors: symmetricEigenvalues(reduced, size).values };
 }
