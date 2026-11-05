@@ -902,15 +902,15 @@ export const RULES: readonly Rule[] = [
   {
     rule: "A matrix with an entry that is not finite is not decomposed, as its QL iterations would each run to their limit, some 15 times the work of a finite matrix.",
     file: "packages/psychometrics/src/math/eigen.ts",
-    find: "if (!work.every(Number.isFinite)) return { ...undecomposed(size)",
-    replace: "if (false) return { ...undecomposed(size)",
+    find: "if (!work.every(Number.isFinite)) return { ...notDecomposed(size)",
+    replace: "if (false) return { ...notDecomposed(size)",
     test: "packages/psychometrics/test/math.test.ts",
     titles: "decomposes no matrix with an entry that is not finite",
   },
   {
     rule: "A matrix with an entry that is not finite has no eigenvalues alone either, as its QL iterations would each run to their limit.",
     file: "packages/psychometrics/src/math/eigen.ts",
-    find: "if (!work.every(Number.isFinite)) return undecomposed(size);",
+    find: "if (!work.every(Number.isFinite)) return notDecomposed(size);",
     replace: "",
     test: "packages/psychometrics/test/math.test.ts",
     titles: "eigenvalues alone as the decomposition gives them",
