@@ -82,10 +82,13 @@ export function routingCurve(
     exact: 0,
     adjacent: 0,
   };
+  // Every statistic is the same for scores less one value, and the sums of scores less a score stay small, so that
+  // scores near 10^8 keep the differences of sums exact.
+  const shift = human[order[0] ?? 0] ?? 0;
   const points: RoutingPoint[] = [];
   for (let k = 0; k < order.length; k++) {
     const subject = order[k] ?? 0;
-    addPair(sums, machine[subject] ?? 0, human[subject] ?? 0);
+    addPair(sums, (machine[subject] ?? 0) - shift, (human[subject] ?? 0) - shift);
     const next = order[k + 1];
     if (next !== undefined && confidence[next] === confidence[subject]) continue;
     points.push({ minConfidence: confidence[subject] ?? 0, coverage: sums.n / order.length, ...statistics(sums) });
@@ -120,7 +123,7 @@ function addPair(sums: RunningSums, machine: number, human: number): void {
 
 /**
  * Returns the statistics of the pairs. The sums of squares and products about the means, times n, are differences of
- * sums: exact for integer scores.
+ * sums: exact for integer scores while n times the sum of squares stays below 2⁵³.
  */
 function statistics(sums: RunningSums): Omit<RoutingPoint, "minConfidence" | "coverage"> {
   const { n } = sums;

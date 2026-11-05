@@ -920,6 +920,24 @@ describe("routingCurve", () => {
     }
   });
 
+  it("gives scores far from 0, whose sums of squares pass 2^53, the statistics of the same scores near 0", () => {
+    // Categories near 10^8 over 100 subjects: n Σ x² is near 10^20, whose rounding would swamp a spread of about 10^4.
+    const subjectsFrom = (base: number) =>
+      Array.from({ length: 100 }, (_, subject) => ({
+        machine: base + (subject % 5),
+        human: base + ((subject * 3) % 5),
+        confidence: subject % 7,
+      }));
+    const far = routingCurve(subjectsFrom(100_000_000));
+    const near = routingCurve(subjectsFrom(0));
+    expect(far).toHaveLength(near.length);
+    near.forEach((point, k) => {
+      for (const name of ["quadraticKappa", "correlation", "smd", "rmse"] as const) {
+        expectClose(far[k]?.[name] ?? null, point[name], 1e-12, name);
+      }
+    });
+  });
+
   it("rejects a subject without a confidence", () => {
     expect(() =>
       routingCurve(subjectsOf([1, 2], [1, 2], (subject) => ({ confidence: subject === 0 ? 0.5 : null }))),
