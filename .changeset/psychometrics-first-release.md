@@ -19,9 +19,9 @@ A function takes what it needs as arguments, `calibrate(data, model, options)`, 
 misspell.
 
 Each module is imported from its subpath, such as `@measurekit/psychometrics/irt`, and each name from one entry. The
-package's name gives only what every module uses and core owns: `createRandom`, `Random`, `DataError` and
-`MeasurekitError`. A type of core that the modules take, such as `QMatrix`, `ThresholdItem`, `ThetaDistribution` or
-`KappaWeights`, is imported from `@measurekit/core`.
+package's name gives only what the modules share and core owns: `createRandom`, `DataError`, `MeasurekitError` and the
+types of core that the modules take and return, `Random`, `QMatrix`, `ThetaDistribution`, `ThresholdItem`,
+`NominalParameters` and `KappaWeights`, so a user never imports `@measurekit/core`.
 
 The EM calibrations of the multidimensional models, the many-facet Rasch model and the linear logistic test model
 accelerate EM with SQUAREM, and the posterior means of a data set tabulate the log probabilities of each item once. At the

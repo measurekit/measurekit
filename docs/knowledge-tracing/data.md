@@ -88,8 +88,9 @@ or, without one, the learner's first event with an outcome at the item. Events w
 ## Q-matrices
 
 A `QMatrix` gives the skills of each item, `{ [item]: skills }`, for events that do not carry skills. It is the
-`QMatrix` of `@measurekit/core`, which `@measurekit/psychometrics` shares; a row may be empty here, as an item may practice no skill,
-where its cognitive diagnosis needs at least one attribute per item.
+`QMatrix` of `@measurekit/core`, which `@measurekit/psychometrics` shares and both packages export from their name; a
+row may be empty here, as an item may practice no skill, where its cognitive diagnosis needs at least one attribute per
+item.
 
 An event without skills whose item the Q-matrix lacks throws `DataError`:
 `Event 7 has no skills, and the Q-matrix lacks its item "q9".` A skill a model has no parameters for, such as a skill new

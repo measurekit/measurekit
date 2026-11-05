@@ -1,8 +1,8 @@
 # Choosing core
 
 When to install `@measurekit/core` itself, and when another library fits better. Most users install
-`@measurekit/psychometrics` or `@measurekit/knowledge-tracing`, which depend on it and re-export `createRandom`, `Random`,
-`DataError` and `MeasurekitError`.
+`@measurekit/psychometrics` or `@measurekit/knowledge-tracing`, which depend on it and re-export `createRandom`,
+`DataError`, `MeasurekitError` and the types of core that their API names, such as `Random` and `QMatrix`.
 
 ```mermaid
 flowchart TD

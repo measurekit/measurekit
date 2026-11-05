@@ -26,8 +26,8 @@ npm install @measurekit/psychometrics
 npm install @measurekit/knowledge-tracing
 ```
 
-Each library installs `@measurekit/core` with it, and re-exports `createRandom`, `Random`, `DataError`
-and `MeasurekitError`, so you do not import core yourself.
+Each library installs `@measurekit/core` with it, and re-exports `createRandom`, `DataError`, `MeasurekitError` and the
+types of core that its API names, such as `Random` and `QMatrix`, so you do not import core yourself.
 
 - **Psychometrics** analyzes a test after the fact: item statistics, calibration, ability estimates, fit, bias and
   equating. It also runs adaptive tests and standard setting, reports and predicts scores, and checks dimensionality.

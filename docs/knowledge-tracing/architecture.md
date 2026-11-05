@@ -69,10 +69,10 @@ and one subpath per module: `@measurekit/knowledge-tracing/data`,
 `@measurekit/knowledge-tracing/bkt`, `@measurekit/knowledge-tracing/logistic`,
 `@measurekit/knowledge-tracing/irt`, `@measurekit/knowledge-tracing/kst`, `@measurekit/knowledge-tracing/practice`
 and `@measurekit/knowledge-tracing/sim`. Each public name has one entry, its module's subpath. `.` holds the model
-interface, `LearnerModel` and `ModelFit`, which no module owns, and what every module uses and core owns, `createRandom`,
-`Random`, `DataError` and `MeasurekitError`, so that a user does not import core
-([AGENTS.md](../../AGENTS.md#deviations-from-the-standards)). A type of core that the modules take, such as `QMatrix` or
-`ThetaDistribution`, is imported from `@measurekit/core`. `math/` is not exported.
+interface, `LearnerModel` and `ModelFit`, which no module owns, and what the modules share and core owns, so that a user
+does not import core ([AGENTS.md](../../AGENTS.md#deviations-from-the-standards)): `createRandom`, `DataError`,
+`MeasurekitError` and the types of core that the modules take or return, `Random`, `QMatrix`, `ThresholdItem`,
+`NominalParameters` and `ThetaDistribution`, which no module re-exports. `math/` is not exported.
 
 ## Dependencies between modules
 

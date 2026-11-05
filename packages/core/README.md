@@ -6,7 +6,8 @@ Install @measurekit/psychometrics or @measurekit/knowledge-tracing.
 It holds the errors the packages throw, the checks of their arguments, a seeded random number generator, the numerics and
 the types that both packages use. [`@measurekit/psychometrics`](https://measurekit.wakan.dev/_measurekit/psychometrics/)
 and [`@measurekit/knowledge-tracing`](https://measurekit.wakan.dev/_measurekit/knowledge-tracing/) depend on it and
-re-export `createRandom`, `Random`, `DataError` and `MeasurekitError`, so their users do not import it themselves.
+re-export `createRandom`, `DataError`, `MeasurekitError` and the types of core that their API names, such as `Random` and
+`QMatrix`, so their users do not import it themselves.
 
 ```bash
 npm install @measurekit/core

@@ -12,9 +12,9 @@ A function takes what it cannot work without as arguments, `irt(parameters, opti
 to misspell.
 
 Each module is imported from its subpath, such as `@measurekit/knowledge-tracing/bkt`, and each name from one entry. The
-package's name gives only the learner model interface, `LearnerModel` and `ModelFit`, and what every module uses and core
-owns: `createRandom`, `Random`, `DataError` and `MeasurekitError`. A type of core that the modules take, `QMatrix` or
-`ThetaDistribution`, is imported from `@measurekit/core`.
+package's name gives only the learner model interface, `LearnerModel` and `ModelFit`, and what the modules share and core
+owns: `createRandom`, `DataError`, `MeasurekitError` and the types of core that the modules take and return, `Random`,
+`QMatrix`, `ThetaDistribution`, `ThresholdItem` and `NominalParameters`, so a user never imports `@measurekit/core`.
 
 An event may carry no outcome: `outcome: null` is a learning opportunity, such as a lesson or a video, which every model
 accepts. BKT applies the learn and forget rates of the event's `resource` and estimates a lesson's rates from the
