@@ -902,8 +902,8 @@ export const RULES: readonly Rule[] = [
   {
     rule: "A covariance sums the values less the first of each, so that scores far from 0, such as near 1e8, are not cancelled to noise.",
     file: "packages/psychometrics/src/math/statistics.ts",
-    find: "const xi = (x[i] ?? 0) - firstX;",
-    replace: "const xi = x[i] ?? 0;",
+    find: "const firstX = x[0] ?? 0;\n  const firstY = y[0] ?? 0;",
+    replace: "const firstX = 0;\n  const firstY = 0;",
     test: "packages/psychometrics/test/math.test.ts",
     titles: "scores far from 0",
   },
