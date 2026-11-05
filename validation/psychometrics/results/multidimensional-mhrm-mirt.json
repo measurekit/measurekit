@@ -1,0 +1,86 @@
+{
+  "source": "calibrateMultidimensional by MH-RM with Hessian standard errors, on the 25 graded items of psych::bfi, the first 800 complete cases, 5 correlated dimensions, against the mean of mirt's MH-RM over seeds 1 to 4.",
+  "seeds": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "sizes": {
+    "persons": 800,
+    "items": 25,
+    "dimensions": 5
+  },
+  "tolerances": {
+    "parameters": 0.3,
+    "correlations": 0.08,
+    "medianRatio": 0.1,
+    "smallestRatio": 0.6,
+    "largestRatio": 1.6
+  },
+  "worst": {
+    "parameters": 0.16551715116204235,
+    "correlations": 0.02470965755297644,
+    "medianRatio": 0.03641487480766448,
+    "smallestRatio": 0.7252908662467579,
+    "largestRatio": 1.6219908171158017
+  },
+  "fits": [
+    {
+      "seed": 1,
+      "parameters": 0.16551715116204235,
+      "correlations": 0.02470965755297644,
+      "ratio": {
+        "count": 145,
+        "median": 1.0318254857322757,
+        "smallest": 0.7505022129444652,
+        "largest": 1.423108133460891
+      },
+      "within": true,
+      "iterations": 96,
+      "seconds": 22.3
+    },
+    {
+      "seed": 2,
+      "parameters": 0.1281595444604542,
+      "correlations": 0.013986107571517026,
+      "ratio": {
+        "count": 145,
+        "median": 1.0325309899536366,
+        "smallest": 0.7323454767708194,
+        "largest": 1.5844058268981778
+      },
+      "within": true,
+      "iterations": 110,
+      "seconds": 21.2
+    },
+    {
+      "seed": 3,
+      "parameters": 0.14447073675633204,
+      "correlations": 0.012322528753198725,
+      "ratio": {
+        "count": 145,
+        "median": 1.0364148748076645,
+        "smallest": 0.7496946829703,
+        "largest": 1.6219908171158017
+      },
+      "within": false,
+      "iterations": 106,
+      "seconds": 21.9
+    },
+    {
+      "seed": 4,
+      "parameters": 0.08976575703677137,
+      "correlations": 0.01727119005579686,
+      "ratio": {
+        "count": 145,
+        "median": 1.0249624604573053,
+        "smallest": 0.7252908662467579,
+        "largest": 1.475077948897073
+      },
+      "within": true,
+      "iterations": 119,
+      "seconds": 22.9
+    }
+  ]
+}

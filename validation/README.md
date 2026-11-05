@@ -149,10 +149,10 @@ cdcatR imports cdmTools for its nonparametric rules only, and cdmTools needs a R
 `cat.R` runs without them: download the cdcatR source with `download.packages`, remove cdmTools from `Imports` in
 `DESCRIPTION` and `import(cdmTools)` from `NAMESPACE`, and run `R CMD INSTALL` on the directory.
 
-### Recovery studies
+### Studies
 
-A study of the library's own estimates that takes minutes is a TypeScript script of `validation/<package>/`, run on the
-build: `pnpm build`, then `node validation/<package>/<study>.ts`. Through `study.ts` it writes `results/<study>.json` beside
+A study that takes too long for the tests, a recovery at the sizes of the guides or a comparison with a reference that no
+test can run in seconds, is a TypeScript script of `validation/<package>/`, run on the build: `pnpm build`, then `node validation/<package>/<study>.ts`. Through `study.ts` it writes `results/<study>.json` beside
 it as each fit finishes, with the seeds, the sizes and the bound it shows, and the file is committed; the tests hold the
 same rule at a size that runs in seconds. `validation/` is a package of the workspace, so that the studies import the
 packages by name and `pnpm typecheck` checks them; no Vitest project and no job of CI runs them. A study exits with 1 when
@@ -167,6 +167,8 @@ a fit misses the threshold it states.
 | `psychometrics/longitudinal-recovery.ts`            | About 5 minutes  | The moments of 5,000 persons on 2 and 3 occasions at 10 and 40 items, seeds 1 to 3: each fit's errors against 1.5 times mirt's worst, and the worst over the seeds; 40 items on 3 occasions at 15 nodes; the distances between 15, 21 and 31 nodes                                 |
 | `psychometrics/multidimensional-groups-recovery.ts` | About 10 minutes | Three groups of 700, 600 and 600 persons, 40 items on each of 3 dimensions, three seeds at 21 and 15 nodes: each fit's errors of the means and covariances against 0.18 and 0.25, and the worst at each number of nodes                                                            |
 | `psychometrics/multidimensional-mhrm-recovery.ts`   | About 2 minutes  | 30 items on 5 dimensions by MH-RM, 2,000 persons, three seeds: each fit's largest errors in standard errors against 4 and its slopes' root mean square error against 0.2, and the worst over the seeds                                                                             |
+| `psychometrics/multidimensional-mhrm-mirt.ts`       | About 2 minutes  | MH-RM on the 25 graded items of `bfi`, 800 persons, 5 dimensions, seeds 1 to 4: each fit's largest differences from the mean of mirt's runs against 0.3 and 0.08, its ratios of standard errors against 1 ± 0.1 and 0.6 to 1.6, and the worst over the seeds                       |
+| `psychometrics/multidimensional-groups-mirt.ts`     | About 10 seconds | Two groups on three dimensions, the case `three` of `multidimensional-groups.json`: the largest differences from mirt's estimates, moments and log-likelihood against 2e-4, 5e-4 and 5e-6                                                                                          |
 
 ## Knowledge tracing
 

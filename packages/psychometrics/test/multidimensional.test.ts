@@ -727,6 +727,46 @@ function calibrateFixture(
   );
 }
 
+/** Returns the largest absolute difference of the slopes and intercepts from those of a reference. */
+function largestDifference(
+  fit: MultidimensionalCalibration<Parameters>,
+  reference: { readonly items: readonly { readonly parameters: FixtureParameters }[] },
+): number {
+  let largest = 0;
+  reference.items.forEach(({ parameters: target }, i) => {
+    const found = defined(fit.items[i]).parameters;
+    target.a.forEach((slope, d) => {
+      if (slope !== 0) largest = Math.max(largest, Math.abs(defined(found.a[d]) - slope));
+    });
+    if ("intercepts" in found) {
+      (target.intercepts ?? []).forEach((value, k) => {
+        largest = Math.max(largest, Math.abs(defined(found.intercepts[k]) - value));
+      });
+    } else {
+      largest = Math.max(largest, Math.abs(found.intercept - defined(target.intercept)));
+    }
+  });
+  return largest;
+}
+
+/**
+ * Calibrates the first `persons` of a fixture by EM, on 21 nodes to a tight tolerance, and by MH-RM with seed 1, with the
+ * same options, so that MH-RM is held to EM on the same persons.
+ */
+function bothWays(
+  fixture: Pick<Fixture, "itemIds" | "responses" | "loadings">,
+  model: MultidimensionalModel<Parameters> | readonly MultidimensionalModel<Parameters>[],
+  extra: Pick<MultidimensionalCalibrationOptions<Parameters>, "priors" | "fixedParameters" | "standardErrors">,
+  persons = 200,
+): { readonly em: MultidimensionalCalibration<Parameters>; readonly mhrm: MultidimensionalCalibration<Parameters> } {
+  const data = buildResponseMatrix(fixture.responses.slice(0, persons), { itemIds: [...fixture.itemIds] });
+  const options = { loadings: fixture.loadings, ...extra };
+  return {
+    em: calibrateMultidimensional(data, model, { ...options, points: 21, tolerance: 1e-8, maxIterations: 5000 }),
+    mhrm: calibrateMultidimensional(data, model, { ...options, method: "mhrm", seed: 1 }),
+  };
+}
+
 /**
  * Returns a function that computes a value on its first call and returns that value after, so that the tests that read one
  * calibration share it and only the first that runs pays for it.
@@ -1103,7 +1143,7 @@ describe("calibration", () => {
   });
 
   it("matches mirt for the graded model on three dimensions", () => {
-    const fit = calibrateFixture(graded3, "none", { tolerance: 1e-7 });
+    const fit = calibrateFixture(graded3, "none", { tolerance: 1e-6 });
     expectCalibration(fit, graded3, { parameters: 2e-4, errors: 1e-3, likelihood: 1e-4 }, "graded, three dimensions");
     expect(fit.correlations).toHaveLength(3);
     expect(fit.correlationStandardErrors).toBeNull();
@@ -1162,7 +1202,7 @@ describe("calibration", () => {
           [0, 1],
         ]);
         expect(fit.correlationStandardErrors).toBeNull();
-      }, 300_000);
+      });
     }
   });
 
@@ -1382,13 +1422,13 @@ describe("calibration", () => {
     for (const standardErrors of ["hessian", "cross-product"] as const) {
       const plain = calibrateMultidimensional(data, multidimensionalTwoParameterLogistic, {
         loadings: m2pl.loadings,
-        points: 15,
+        points: 11,
         tolerance: 1e-6,
         standardErrors,
       });
       const tight = calibrateMultidimensional(data, multidimensionalTwoParameterLogistic, {
         loadings: m2pl.loadings,
-        points: 15,
+        points: 11,
         tolerance: 1e-6,
         standardErrors,
         priors: { intercept: normalPrior(0, 0.01) },
@@ -1604,26 +1644,21 @@ describe("fixed parameters", () => {
   });
 
   it("hold with MH-RM, near the solution of EM within its Monte Carlo error", () => {
-    const fit = calibrateMultidimensional(matrix, optionsModel, {
-      loadings: options.loadings,
-      fixedParameters: options.fixedParameters,
-      method: "mhrm",
-      seed: 1,
+    // The first 200 persons by EM and by MH-RM: over the seeds 1 to 20 of MH-RM the slopes and intercepts were within 0.46
+    // of EM's; the bound is 1.5 times that, rounded up.
+    const { em, mhrm: fit } = bothWays(held, optionsModel, {
+      fixedParameters: held.fixedParameters,
       standardErrors: "hessian",
     });
     expect(fit.converged).toBe(true);
-    held.items.forEach(({ id, parameters, standardErrors }, i) => {
+    expect(largestDifference(fit, em)).toBeLessThan(0.7);
+    held.items.forEach(({ id, standardErrors }, i) => {
       const found = defined(fit.items[i]);
-      const logistic = found.parameters as MultidimensionalLogisticParameters;
-      expect(logistic.c).toBe(held.fixedParameters[id]?.c ?? 0);
-      parameters.a.forEach((slope, d) => {
-        expect(Math.abs(defined(logistic.a[d]) - slope), `${id} a${d + 1}`).toBeLessThan(0.15);
-      });
-      expect(Math.abs(logistic.intercept - parameters.intercept), `${id} intercept`).toBeLessThan(0.15);
+      expect((found.parameters as MultidimensionalLogisticParameters).c).toBe(held.fixedParameters[id]?.c ?? 0);
       expect(Object.keys(defined(found.standardErrors))).toEqual(Object.keys(standardErrors));
     });
     expect(fit.aic).toBeCloseTo(-2 * fit.logLikelihood + 2 * held.estimated, 9);
-  }, 120_000);
+  });
 
   it("change nothing when empty", () => {
     const small = buildResponseMatrix(m2pl.responses.slice(0, 200), { itemIds: [...m2pl.itemIds] });
@@ -1709,135 +1744,62 @@ describe("fixed parameters", () => {
 });
 
 describe("MH-RM", () => {
-  /** The calibration of a fixture by MH-RM. */
-  function byMhrm(
-    fixture: Pick<Fixture, "model" | "itemIds" | "responses" | "loadings">,
-    extra: {
-      readonly seed: number;
-      readonly priors?: Readonly<Record<string, ParameterPrior>>;
-      readonly standardErrors?: "none" | "hessian";
-    },
-  ): MultidimensionalCalibration<Parameters> {
-    return calibrateMultidimensional(
-      buildResponseMatrix(fixture.responses, { itemIds: [...fixture.itemIds] }),
-      modelOf(fixture.model),
-      {
-        loadings: fixture.loadings,
-        method: "mhrm",
-        ...extra,
-      },
-    );
-  }
-
-  /** Returns the largest absolute difference of the slopes and intercepts from those of the fixture. */
-  function largestDifference(fit: MultidimensionalCalibration<Parameters>, fixture: Pick<Fixture, "items">): number {
-    let largest = 0;
-    fixture.items.forEach(({ parameters: target }, i) => {
-      const found = defined(fit.items[i]).parameters;
-      target.a.forEach((slope, d) => {
-        if (slope !== 0) largest = Math.max(largest, Math.abs(defined(found.a[d]) - slope));
-      });
-      if ("intercepts" in found) {
-        (target.intercepts ?? []).forEach((value, k) => {
-          largest = Math.max(largest, Math.abs(defined(found.intercepts[k]) - value));
-        });
-      } else {
-        largest = Math.max(largest, Math.abs(found.intercept - defined(target.intercept)));
-      }
-    });
-    return largest;
-  }
-
-  // The estimates of MH-RM carry Monte Carlo error. Its size was measured over seeds 1 to 6 on the case of two correlated
-  // dimensions, at the default settings: the largest difference from the solution of EM was 0.057, 0.34 to 0.41 of the
-  // largest standard error, and the standard errors were within 7%. The tolerances are about twice as large.
+  // The estimates of MH-RM carry Monte Carlo error, which the tests bound on the first 200 persons of a fixture against EM on
+  // the same persons: each bound is 1.5 times the worst over the seeds 1 to 20 of MH-RM, rounded up, and the test keeps
+  // seed 1. validation/psychometrics/multidimensional-mhrm-mirt.ts compares MH-RM with mirt's on five dimensions.
   it("agrees with the EM solution on two correlated dimensions within its Monte Carlo error", () => {
-    const fit = byMhrm(m2pl, { seed: 1, standardErrors: "hessian" });
+    // Over the 20 seeds: slopes and intercepts within 0.30 of EM's, the correlation within 0.065, the median ratio of the
+    // standard errors to EM's from 0.99 to 1.02 and every ratio from 0.79 to 1.83, the log-likelihood within 0.84.
+    const { em, mhrm: fit } = bothWays(m2pl, modelOf(m2pl.model), { standardErrors: "hessian" });
     expect(fit.converged).toBe(true);
     expect(fit.dimensions).toEqual(["F1", "F2"]);
-    expect(largestDifference(fit, m2pl)).toBeLessThan(0.12);
-    expectClose(defined(fit.correlations[0]?.[1]), defined(m2pl.correlations[0]?.[1]), 0.05, "correlation");
-    m2pl.items.forEach((expected, i) => {
-      for (const [name, error] of Object.entries(expected.standardErrors ?? {})) {
-        const actual = defined(fit.items[i]?.standardErrors)[name] ?? Number.NaN;
-        expectClose(actual / defined(error), 1, 0.15, `standard error of ${name} of ${expected.id}`);
-      }
-    });
-    expectClose(
-      defined(fit.correlationStandardErrors?.[0]?.[1]) / defined(m2pl.correlationStandardErrors?.[0]?.[1]),
-      1,
-      0.15,
-      "standard error of the correlation",
-    );
-    // The log-likelihood is estimated by importance sampling, within about one unit of EM's here.
-    expectClose(fit.logLikelihood, m2pl.logLikelihood, 4, "log-likelihood");
+    expect(largestDifference(fit, em)).toBeLessThan(0.46);
+    expectClose(defined(fit.correlations[0]?.[1]), defined(em.correlations[0]?.[1]), 0.1, "correlation");
+    const ratios = [
+      ...em.items.flatMap((item, i) =>
+        Object.entries(defined(item.standardErrors)).map(
+          ([name, error]) => defined(fit.items[i]?.standardErrors?.[name]) / error,
+        ),
+      ),
+      defined(fit.correlationStandardErrors?.[1]?.[0]) / defined(em.correlationStandardErrors?.[1]?.[0]),
+    ].sort((x, y) => x - y);
+    expectClose(defined(ratios[Math.floor(ratios.length / 2)]), 1, 0.03, "median ratio of the standard errors");
+    expect(defined(ratios[0])).toBeGreaterThan(0.68);
+    expect(defined(ratios.at(-1))).toBeLessThan(2.25);
+    // The log-likelihood is estimated by importance sampling.
+    expectClose(fit.logLikelihood, em.logLikelihood, 1.3, "log-likelihood");
     expectClose(fit.aic, -2 * fit.logLikelihood + 2 * 25, 1e-9, "AIC");
-  }, 120_000);
+  });
 
-  it("agrees with the EM solution with missing responses and with the M3PL and its priors", () => {
-    const withMissing = byMhrm(missing, { seed: 1 });
-    expect(largestDifference(withMissing, missing)).toBeLessThan(0.15);
+  it("agrees with the EM solution with missing responses within its Monte Carlo error", () => {
+    // Over the 20 seeds: slopes and intercepts within 0.52 of EM's, the correlation within 0.064.
+    const { em, mhrm: fit } = bothWays(missing, modelOf(missing.model), {});
+    expect(largestDifference(fit, em)).toBeLessThan(0.8);
+    expectClose(defined(fit.correlations[0]?.[1]), defined(em.correlations[0]?.[1]), 0.1, "correlation");
+  });
+
+  it("agrees with the EM solution for the M3PL and its priors within its Monte Carlo error", () => {
+    // A lognormal prior on the slopes as well as mirt's on logit c: on 200 persons an item of the M3PL has no maximum
+    // without it. Over the 20 seeds: slopes and intercepts within 0.13 of EM's, every c within 0.007.
     const { mean, sd } = m3pl.priors.c;
-    const guessing = byMhrm(m3pl, { seed: 1, priors: { c: logitNormalPrior(mean, sd) } });
-    expect(largestDifference(guessing, m3pl)).toBeLessThan(0.2);
-    m3pl.items.forEach(({ parameters: target }, i) => {
-      const c = (defined(guessing.items[i]).parameters as MultidimensionalLogisticParameters).c;
-      expectClose(c, defined(target.c), 0.05, `c of item ${i + 1}`);
+    const priors = { c: logitNormalPrior(mean, sd), a: logNormalPrior(0, 0.5) };
+    const { em, mhrm: fit } = bothWays(m3pl, modelOf(m3pl.model), { priors });
+    expect(largestDifference(fit, em)).toBeLessThan(0.2);
+    em.items.forEach(({ parameters }, i) => {
+      const c = (defined(fit.items[i]).parameters as MultidimensionalLogisticParameters).c;
+      expectClose(c, (parameters as MultidimensionalLogisticParameters).c, 0.011, `c of item ${i + 1}`);
       expect(c).toBeGreaterThan(0);
     });
-  }, 120_000);
+  });
 
-  // mirt's MH-RM was run with seeds 1 to 4 on the first 800 complete cases of the 25 items of bfi: its estimates differ from
-  // their mean over the seeds by up to 0.076, and measurekit's, over seeds 1 to 4, from that mean by up to 0.17, which is
-  // about one standard error of the least precise intercepts. The tolerance is 0.3. mirt's standard errors vary 20% from
-  // seed to seed (79% at most); measurekit's are compared with their mean over the seeds.
-  it("agrees with mirt's MH-RM on five dimensions", () => {
-    const fit = byMhrm(mirtMhrm, { seed: 1, standardErrors: "hessian" });
+  it("estimates the log-likelihood that EM computes, for the graded model", () => {
+    // 120 persons, as the 5,000 draws of the importance sampling take a likelihood of every category: over the 20 seeds,
+    // the log-likelihood within 1.04 of EM's, slopes and intercepts within 0.23.
+    const { em, mhrm: fit } = bothWays(graded, modelOf(graded.model), {}, 120);
     expect(fit.converged).toBe(true);
-    const slopes = (parameters: FixtureParameters): number[] => parameters.a.filter((value) => value !== 0);
-    mirtMhrm.itemIds.forEach((_, i) => {
-      const found = defined(fit.items[i]).parameters as MultidimensionalGradedParameters;
-      const references = mirtMhrm.runs.map((run) => defined(run.items[i]).parameters);
-      slopes(found).forEach((slope, k) => {
-        const reference =
-          references.reduce((sum, parameters) => sum + defined(slopes(parameters)[k]), 0) / references.length;
-        expectClose(slope, reference, 0.3, `slope of item ${i + 1}`);
-      });
-      found.intercepts.forEach((value, k) => {
-        const reference =
-          references.reduce((sum, parameters) => sum + defined(parameters.intercepts?.[k]), 0) / references.length;
-        expectClose(value, reference, 0.3, `intercept ${k + 1} of item ${i + 1}`);
-      });
-    });
-    const meanCorrelation = (i: number, j: number): number =>
-      mirtMhrm.runs.reduce((sum, run) => sum + defined(run.correlations[i]?.[j]), 0) / mirtMhrm.runs.length;
-    fit.correlations.forEach((row, i) => {
-      row.forEach((value, j) => {
-        expectClose(value, meanCorrelation(i, j), 0.08, `correlation ${i},${j}`);
-      });
-    });
-    const ratios: number[] = [];
-    mirtMhrm.runs[0]?.items.forEach((item, i) => {
-      for (const name of Object.keys(item.standardErrors ?? {})) {
-        const reference = mirtMhrm.runs.map((run) => run.items[i]?.standardErrors?.[name]);
-        if (!reference.every((value) => typeof value === "number")) continue;
-        const mean = reference.reduce((sum, value) => sum + (value ?? 0), 0) / reference.length;
-        ratios.push(defined(fit.items[i]?.standardErrors?.[name]) / mean);
-      }
-    });
-    ratios.sort((a, b) => a - b);
-    expect(ratios.length).toBeGreaterThan(100);
-    expectClose(ratios[Math.floor(ratios.length / 2)] ?? Number.NaN, 1, 0.1, "median ratio of the standard errors");
-    expect(ratios[0]).toBeGreaterThan(0.6);
-    expect(ratios.at(-1)).toBeLessThan(1.6);
-  }, 300_000);
-
-  it("estimates the log-likelihood that EM computes, on three dimensions", () => {
-    const fit = byMhrm(graded3, { seed: 1 });
-    expect(fit.converged).toBe(true);
-    expectClose(fit.logLikelihood, graded3.logLikelihood, 3, "log-likelihood");
-    expect(largestDifference(fit, graded3)).toBeLessThan(0.25);
-  }, 120_000);
+    expectClose(fit.logLikelihood, em.logLikelihood, 1.6, "log-likelihood");
+    expect(largestDifference(fit, em)).toBeLessThan(0.35);
+  });
 
   describe("small data", () => {
     const rows = m2pl.responses.slice(0, 150);
@@ -1997,7 +1959,7 @@ describe("MH-RM", () => {
       }),
       { numRuns: 4 },
     );
-  }, 120_000);
+  });
 });
 
 describe("MH-RM internals", () => {
@@ -2339,15 +2301,28 @@ describe("multiple groups", () => {
     expectGroups(fit, graded, 5e-4);
   });
 
-  // Under coverage this calibration takes about 40 s, and two to three times as long on a runner.
-  it("matches mirt for two groups on three dimensions", () => {
+  it("calibrates two groups on three dimensions, the first on the scale of N(0, 1)", () => {
+    // A calibration of two groups on three dimensions runs each cycle of EM over 15 ** 3 nodes:
+    // validation/psychometrics/multidimensional-groups-mirt.ts compares it with mirt's at the tolerances above. Three cycles
+    // on 7 nodes per dimension show the design: one mean, variance and covariance of each dimension per group, the first
+    // group's means 0 and variances 1.
     const three: GroupsFixture = groups.three;
-    // Each cycle of EM estimates the 3 × 3 covariances of both groups over 15 ** 3 nodes, so this calibration runs to
-    // 1e-6, which moves its distances from mirt's estimates by less than 1e-5 against 1e-7.
-    const fit = calibrateGroups(three, "none", { tolerance: 1e-6 });
-    expectCalibration(fit, three, mirtTolerances, "three dimensions");
-    expectGroups(fit, three, 5e-4);
-  }, 300_000);
+    const fit = calibrateGroups(three, "none", { points: 7, maxIterations: 3 });
+    expect(fit.iterations).toBe(3);
+    expect(fit.dimensions).toEqual(["F1", "F2", "F3"]);
+    expect(fit.groups?.map(({ group }) => group)).toEqual(["A", "B"]);
+    const [first, second] = [defined(fit.groups?.[0]), defined(fit.groups?.[1])];
+    expect(first.means).toEqual([0, 0, 0]);
+    expect(first.covariance.map((row, i) => row[i])).toEqual([1, 1, 1]);
+    expect(second.means.every((mean) => mean !== 0)).toBe(true);
+    second.covariance.forEach((row, i) => {
+      expect(defined(row[i])).toBeGreaterThan(0);
+      row.forEach((value, j) => {
+        expect(value).toBe(second.covariance[j]?.[i]);
+      });
+    });
+    expect(fit.correlations.map((row, i) => row[i])).toEqual([1, 1, 1]);
+  });
 
   it("reaches the maximum of the likelihood that mirt's EM stops short of for a group of standard deviations near 2", () => {
     const { wide } = groups;
@@ -4669,14 +4644,17 @@ describe("errors", () => {
   });
 
   it("bounds standard errors to 2,000 parameters before it estimates anything, by EM, MH-RM and over occasions", () => {
-    // Three persons answer 701 items with both categories each: two slopes and an intercept each, 2,103 parameters.
+    // Three persons answer 701 items with both categories each: two slopes and an intercept each, 2,103 parameters in an
+    // exploratory model, and with the correlation 2,104 in a confirmatory one that loads every item on both dimensions. The
+    // start of an exploratory model takes the components of the items' correlations, a second under coverage, so the
+    // other methods take the confirmatory one.
     const wide = buildResponseMatrix([0, 1, 2].map((k) => Array.from({ length: 701 }, (_, j) => (j + k) % 2)));
+    const both = { loadings: Object.fromEntries(wide.itemIds.map((id) => [id, ["F1", "F2"]])) };
     const message = "Standard errors take at most 2000 estimated parameters, as their information holds every pair";
-    for (const standardErrors of ["hessian", "cross-product"] as const) {
-      expect(() => calibrateMultidimensional(wide, model, { dimensions: 2, standardErrors })).toThrow(message);
-    }
+    expect(() => calibrateMultidimensional(wide, model, { dimensions: 2, standardErrors: "hessian" })).toThrow(message);
+    expect(() => calibrateMultidimensional(wide, model, { ...both, standardErrors: "cross-product" })).toThrow(message);
     expect(() =>
-      calibrateMultidimensional(wide, model, { dimensions: 2, method: "mhrm", standardErrors: "hessian" }),
+      calibrateMultidimensional(wide, model, { ...both, method: "mhrm", standardErrors: "hessian" }),
     ).toThrow(message);
     // Two occasions of 1,001 items each: their 2PL items alone have 2,002 parameters.
     const occasion = (seed: number) =>

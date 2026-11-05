@@ -32,18 +32,18 @@ cases$two <- local({
 
 # --- Three occasions ---------------------------------------------------------------------------------------------------------
 
-# 300 persons, 8 items on three occasions; 15% do not take part in the third. Three occasions are on 15 nodes, whose grid
-# of 15 ** 3 nodes keeps measurekit's calibration to a second or two; the tests hold the default of 21 apart.
+# 300 persons, 8 items on three occasions; 15% do not take part in the third. Three occasions are on 13 nodes, whose grid
+# of 13 ** 3 nodes keeps measurekit's calibration to about a second; the tests hold the default of 21 apart.
 cases$three <- local({
   set.seed(20261101)
   items <- simulate_items(8)
   thetas <- simulate_abilities(300, c(0, 0.3, 0.7), c(1, 1.15, 1.3), autoregressive(3, 0.75))
   occasions <- simulate_responses(thetas, items, list(1:8, 1:8, 1:8), list(integer(), integer(), sort(sample(300, 45))))
-  run <- fit_mirt(occasions, "2PL", 15)
+  run <- fit_mirt(occasions, "2PL", 13)
   c(
     list(
       source = "Simulated with set.seed(20261101): 300 persons, 8 dichotomous items on 3 occasions, abilities N((0, 0.3, 0.7), sds (1, 1.15, 1.3), autoregressive correlation 0.75); 45 persons absent from the third occasion.",
-      model = "2pl", points = 15, occasions = occasion_records(occasions), items = mirt_items(run, occasions, FALSE)
+      model = "2pl", points = 13, occasions = occasion_records(occasions), items = mirt_items(run, occasions, FALSE)
     ),
     mirt_moments(run), mirt_statistics(run)
   )

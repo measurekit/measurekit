@@ -1,0 +1,23 @@
+{
+  "source": "calibrateMultidimensional of the case three of multidimensional-groups.json, two groups on three correlated dimensions, against mirt's multipleGroup at the same 15 nodes per dimension.",
+  "sizes": {
+    "persons": 1100,
+    "items": 18,
+    "dimensions": 3,
+    "points": 15
+  },
+  "tolerances": {
+    "parameters": 0.0002,
+    "moments": 0.0005,
+    "likelihood": 0.000005
+  },
+  "differences": {
+    "parameters": 0.000048329133324642726,
+    "moments": 0.00010846224015903516,
+    "likelihood": 3.2484240364283323e-7
+  },
+  "within": true,
+  "converged": true,
+  "iterations": 32,
+  "seconds": 6
+}

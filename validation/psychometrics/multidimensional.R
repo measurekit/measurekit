@@ -173,24 +173,27 @@ two_groups <- c(rep("F1", 6), rep("F2", 6)) # the dimension of each of the 12 it
 
 # --- Confirmatory 2D M2PL, correlated -----------------------------------------------------------------------------------
 
+# The calibrations of two dimensions are on 21 nodes, where measurekit's agree with mirt's as closely as on 31 in less
+# than half the time; the scores are on 31.
+
 set.seed(20261029)
 m2pl_data <- simdata(simulate_slopes(6, 2), rnorm(12), 1500, itemtype = "dich", sigma = matrix(c(1, 0.4, 0.4, 1), 2))
 colnames(m2pl_data) <- sprintf("q%02d", 1:12)
 
 if (selected("m2pl")) {
-  m2pl <- mirt(m2pl_data, mirt.model("F1 = 1-6\nF2 = 7-12\nCOV = F1*F2"), quadpts = 31, TOL = TOL, SE = TRUE,
+  m2pl <- mirt(m2pl_data, mirt.model("F1 = 1-6\nF2 = 7-12\nCOV = F1*F2"), quadpts = 21, TOL = TOL, SE = TRUE,
                SE.type = "Oakes", verbose = FALSE, technical = list(NCYCLES = 5000))
   stopifnot_converged(m2pl)
   m2pl_items <- mirt_items(m2pl, 2, graded = FALSE, guessing = FALSE)
   # The cross-product standard errors, mirt's SE.type = "crossprod", from the same estimates.
-  m2pl_cross <- mirt(m2pl_data, mirt.model("F1 = 1-6\nF2 = 7-12\nCOV = F1*F2"), quadpts = 31, TOL = TOL, SE = TRUE,
+  m2pl_cross <- mirt(m2pl_data, mirt.model("F1 = 1-6\nF2 = 7-12\nCOV = F1*F2"), quadpts = 21, TOL = TOL, SE = TRUE,
                      SE.type = "crossprod", verbose = FALSE, technical = list(NCYCLES = 5000))
   stopifnot_converged(m2pl_cross)
 
   write_fixture("multidimensional-m2pl", c(
     list(
       source = "simdata (set.seed(20261029)): 1500 persons, 12 dichotomous items, 6 on each of 2 dimensions correlated 0.4.",
-      model = "m2pl", points = 31, itemIds = colnames(m2pl_data), responses = unname(m2pl_data),
+      model = "m2pl", points = 21, itemIds = colnames(m2pl_data), responses = unname(m2pl_data),
       loadings = confirmatory_pattern(colnames(m2pl_data), two_groups), dimensionNames = c("F1", "F2"),
       items = m2pl_items
     ),
@@ -210,14 +213,14 @@ if (selected("missing")) {
   set.seed(20261029)
   missing_data <- m2pl_data
   missing_data[matrix(runif(length(missing_data)) < 0.08, nrow(missing_data))] <- NA
-  missing <- mirt(missing_data, mirt.model("F1 = 1-6\nF2 = 7-12\nCOV = F1*F2"), quadpts = 31, TOL = TOL, SE = TRUE,
+  missing <- mirt(missing_data, mirt.model("F1 = 1-6\nF2 = 7-12\nCOV = F1*F2"), quadpts = 21, TOL = TOL, SE = TRUE,
                   SE.type = "Oakes", verbose = FALSE, technical = list(NCYCLES = 5000))
   stopifnot_converged(missing)
 
   write_fixture("multidimensional-missing", c(
     list(
       source = "The 2D M2PL simulation of multidimensional-m2pl with 8% of the responses missing completely at random.",
-      model = "m2pl", points = 31, itemIds = colnames(missing_data), responses = unname(missing_data),
+      model = "m2pl", points = 21, itemIds = colnames(missing_data), responses = unname(missing_data),
       loadings = confirmatory_pattern(colnames(missing_data), two_groups), dimensionNames = c("F1", "F2"),
       items = mirt_items(missing, 2, graded = FALSE, guessing = FALSE)
     ),
@@ -278,7 +281,7 @@ if (selected("fixed-parameters")) {
   for (j in which(held_guessing > 0)) hold(colnames(held_data)[j], "g", held_guessing[j])
   hold("q05", "a1", 1)
   held_fit <- function(se_type) {
-    fit <- mirt(held_data, held_model, itemtype = held_types, pars = held_values, quadpts = 31, TOL = TOL, SE = TRUE,
+    fit <- mirt(held_data, held_model, itemtype = held_types, pars = held_values, quadpts = 21, TOL = TOL, SE = TRUE,
                 SE.type = se_type, verbose = FALSE, technical = list(NCYCLES = 20000))
     stopifnot_converged(fit)
     fit
@@ -296,8 +299,8 @@ if (selected("fixed-parameters")) {
     list(
       source = paste("simdata (set.seed(20261104)): 2000 persons, 12 dichotomous items on 2 dimensions correlated 0.4,",
                      "items 6 and 12 on both; mirt 1.48 with est = FALSE on g of the 3PL items 1, 2, 6 and 7 and on a1",
-                     "of item 5, quadpts = 31, TOL = 1e-10, SE.type Oakes and crossprod."),
-      models = I(tolower(sub("PL", "pl", paste0("m", held_types)))), points = 31, itemIds = colnames(held_data),
+                     "of item 5, quadpts = 21, TOL = 1e-10, SE.type Oakes and crossprod."),
+      models = I(tolower(sub("PL", "pl", paste0("m", held_types)))), points = 21, itemIds = colnames(held_data),
       responses = unname(held_data),
       loadings = confirmatory_pattern(colnames(held_data), c(rep(list("F1"), 5), list(c("F1", "F2")),
                                                              rep(list("F2"), 5), list(c("F1", "F2")))),
@@ -325,7 +328,7 @@ bfi_items <- function(scales) {
 
 if (selected("graded")) {
   graded_data <- bfi_items(c("A", "C"))[1:800, ]
-  graded <- mirt(graded_data, mirt.model("F1 = 1-5\nF2 = 6-10\nCOV = F1*F2"), itemtype = "graded", quadpts = 31,
+  graded <- mirt(graded_data, mirt.model("F1 = 1-5\nF2 = 6-10\nCOV = F1*F2"), itemtype = "graded", quadpts = 21,
                  TOL = TOL, SE = TRUE, SE.type = "Oakes", verbose = FALSE, technical = list(NCYCLES = 20000))
   stopifnot_converged(graded)
   graded_groups <- c(rep("A", 5), rep("C", 5))
@@ -334,7 +337,7 @@ if (selected("graded")) {
   write_fixture("multidimensional-graded", c(
     list(
       source = "psych::bfi items A1-A5 and C1-C5, the first 800 complete cases, coded 0-5, under the graded model.",
-      model = "mgrm", points = 31, itemIds = colnames(graded_data), responses = unname(as.matrix(graded_data)),
+      model = "mgrm", points = 21, itemIds = colnames(graded_data), responses = unname(as.matrix(graded_data)),
       loadings = confirmatory_pattern(colnames(graded_data), graded_groups), dimensionNames = c("A", "C"),
       items = graded_items
     ),
@@ -344,15 +347,16 @@ if (selected("graded")) {
 }
 
 if (selected("graded3")) {
-  graded3_data <- bfi_items(c("A", "C", "E"))[1:500, ]
+  # 150 persons on 13 nodes per dimension, so that a calibration on the 13 ** 3 nodes takes a second.
+  graded3_data <- bfi_items(c("A", "C", "E"))[1:150, ]
   graded3 <- mirt(graded3_data, mirt.model("F1 = 1-5\nF2 = 6-10\nF3 = 11-15\nCOV = F1*F2, F1*F3, F2*F3"),
-                  itemtype = "graded", quadpts = 15, TOL = TOL, verbose = FALSE, technical = list(NCYCLES = 20000))
+                  itemtype = "graded", quadpts = 13, TOL = TOL, verbose = FALSE, technical = list(NCYCLES = 20000))
   stopifnot_converged(graded3)
 
   write_fixture("multidimensional-graded3", c(
     list(
-      source = "psych::bfi items A1-A5, C1-C5 and E1-E5, the first 500 complete cases, coded 0-5, under the graded model.",
-      model = "mgrm", points = 15, itemIds = colnames(graded3_data), responses = unname(as.matrix(graded3_data)),
+      source = "psych::bfi items A1-A5, C1-C5 and E1-E5, the first 150 complete cases, coded 0-5, under the graded model.",
+      model = "mgrm", points = 13, itemIds = colnames(graded3_data), responses = unname(as.matrix(graded3_data)),
       loadings = confirmatory_pattern(colnames(graded3_data), c(rep("A", 5), rep("C", 5), rep("E", 5))),
       dimensionNames = c("A", "C", "E"), items = mirt_items(graded3, 3, graded = TRUE, guessing = FALSE, errors = FALSE)
     ),

@@ -95,18 +95,18 @@ each case (0.441 and 0.135 at worst).
 
 | Multidimensional quantity                                              | Reference                                                                                                                                             |
 | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2PL: estimates, SEs, correlations, log-likelihood, AIC, BIC            | `mirt(model = "F1 = 1-6 / F2 = 7-12 / COV = F1*F2", SE.type = "Oakes")`, `TOL = 1e-10`, 31 points; also with 8% of the responses missing              |
+| 2PL: estimates, SEs, correlations, log-likelihood, AIC, BIC            | `mirt(model = "F1 = 1-6 / F2 = 7-12 / COV = F1*F2", SE.type = "Oakes")`, `TOL = 1e-10`, 21 points; also with 8% of the responses missing              |
 | Responses missing not at random: items, correlation, fit               | The same mirt model of the responses and their indicators, 31 points, `TOL = 1e-10` (below)                                                           |
 | 3PL with normal priors on logit c                                      | The same, 21 points, `PRIOR = (1-12, g, norm, ...)`                                                                                                   |
-| Parameters held: estimates, SEs, correlation, log-likelihood, AIC, BIC | The same with `pars` and `est = FALSE` on `g` of 3PL items, 1 of them on both dimensions, and on `a1` of a 2PL item; 31 points, Oakes and `crossprod` |
-| Graded: `bfi` A and C on two dimensions, A, C and E on three           | `mirt(itemtype = "graded")` with `COV`; 31 points and 15 points                                                                                       |
+| Parameters held: estimates, SEs, correlation, log-likelihood, AIC, BIC | The same with `pars` and `est = FALSE` on `g` of 3PL items, 1 of them on both dimensions, and on `a1` of a 2PL item; 21 points, Oakes and `crossprod` |
+| Graded: `bfi` A and C on two dimensions, A, C and E on three           | `mirt(itemtype = "graded")` with `COV`; 21 points and 13 points                                                                                       |
 | Cross-product standard errors                                          | `mirt(SE.type = "crossprod")`                                                                                                                         |
 | Several groups: estimates, SEs, moments, log-likelihood                | `multipleGroup(invariance = c("slopes", "intercepts", "free_means", "free_var"))`, `TOL = 1e-10`, 21 and 15 points; a wide group: base R BFGS         |
 | Fixed items that set the scale                                         | `multipleGroup` with `pars` and `est = FALSE` for the fixed items, and the other items named in `invariance`                                          |
 | Longitudinal: items, moments, changes, log-likelihood                  | `mirt`: a dimension per occasion, items tied by `constrain`, `MEAN` and `COV` for later occasions, `TOL = 1e-9`; changes in base R                    |
 | Longitudinal: Rasch model                                              | `tam.mml` with `Q` and `A`, on the scale of the first occasion; `mirt` with equal slopes                                                              |
 | Longitudinal: standard errors                                          | `mirt`'s `SE.type = "Oakes"` and `"crossprod"`, with the delta method for difficulty, correlation, SD                                                 |
-| MH-RM: estimates, correlations, standard errors                        | The EM references above for two and three dimensions; `mirt(method = "MHRM", SE = TRUE)` with `technical = list(set.seed = 1 to 4)` for five          |
+| MH-RM: estimates, correlations, standard errors                        | EM on the same persons for two dimensions; `mirt(method = "MHRM", SE = TRUE)` with `technical = list(set.seed = 1 to 4)` for five                     |
 | MH-RM complete-data score and information of an item                   | `mirt:::Deriv` at given thetas                                                                                                                        |
 | Exploratory 2D 2PL: estimates, log-likelihood                          | Base R: BFGS then Newton steps on the exact gradient of the marginal likelihood from mirt's estimates, the first item's second slope fixed at 0       |
 | Rotation: varimax, oblimin, Kaiser normalization, gamma                | `GPArotation::Varimax`, `GPArotation::oblimin` to a gradient of 1e-10, mirt's sign convention; checked against mirt's `Rotate`                        |
@@ -960,11 +960,12 @@ Several results of the reference packages are not references:
   gradient below 1e-8. mirt's own EM stops 14.5 log-likelihood units below that maximum on the simulated case and 0.21
   below it on SAT12, with 11 points.
 - **MH-RM's Monte Carlo error.** MH-RM estimates are random, so they are compared with EM's within their Monte Carlo
-  error, not to the digits. On the two-dimensional M2PL case, seeds 1 to 6 at the default settings differ from mirt's EM
-  by 0.034 to 0.057 in a parameter, 0.28 to 0.41 of the largest standard error, by at most 0.025 in the correlation, 7%
-  in the standard errors and -2.3 to 1.4 in the log-likelihood; 400 cycles of the last stage lower the parameters'
-  difference only to about 0.03. The tolerances are about twice the largest of these. The five-dimensional case has no
-  exact reference. mirt's MH-RM with four seeds differs from its mean over the seeds by up to 0.08 in a parameter
+  error, not to the digits. On the 1,500 persons of the two-dimensional M2PL case, seeds 1 to 6 at the default settings
+  differ from mirt's EM by 0.034 to 0.057 in a parameter, 0.28 to 0.41 of the largest standard error, by at most 0.025 in
+  the correlation, 7% in the standard errors and -2.3 to 1.4 in the log-likelihood; 400 cycles of the last stage lower
+  the parameters' difference only to about 0.03. The tests take the first 200 persons, where MH-RM runs in seconds, and
+  hold it to EM on the same persons within 1.5 times the worst of the seeds 1 to 20 (above). The five-dimensional case
+  has no exact reference. mirt's MH-RM with four seeds differs from its mean over the seeds by up to 0.08 in a parameter
   (median 0.012), and its standard errors by 20% at the median and 79% at most, with some missing where its information
   is not positive definite. The estimates and standard errors here are compared with that mean, with tolerances of
   about twice what the seeds 1 to 4 found here, 0.17 at most.
@@ -1172,7 +1173,7 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
 | `multidimensional-not-at-random.json`    | `set.seed(20261102)`: 1,500 persons, 8 two-parameter items and 8 indicators of whether each was answered, on a propensity correlated 0.5 with the ability                                                                                                                                                                                                                |
 | `multidimensional-m3pl.json`             | `simdata`, `set.seed(20261029)`: 1000 persons, 12 3PL items with g = 0.15, 6 on each of 2 dimensions                                                                                                                                                                                                                                                                     | Normal priors on logit c                                                                                                                                              |
 | `multidimensional-graded.json`           | `psych::bfi` A1-A5 and C1-C5, the first 800 complete cases, coded 0-5                                                                                                                                                                                                                                                                                                    | Six categories, two dimensions, EAP and MAP of 24 patterns                                                                                                            |
-| `multidimensional-graded3.json`          | `psych::bfi` A1-A5, C1-C5 and E1-E5, the first 500 complete cases                                                                                                                                                                                                                                                                                                        | Three dimensions, 15 points                                                                                                                                           |
+| `multidimensional-graded3.json`          | `psych::bfi` A1-A5, C1-C5 and E1-E5, the first 150 complete cases                                                                                                                                                                                                                                                                                                        | Three dimensions, 15 points                                                                                                                                           |
 | `multidimensional-mhrm.json`             | `psych::bfi`, the 25 items, the first 800 complete cases, coded 0-5; mirt's MH-RM with seeds 1 to 4; the score and Hessian of two items at given thetas                                                                                                                                                                                                                  | Five dimensions, the Monte Carlo error of mirt's runs, mirt's complete-data derivatives                                                                               |
 | `multidimensional-groups.json`           | `mirt::simdata` with `set.seed(20261029)`, 20261106 for a wide group: six cases of two or three groups on 2 or 3 dimensions, with items missing by design, graded items, 4 fixed items, and the wide group                                                                                                                                                               |                                                                                                                                                                       |
 | `longitudinal.json`                      | `set.seed(20261101)`: five cases of 2 or 3 occasions, with persons absent, items on one occasion only, graded items, and the Rasch model with TAM's estimates                                                                                                                                                                                                            |                                                                                                                                                                       |
@@ -1520,16 +1521,16 @@ one item, two persons) are tested against values derived by hand in `test/ctt.te
 | Item fit against its exact sums and against CDM's correlations                                          | 1e-3 absolute                                                   | 7.5e-6                    |
 | Item fit z against GDINA's resampling of 1e6 persons                                                    | 0.15 absolute                                                   | 0.091                     |
 | The identifiability of the DINA                                                                         | exact                                                           | exact                     |
-| Multidimensional 2PL parameters, correlations, loadings, communalities                                  | 1e-5 absolute                                                   | 1.3e-6                    |
-| Multidimensional 2PL standard errors                                                                    | 1e-4 relative                                                   | 1.5e-6                    |
-| Multidimensional 2PL log-likelihood, AIC, BIC                                                           | 1e-6 absolute                                                   | 4.4e-11                   |
-| Multidimensional parameters held by `fixedParameters`: parameters, correlation                          | 1e-5 absolute                                                   | 4.1e-6                    |
-| Multidimensional parameters held: Oakes' and cross-product standard errors, their correlation's         | 1e-5 relative                                                   | 4.0e-6                    |
-| Multidimensional parameters held: log-likelihood, AIC, BIC                                              | 1e-8 absolute                                                   | 6.1e-10                   |
-| Multidimensional 3PL and graded parameters, correlations, loadings                                      | 2e-4 absolute                                                   | 9.7e-5                    |
+| Multidimensional 2PL parameters, correlations, loadings, communalities                                  | 1e-5 absolute                                                   | 1.1e-6                    |
+| Multidimensional 2PL standard errors                                                                    | 1e-4 relative                                                   | 1.3e-6                    |
+| Multidimensional 2PL log-likelihood, AIC, BIC                                                           | 1e-6 absolute                                                   | 1.0e-10                   |
+| Multidimensional parameters held by `fixedParameters`: parameters, correlation                          | 1e-5 absolute                                                   | 2.0e-6                    |
+| Multidimensional parameters held: Oakes' and cross-product standard errors, their correlation's         | 1e-5 relative                                                   | 2.0e-6                    |
+| Multidimensional parameters held: log-likelihood, AIC, BIC                                              | 1e-8 absolute                                                   | 4.7e-11                   |
+| Multidimensional 3PL and graded parameters, correlations, loadings                                      | 2e-4 absolute                                                   | 6.8e-5                    |
 | Multidimensional 3PL and graded standard errors                                                         | 1e-3 relative                                                   | 9.2e-5                    |
 | Multidimensional 3PL and graded log-likelihood, AIC, BIC                                                | 1e-4 absolute                                                   | 2.5e-5                    |
-| Multidimensional cross-product standard errors                                                          | 1e-3 relative                                                   | 8.2e-7                    |
+| Multidimensional cross-product standard errors                                                          | 1e-3 relative                                                   | 8.0e-7                    |
 | Bifactor and two-tier parameters, correlation, loadings, communalities                                  | 5e-4 absolute                                                   | 1.8e-4                    |
 | Bifactor and two-tier standard errors, Oakes' and cross-product                                         | 1e-3 relative                                                   | 1.5e-4                    |
 | Bifactor and two-tier log-likelihood, AIC, BIC                                                          | 1e-4 absolute                                                   | 4.4e-7                    |
@@ -1542,18 +1543,19 @@ one item, two persons) are tested against values derived by hand in `test/ctt.te
 | Multidimensional groups: log-likelihood, AIC, BIC                                                       | 5e-6 absolute; 1e-6 for two correlated groups                   | 6.8e-7; 5.0e-8            |
 | Multidimensional groups, a wide group, against the base R maximum: parameters; moments; likelihood      | 1e-5; 5e-5; 1e-6 absolute                                       | 9.6e-7; 6.0e-6; 1.4e-10   |
 | Longitudinal: parameters, moments, changes; 2 occasions                                                 | 1e-4 absolute                                                   | 1.0e-5                    |
-| Longitudinal: parameters, moments, changes; 3 occasions                                                 | 1e-3 absolute                                                   | 3.4e-5                    |
+| Longitudinal: parameters, moments, changes; 3 occasions                                                 | 1e-3 absolute                                                   | 8.7e-5                    |
 | Longitudinal: parameters, moments, changes; Rasch model                                                 | 5e-4 absolute                                                   | 1.1e-4                    |
-| Longitudinal: log-likelihood against mirt                                                               | 1e-2 absolute; at least mirt's less 1e-6                        | 4.7e-5; never below       |
+| Longitudinal: log-likelihood against mirt                                                               | 1e-2 absolute; at least mirt's less 1e-6                        | 7.9e-7; never below       |
 | Longitudinal: parameters and moments; log-likelihood against TAM                                        | 5e-3 absolute; 1e-2 absolute                                    | 1.3e-5; 2.1e-4            |
 | Longitudinal: standard errors, Hessian; cross-product                                                   | 1e-5 absolute                                                   | 5.1e-7; 2.4e-7            |
-| MH-RM 2PL parameters; correlation against mirt's EM                                                     | 0.12; 0.05 absolute                                             | 0.057; 0.025              |
-| MH-RM 2PL standard errors against mirt's Oakes                                                          | 0.15 relative                                                   | 0.065                     |
-| MH-RM 2PL log-likelihood against mirt's EM                                                              | 4 absolute                                                      | 2.3                       |
-| MH-RM parameters with missing responses; 3PL with priors; its c                                         | 0.15; 0.2; 0.05 absolute                                        | 0.066; 0.073; 0.008       |
-| MH-RM graded parameters and log-likelihood, three dimensions                                            | 0.25; 3 absolute                                                | 0.082; 0.24               |
+| MH-RM 2PL against EM, 200 persons, worst of 20 seeds: parameters; correlation                           | 0.46; 0.1 absolute                                              | 0.30; 0.065               |
+| MH-RM 2PL standard errors against EM's, 200 persons: median ratio; every ratio                          | 1 ± 0.03; 0.68 to 2.25                                          | 0.99-1.02; 0.79-1.83      |
+| MH-RM 2PL log-likelihood against EM, 200 persons                                                        | 1.3 absolute                                                    | 0.84                      |
+| MH-RM against EM, 200 persons: missing responses; 3PL with priors; its c                                | 0.8; 0.2; 0.011 absolute                                        | 0.52; 0.13; 0.007         |
+| MH-RM against EM, 200 persons: parameters held by `fixedParameters`                                     | 0.7 absolute                                                    | 0.46                      |
+| MH-RM graded parameters; log-likelihood against EM, 120 persons                                         | 0.35; 1.6 absolute                                              | 0.23; 1.04                |
 | MH-RM five-dimensional parameters; correlations against the mean of mirt's runs                         | 0.3; 0.08 absolute                                              | 0.17; 0.025               |
-| MH-RM five-dimensional standard errors against the mean of mirt's runs: median, range of ratios         | 1 ± 0.1; 0.6 to 1.6                                             | 1.03; 0.75 to 1.42        |
+| MH-RM five-dimensional standard errors against the mean of mirt's runs: median, range of ratios         | 1 ± 0.1; 0.6 to 1.6                                             | 1.04; 0.73 to 1.62        |
 | MH-RM complete-data score against `Deriv`                                                               | 1e-10 relative to max(1, \|score\|)                             | 5.4e-14                   |
 | MH-RM observed information against `Deriv`: central, forward differences                                | 1e-8, 2e-4 relative to max(1, \|entry\|)                        | 1.3e-9, 3.9e-5            |
 | Exploratory parameters against the base R maximum                                                       | 2e-4 absolute                                                   | 1.8e-6                    |
@@ -1611,16 +1613,21 @@ EM stops before its estimates settle, and they differ from this library's by up 
 by less than 1e-7 between the tolerances 1e-9 and 1e-11, and their log-likelihood is at least mirt's. Two dimensions are
 on 21 nodes, where the distances are those on 31. For a group whose standard deviations are near 2 on the scale of the
 first, mirt's EM stops 0.148 below the maximum of the likelihood, by mirt's own evaluation there, so that group is held to
-the maximum that BFGS in base R reaches from mirt's estimates.
+the maximum that BFGS in base R reaches from mirt's estimates. `validation/psychometrics/multidimensional-groups-mirt.ts`
+compares the two groups on three dimensions with mirt's, which takes seconds outside the tests (4.8e-5, 1.1e-4 and 3.2e-7
+found).
 
 The longitudinal calibrations run with `tolerance: 1e-6`. On three occasions mirt's EM stops before its estimates settle,
-so they differ from this library's by up to 3.4e-5; this library's estimates move by less than 1e-5 when the tolerance
-is 1e-10, and their log-likelihood is never below mirt's. Three occasions are on 15 nodes and the Rasch model on 2
+so they differ from this library's by up to 8.7e-5; this library's estimates move by less than 1e-5 when the tolerance
+is 1e-10, and their log-likelihood is never below mirt's. Three occasions are on 13 nodes and the Rasch model on 2
 occasions: on 15 nodes per occasion, mirt's Rasch estimates of 3 occasions are 4e-3 from this library's. TAM's Rasch model has the slopes at 1 and the first occasion's
 variance free; the comparison converts it to the scale of that standard deviation, which the 1PL's slope carries.
 
-The MH-RM calibrations run with the default `tolerance` of 1e-3 and the seed 1; the five-dimensional case takes under a
-minute.
+The MH-RM calibrations of the tests run with the default `tolerance` of 1e-3 and the seed 1, on the first 200 persons of
+a fixture, 120 for the graded model, against EM on the same persons; each bound is 1.5 times the worst over the seeds 1 to
+20, rounded up. `validation/psychometrics/multidimensional-mhrm-mirt.ts` compares the five-dimensional case with mirt's
+runs on the seeds 1 to 4, in about two minutes: seed 3 gives a ratio of standard errors of 1.62, above the 1.6 that seed 1
+meets, where mirt's own standard errors vary by up to 79% from seed to seed.
 
 catR's `thetaEst` finds ML, MAP and WLE roots with `uniroot`'s default tolerance, about 1.2e-4; this library's are
 good to 1e-12. catR's EAP uses the trapezoid rule on the 61 points of `posteriorMeanEstimate`, which halves the two
