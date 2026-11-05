@@ -1,8 +1,8 @@
 # Cognitive diagnosis fixtures. References: GDINA's GDINA (G-DINA, DINA, DINO, A-CDM, LLM, R-RUM), personparm, CA by MAP
 # (by EAP, CA's computation in base R) and Qval(method = "PVAF"); NPCD's AlphaNP with the Hamming distance; base R's
 # constrOptim for one M-step of an additive model. Data: Tatsuoka's fraction subtraction data as GDINA ships it (536
-# persons, 20 items, 8 attributes), a seeded G-DINA simulation, GDINA's realdata_ECPE (2922 persons, 28 items, 3
-# attributes) and sim30GDINA (1000 persons, 30 items, 5 attributes).
+# persons, 20 items, 8 attributes; the case keeps 13 items and 5 attributes), a seeded G-DINA simulation, GDINA's
+# realdata_ECPE (2922 persons, 28 items, 3 attributes) and sim30GDINA (1000 persons, 30 items, 5 attributes).
 
 source("validation/psychometrics/common.R")
 suppressPackageStartupMessages({
@@ -110,9 +110,14 @@ cdm_case <- function(name, data, Q, models, persons) {
 }
 
 data(realdata_Tatsuoka1990, package = "GDINA")
-fraction <- realdata_Tatsuoka1990$dat
 fraction_q <- as.matrix(realdata_Tatsuoka1990$Q)
 colnames(fraction_q) <- paste0("A", seq_len(ncol(fraction_q)))
+# The DINA's EM runs over the 2^K profiles, 256 for the 8 attributes, and takes tens of seconds under coverage: the 13 items whose
+# attributes are among A2, A4, A5, A7 and A8, which are 32 profiles, keep the case to seconds.
+fraction_attributes <- c("A2", "A4", "A5", "A7", "A8")
+fraction_items <- which(rowSums(fraction_q[, setdiff(colnames(fraction_q), fraction_attributes)]) == 0)
+fraction <- realdata_Tatsuoka1990$dat[, fraction_items]
+fraction_q <- fraction_q[fraction_items, fraction_attributes]
 
 # A G-DINA simulation: 4 attributes, 15 items, 1500 persons from a saturated distribution over the 16 profiles.
 set.seed(SEED)
@@ -133,7 +138,7 @@ simulated <- sapply(seq_len(nrow(sim_q)), function(j) {
 })
 
 write_fixture("cdm", list(
-  source = "GDINA's realdata_Tatsuoka1990 (536 persons, 20 items, 8 attributes); a G-DINA simulation, set.seed(20261029).",
+  source = "GDINA's realdata_Tatsuoka1990 (536 persons, the 13 of its 20 items whose attributes are among A2, A4, A5, A7 and A8); a G-DINA simulation, set.seed(20261029).",
   cases = list(
     # With 8 attributes the DINA's profiles fall in classes the data cannot tell apart, so the persons' posteriors and
     # the profile proportions within a class are not identified: the fixture compares the classes' proportions. The

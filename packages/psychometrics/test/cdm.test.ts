@@ -574,7 +574,9 @@ describe("calibrateCdm", () => {
       { itemIds },
     );
     const qMatrix = Object.fromEntries(Object.entries(definedEntries(reference.qmatrix)).slice(0, 10));
-    const options = { tolerance: 1e-10, maxIterations: 10_000 };
+    // The models are one model for an item of one attribute, so their EM runs are one sequence of estimates, which agree to
+    // rounding after any number of iterations: 50 are enough.
+    const options = { tolerance: 0, maxIterations: 50 };
     const saturated = calibrateCdm(matrix, qMatrix, { ...options, model: "gdina" });
     for (const model of ["acdm", "llm", "rrum"] as const) {
       const result = calibrateCdm(matrix, qMatrix, { ...options, model });

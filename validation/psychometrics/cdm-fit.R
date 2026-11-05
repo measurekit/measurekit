@@ -144,7 +144,7 @@ cdm_largest <- sapply(seq_len(ncol(data_matrix)), function(j) {
 })
 
 # M2 of a true model on sets of its own data.
-SETS <- 60
+SETS <- 30
 PERSONS <- 400
 set.seed(20261104)
 true_items <- lapply(seq_len(nrow(q_matrix)), function(j) {
