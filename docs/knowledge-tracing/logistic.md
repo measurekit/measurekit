@@ -273,8 +273,8 @@ The [quick start](#quick-start) is online use, at given parameters.
 The state holds each skill's history: `successes`, `failures`, `last`, the time of the last attempt, and `decayed`, the
 decayed successes and failures of each decay the features use, and the fields that the model's other features read
 (`previous`, `first`, `firstPractice`, `leaky`, `times` and `outcomes`), with the learner's `practice` time, and for terms
-over items and the learner, the same histories in `items`, by item id, and `overall`. It is plain data; the model checks it,
-and that it has what the model's features need. An attempt or event earlier than the learner's last attempt at one of its
+over items and the learner, the same histories in `items`, by item id, and `overall`. It is plain data; the model checks
+what it reads of it, the histories of the attempt's skills and item, and that they have what the model's features need. An attempt or event earlier than the learner's last attempt at one of its
 skills throws `DataError`, as the time since it would be negative. Coefficients are keyed by the feature's label: its
 name, with its parameter in parentheses. A skill without coefficients throws `DataError`. Every event needs at least one
 skill; outcomes from 0 to 1 count as partial credit.

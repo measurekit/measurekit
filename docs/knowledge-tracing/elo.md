@@ -120,8 +120,8 @@ periodically and use `update` alone in between.
 | `count`   | n_θ, the events that have updated θ                                                            |
 | `skills`  | `{ [skill]: { ability, count } }`, θ_k and n_k of each skill practiced; empty without `skills` |
 
-The state is plain data: store it as JSON and pass it back. `update` and `predict` check it and throw `DataError` for
-a malformed state, naming the field. Item ratings `{ difficulty, count }` are plain data alike.
+The state is plain data: store it as JSON and pass it back. `update` and `predict` check what they read of it, the
+ability and the abilities of the attempt's skills, and throw `DataError` for a malformed one, naming the field. Item ratings `{ difficulty, count }` are plain data alike.
 
 ## Mastery
 

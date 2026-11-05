@@ -328,26 +328,38 @@ const NO_NEEDS: HistoryNeeds = {
 };
 
 /**
- * Checks a state, which may come from storage, throwing a `DataError` that names the first problem found. `needs` are
- * what the model's terms need a state to track.
+ * Checks what a call at an attempt reads of a state, which may come from storage: its learner, its records, their entries
+ * at the attempt's skills and item, its overall history and its practice time, throwing a `DataError` that names the first
+ * problem found. `needs` are what the model's terms need a state to track. A call checks the entries it reads, so that its
+ * cost does not grow with the skills and items the learner has practiced.
  */
-export function checkState(state: LogisticState, needs: StateNeeds): void {
+export function checkState(state: LogisticState, needs: StateNeeds, attempt: Attempt): void {
   const learner = checkLearnerState(state, "logistic");
   const label = `The logistic state of learner "${learner}"`;
   checkRecordById(state.skills, `${label} needs skills, an object of histories by skill id`);
-  checkHistories(state.skills, `${label}, skill`, needs.skills);
-  checkExposures(state, label, needs.skills.exposureDecays);
+  if (state.exposures !== undefined) {
+    checkRecordById(state.exposures, `${label} needs exposures, an object of exposures by skill id`);
+  }
+  for (const skill of attempt.skills) {
+    checkHistoryAt(state.skills, skill, `${label}, skill`, needs.skills);
+    checkExposureAt(state.exposures, skill, label, needs.skills.exposureDecays);
+  }
   if (state.items !== undefined) {
     checkRecordById(state.items, `${label} needs items, an object of histories by item id`);
-    checkHistories(state.items, `${label}, item`, needs.items ?? NO_NEEDS);
+    checkHistoryAt(state.items, attempt.item, `${label}, item`, needs.items ?? NO_NEEDS);
   }
   if (state.overall !== undefined) checkHistory(state.overall, `${label}, overall history,`, needs.overall ?? NO_NEEDS);
   if (state.practice !== undefined) checkCount(state.practice, `${label} needs practice, the time spent`);
 }
 
-/** Checks the histories of a record, by the id of what they count over, which `kind` names. */
-function checkHistories(histories: Readonly<Record<string, SkillHistory>>, kind: string, needs: HistoryNeeds): void {
-  for (const [id, history] of Object.entries(histories)) checkHistory(history, `${kind} "${id}",`, needs);
+/** Checks the history of a record at an id, if it has one: `kind` names what the record counts over. */
+function checkHistoryAt(
+  histories: Readonly<Record<string, SkillHistory>>,
+  id: string,
+  kind: string,
+  needs: HistoryNeeds,
+): void {
+  if (Object.hasOwn(histories, id)) checkHistory(histories[id] as SkillHistory, `${kind} "${id}",`, needs);
 }
 
 /** Checks one history against what its features read. */
@@ -431,26 +443,29 @@ function checkTimes(history: SkillHistory, prefix: string, needed: boolean): voi
   if (!outcomes?.every(isUnitInterval)) throw new DataError(`${prefix} needs outcomes from 0 to 1.`);
 }
 
-/** Checks a state's exposures, which are optional: a state stored before there were any has none. */
-function checkExposures(state: LogisticState, label: string, exposureDecays: readonly number[]): void {
-  if (state.exposures === undefined) return;
-  checkRecordById(state.exposures, `${label} needs exposures, an object of exposures by skill id`);
-  for (const [skill, exposure] of Object.entries(state.exposures)) {
-    const prefix = `${label}, exposures to skill "${skill}",`;
-    checkRecord(exposure, `${prefix} must be an object`);
-    checkCount(exposure.count, `${prefix} needs count`);
-    if (!Number.isFinite(exposure.last)) {
-      throw new DataError(`${prefix} needs last, the time of the last exposure, found ${describe(exposure.last)}.`);
+/** Checks the exposures to a skill, if the state has any: a state stored before there were any has none. */
+function checkExposureAt(
+  exposures: Readonly<Record<string, ExposureHistory>> | undefined,
+  skill: string,
+  label: string,
+  exposureDecays: readonly number[],
+): void {
+  if (exposures === undefined || !Object.hasOwn(exposures, skill)) return;
+  const exposure = exposures[skill] as ExposureHistory;
+  const prefix = `${label}, exposures to skill "${skill}",`;
+  checkRecord(exposure, `${prefix} must be an object`);
+  checkCount(exposure.count, `${prefix} needs count`);
+  if (!Number.isFinite(exposure.last)) {
+    throw new DataError(`${prefix} needs last, the time of the last exposure, found ${describe(exposure.last)}.`);
+  }
+  checkRecord(exposure.decayed, `${prefix} needs decayed, an object of decayed counts by decay`);
+  for (const decay of exposureDecays) {
+    if (entry(exposure.decayed, String(decay)) === undefined) {
+      throw new DataError(`${prefix} lacks the decayed count of decay ${decay}, which the model's features need.`);
     }
-    checkRecord(exposure.decayed, `${prefix} needs decayed, an object of decayed counts by decay`);
-    for (const decay of exposureDecays) {
-      if (entry(exposure.decayed, String(decay)) === undefined) {
-        throw new DataError(`${prefix} lacks the decayed count of decay ${decay}, which the model's features need.`);
-      }
-    }
-    for (const [decay, sum] of Object.entries(exposure.decayed)) {
-      checkCount(sum, `${prefix} needs a decayed count for decay ${decay}`);
-    }
+  }
+  for (const [decay, sum] of Object.entries(exposure.decayed)) {
+    checkCount(sum, `${prefix} needs a decayed count for decay ${decay}`);
   }
 }
 

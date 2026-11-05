@@ -366,8 +366,8 @@ function create(options: LogisticOptions): LogisticModel {
       return steps.initialState(learner);
     },
     update(state, event) {
-      checkState(state, needs);
       checkEvent(event, "The event");
+      checkState(state, needs, event);
       checkObservedHasSkills(event, "The event", "logistic model");
       checkDuration(event, "The event", needs);
       checkLearner(state.learner, event);
@@ -375,8 +375,8 @@ function create(options: LogisticOptions): LogisticModel {
       return advanceState(state, event, needs);
     },
     predict(state, attempt) {
-      checkState(state, needs);
       checkAttempt(attempt, "The attempt");
+      checkState(state, needs, attempt);
       checkHasSkills(attempt, "The attempt", "logistic model");
       checkCovariates(attempt, "The attempt", terms.covariates);
       checkLearner(state.learner, attempt);

@@ -42,7 +42,7 @@ every build, and no build regenerates it.
 
 An answer reads the learner's state and the parameters of the item at hand, builds the model from them, and writes the
 state and the event back. It never reads the log. A model built from a few rows costs as little as the rows: building
-an Elo model of one item and updating it takes under a microsecond, against milliseconds for a model of thousands.
+an Elo model of one item and updating it takes about a microsecond, against milliseconds for a model of thousands.
 
 ```ts
 import { bkt } from "@measurekit/knowledge-tracing/bkt";
@@ -74,7 +74,10 @@ const next = tracer.update(stateRow, {
 A logistic model takes the rows of the item's skills and, with fixed proficiency, the learner's θ; an IRT model the
 item's row, as `irt({ items: { q7: itemRow } })`.
 
-Updating a learner takes about 0.1 µs with Elo, 0.2 µs with BKT and 3 µs with IRT, whose model takes 4 µs to build. A
+Updating a learner takes about 0.3 µs with Elo, 0.6 µs with BKT and 6 µs with IRT, whose model takes 10 µs to build. A
+call checks what it reads of a state, the entries of the attempt's skills, and `predict` and `mastery` take the same time
+at any number of skills; `update` returns a new state, a copy of its records, which takes about 0.05 ms at 128 skills and
+2 ms at 5,000. Pass the rows of the event's skills, as above, and an update costs the same at any number of skills. A
 KST update takes time proportional to the knowledge states: about 0.01 ms for 400 states, 0.1 ms for 6,000. A KST model
 needs its whole structure and π; cache it between answers. With BKT, or Elo without online item updates, parameters
 change only at refits, so an app can cache them.

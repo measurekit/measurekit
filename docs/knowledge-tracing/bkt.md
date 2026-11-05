@@ -195,7 +195,7 @@ The [quick start](#quick-start) is online use, at given rates.
 - `update(state, event)` returns a new state; `predict` and `mastery` read it. A skill the learner has not practiced
   has their prior. The model has no parameters for a skill it was not fitted to, and throws `DataError` for it.
 - The state, `{ learner, skills: { [skill]: P(L) } }`, is plain data: store it as JSON and pass it back. Model methods
-  check it.
+  check what they read of it, the P(L) of the skills at hand.
 
 ## Mastery
 

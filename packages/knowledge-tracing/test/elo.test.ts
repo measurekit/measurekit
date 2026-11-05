@@ -320,13 +320,22 @@ describe("elo input checks", () => {
     expect(() => model.predict(parse('{"learner": "ana", "ability": 0, "count": 1.5, "skills": {}}'), event)).toThrow(
       "needs a count, a non-negative integer, found 1.5.",
     );
-    expect(() =>
-      model.update(parse('{"learner": "ana", "ability": 0, "count": 0, "skills": {"x": {"ability": 0}}}'), event),
-    ).toThrow('The Elo state of learner "ana", skill "x", needs a count');
+    const atX = parse('{"learner": "ana", "ability": 0, "count": 0, "skills": {"x": {"ability": 0}}}');
+    expect(() => model.update(atX, { ...event, skills: ["x"] })).toThrow(
+      'The Elo state of learner "ana", skill "x", needs a count',
+    );
     expect(() => model.update(model.initialState("budi"), event)).toThrow(
       'An attempt of learner "ana" was given the state of learner "budi".',
     );
     expect(() => model.initialState("")).toThrow('A learner id must be a non-empty string, found "".');
+  });
+
+  it("checks the skill abilities of the skills a call reads, so that its cost does not grow with the others", () => {
+    const model = elo({ skills: true });
+    const state = JSON.parse('{"learner": "ana", "ability": 0, "count": 0, "skills": {"x": {"ability": 0}}}');
+    const next = model.update(state, { ...event, skills: ["y"] });
+    expect(next.skills.y).toStrictEqual({ ability: expect.any(Number), count: 1 });
+    expect(() => model.predict(next, { ...event, skills: ["x"] })).toThrow('skill "x", needs a count');
   });
 
   it("rejects malformed events and attempts", () => {

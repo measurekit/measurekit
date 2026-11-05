@@ -190,8 +190,8 @@ export function elo(options: EloOptions = {}): EloModel {
       return step(settings, state, items.get(event.item) ?? UNRATED, event).state;
     },
     predict(state, attempt) {
-      checkState(state);
       checkAttempt(attempt, "The attempt");
+      checkState(state, attempt.skills);
       checkLearner(state.learner, attempt);
       return logistic(logit(settings, state, items.get(attempt.item) ?? UNRATED, attempt));
     },
@@ -250,8 +250,8 @@ function skillAbility(state: EloState, skill: string): SkillAbility {
 }
 
 function checkStep(state: EloState, event: Event): void {
-  checkState(state);
   checkEvent(event, "The event");
+  checkState(state, event.skills);
   checkLearner(state.learner, event);
 }
 

@@ -414,27 +414,27 @@ function create(options: BktOptions): { model: BktModel; steps: Steps<BktState> 
       return steps.initialState(learner);
     },
     update(state, event) {
-      checkState(state);
       checkEvent(event, "The event");
+      checkState(state, event.skills);
       checkTraceable(event, "The event");
       checkLearner(state.learner, event);
       return steps.update(state, event);
     },
     predict(state, attempt) {
-      checkState(state);
       checkAttempt(attempt, "The attempt");
+      checkState(state, attempt.skills);
       checkHasSkills(attempt, "The attempt", "BKT model");
       checkLearner(state.learner, attempt);
       return steps.predict(state, attempt);
     },
     mastery(state, skill) {
-      checkState(state);
+      checkState(state, [skill]);
       return masteryOf(state, skill);
     },
     opportunitiesToMastery(state, skill, masteryOptions = {}) {
       checkOptions(masteryOptions, OPPORTUNITIES_TO_MASTERY_OPTIONS);
       const { threshold = DEFAULT_THRESHOLD } = masteryOptions;
-      checkState(state);
+      checkState(state, [skill]);
       checkUnitInterval(threshold, "The threshold");
       return opportunitiesToMastery(masteryOf(state, skill), skillOf(skill), threshold);
     },

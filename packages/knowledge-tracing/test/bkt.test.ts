@@ -1467,6 +1467,19 @@ describe("bkt edge cases", () => {
       "The threshold must be a number from 0 to 1, found 2.",
     );
   });
+
+  it("checks the entries of the skills a call reads, so that its cost does not grow with the others", () => {
+    const rates = { prior: 0.5, learn: 0.1, forget: 0, guess: 0.2, slip: 0.1 };
+    const model = bkt({ pairLearning: true, parameters: { skills: { s: rates, t: rates } } });
+    const state: BktState = JSON.parse('{"learner": "ana", "skills": {"t": 2}, "previous": {"t": ""}}');
+    const next = model.update(state, { learner: "ana", item: "q", skills: ["s"], time: 0, outcome: 1 });
+    expect(model.mastery(next, "s")).toBeCloseTo(0.8364, 4);
+    expect(() => model.mastery(next, "t")).toThrow('needs a probability from 0 to 1 for skill "t", found 2.');
+    const resource = JSON.parse('{"learner": "ana", "skills": {}, "previous": {"t": ""}}');
+    expect(() => model.predict(resource, { learner: "ana", item: "q", skills: ["t"], time: 1 })).toThrow(
+      'needs a resource id, a non-empty string, for skill "t", found "".',
+    );
+  });
 });
 
 describe("bkt options from JavaScript", () => {

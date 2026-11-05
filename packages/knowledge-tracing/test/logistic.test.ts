@@ -1674,6 +1674,31 @@ describe("logistic options of terms from JavaScript", () => {
     const stored = parse(`{${base}, "items": {"q": ${history}}, "overall": ${history}}`);
     expect(model.predict(stored, { ...attempt, time: 5 })).toBeGreaterThan(0);
   });
+
+  it("checks the histories and exposures of the skills and item a call reads, so that its cost does not grow with the others", () => {
+    const model = logistic({
+      features: ["successes", { feature: "successes", over: "item" }, { decayedExposures: 0.5 }],
+      parameters: {
+        skills: {
+          s: { intercept: 0, coefficients: { successes: 0.1, "decayedExposures(0.5)": 0 } },
+          t: { intercept: 0, coefficients: { successes: 0.1, "decayedExposures(0.5)": 0 } },
+        },
+        shared: { "item:successes": 0.1 },
+      },
+    });
+    const bad = '{"successes": -1, "failures": 0, "last": 0, "decayed": {}}';
+    const state: LogisticState = JSON.parse(
+      `{"learner": "ana", "skills": {"t": ${bad}}, "items": {"r": ${bad}}, "exposures": {"t": {"count": -1}}}`,
+    );
+    const next = model.update(state, { learner: "ana", item: "q", skills: ["s"], time: 1, outcome: 1 });
+    expect(next.skills.s?.successes).toBe(1);
+    const at = { learner: "ana", item: "q", skills: ["t"], time: 2 };
+    expect(() => model.predict(next, at)).toThrow('skill "t", needs successes, a non-negative number, found -1.');
+    expect(() => model.predict({ ...next, skills: {} }, at)).toThrow('exposures to skill "t", needs count');
+    expect(() => model.predict(next, { ...at, item: "r", skills: ["s"] })).toThrow(
+      'item "r", needs successes, a non-negative number, found -1.',
+    );
+  });
 });
 
 describe("rate search", () => {

@@ -21,13 +21,19 @@ export interface SkillAbility {
   readonly count: number;
 }
 
-/** Checks a state, which may come from storage, throwing a `DataError` that names the first problem found. */
-export function checkState(state: EloState): void {
+/**
+ * Checks what a call reads of a state, which may come from storage: its learner, its ability and its skill abilities at
+ * the skills named, throwing a `DataError` that names the first problem found. A call checks the entries it reads, so
+ * that its cost does not grow with the skills the learner has practiced.
+ */
+export function checkState(state: EloState, skills: readonly string[]): void {
   const learner = checkLearnerState(state, "Elo");
   const label = `The Elo state of learner "${learner}"`;
   checkRating(state.ability, state.count, label, "an ability");
   checkRecordById(state.skills, `${label} needs skills, an object of skill abilities by skill id`);
-  for (const [skill, rating] of Object.entries(state.skills)) {
+  for (const skill of skills) {
+    if (!Object.hasOwn(state.skills, skill)) continue;
+    const rating = state.skills[skill] as SkillAbility;
     checkRecord(rating, `${label} needs an object for skill "${skill}"`);
     checkRating(rating.ability, rating.count, `${label}, skill "${skill}",`, "an ability");
   }
