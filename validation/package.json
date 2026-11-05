@@ -1,0 +1,16 @@
+{
+  "name": "measurekit-validation",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@measurekit/core": "workspace:*",
+    "@measurekit/psychometrics": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5"
+  },
+  "license": "Apache-2.0"
+}

@@ -17,7 +17,7 @@ const foldersIn = (folder: string): string[] =>
     .map((entry) => join(folder, entry.name));
 
 /** The folders of the workspace (`pnpm-workspace.yaml`), with the root. */
-const WORKSPACE = [".", ...foldersIn("packages"), "examples", "compat"];
+const WORKSPACE = [".", ...foldersIn("packages"), "examples", "compat", "validation"];
 
 describe("the versions of the dependencies", () => {
   it("are exact in every package of the workspace, so that every machine and CI run builds the same output", () => {
@@ -44,6 +44,7 @@ describe("the versions of the dependencies", () => {
         "packages/psychometrics",
         "examples",
         "compat",
+        "validation",
       ]),
     );
   });

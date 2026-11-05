@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "types": ["node"],
+    "paths": {
+      "@measurekit/core": ["../packages/core/src/index.ts"],
+      "@measurekit/psychometrics": ["../packages/psychometrics/src/index.ts"],
+      "@measurekit/psychometrics/*": ["../packages/psychometrics/src/*/index.ts"]
+    }
+  },
+  "include": ["**/*.ts"]
+}

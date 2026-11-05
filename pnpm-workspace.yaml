@@ -2,6 +2,7 @@ packages:
   - packages/*
   - examples
   - compat
+  - validation
 
 # A version is installed only when it has been on the registry for 3 days (in minutes), which STANDARDS.md asks of every
 # dependency. pnpm checks the lock file against it on every install.

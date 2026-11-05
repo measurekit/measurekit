@@ -701,7 +701,7 @@
       }
     },
     {
-      "includes": ["docs/*.ts", "examples/**", "scripts/**", "compat/**"],
+      "includes": ["docs/*.ts", "examples/**", "scripts/**", "compat/**", "validation/**"],
       "linter": {
         "rules": {
           "suspicious": {
@@ -711,7 +711,7 @@
       }
     },
     {
-      "includes": ["docs/*.ts", "scripts/**"],
+      "includes": ["docs/*.ts", "scripts/**", "validation/**"],
       "linter": {
         "rules": {
           "correctness": {

@@ -10,6 +10,9 @@
     "examples": {
       "entry": ["**/*.ts"]
     },
+    "validation": {
+      "entry": ["**/*.ts"]
+    },
     "compat": {
       "entry": ["run.ts", "worker.ts"],
       "ignoreDependencies": ["workerd"]

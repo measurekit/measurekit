@@ -149,6 +149,15 @@ cdcatR imports cdmTools for its nonparametric rules only, and cdmTools needs a R
 `cat.R` runs without them: download the cdcatR source with `download.packages`, remove cdmTools from `Imports` in
 `DESCRIPTION` and `import(cdmTools)` from `NAMESPACE`, and run `R CMD INSTALL` on the directory.
 
+### Recovery studies
+
+A study of the library's own estimates that takes minutes is a TypeScript script of `validation/<package>/`, run on the
+build: `pnpm build`, then `node validation/<package>/<study>.ts`. Through `study.ts` it writes `results/<study>.json` beside
+it as each fit finishes, with the seeds, the sizes and the bound it shows, and the file is committed; the tests hold the
+same rule at a size that runs in seconds. `validation/` is a package of the workspace, so that the studies import the
+packages by name and `pnpm typecheck` checks them; no Vitest project and no job of CI runs them. A study exits with 1 when
+a fit misses the threshold it states.
+
 ## Knowledge tracing
 
 R and Python scripts in `validation/knowledge-tracing/`:
