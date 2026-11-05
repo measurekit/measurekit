@@ -153,7 +153,8 @@ generator of the test's random choices at each step of each person, so that a si
 seeds each call of `start` and `answer`; without it, the generator of the responses makes them.
 
 `simulateResponses` and `simulateMultidimensionalResponses` name the columns of their matrix by the items' ids when the
-items carry them, as a test's or a calibration's do, and `item1` and on when they do not.
+items carry them, as a test's or a calibration's do, and `item1` and on when they do not; items of which only some carry
+an id, or carry one that is not a string, throw `DataError` naming the first item that carries a string id.
 
 `generalizedGradedUnfolding` is the generalized graded unfolding model for agree-disagree items, whose persons agree most
 near an item's location. `calibrateUnfolding` calibrates it as the GGUM package does: from Roberts and Laughlin's starts,
