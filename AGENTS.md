@@ -169,6 +169,8 @@ At the public release the owner sets what a repository file cannot: the reposito
 - Every dependency of every `package.json` of the workspace is an exact version, development tools too, so that every
   machine and CI run builds the same output; `scripts/test/versions.test.ts` fails on a range. `@types/node` stays on the
   oldest supported Node.js major, and Dependabot ignores its major versions.
+- A version is installed only when it is at least 3 days old: `pnpm-workspace.yaml` sets `minimumReleaseAge: 4320`, which
+  pnpm checks against the lock file on every install.
 - Code outside `packages/` imports a package by name.
 - A module imports another only through its `index.ts` or its `internal.ts`, which lists what the modules and tests of
   the package share and is never exported from the package. `pnpm check:standards` fails on a deep path.
