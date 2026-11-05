@@ -1418,23 +1418,30 @@ describe("calibration", () => {
   it("adds the curvature of a prior to the information of both kinds of standard errors", () => {
     // The information is the data's plus the precision 1 / sd² of a normal prior on an intercept, so that with a prior
     // whose sd of 0.01 is far tighter than the data's standard error, a tenth of a unit or more, the standard error of
-    // the intercept is the prior's sd: the data's information of a few tens raises 1e4 by half a percent.
-    const data = buildResponseMatrix(m2pl.responses.slice(0, 200), { itemIds: [...m2pl.itemIds] });
+    // the intercept is the prior's sd: the data's information of a few tens raises 1e4 by half a percent. The intercepts
+    // are 0, where the prior is: a prior far from an item's intercept drives its slope up without bound, until the
+    // information is no longer positive definite and the standard errors are left out.
+    const random = createRandom(20261106);
+    const items = Array.from({ length: 12 }, (_, i) => ({
+      model: multidimensionalTwoParameterLogistic,
+      parameters: { a: [i < 6 ? 1.2 : 0, i < 6 ? 0 : 1.2], intercept: 0, c: 0, d: 1 },
+    }));
+    const data = simulateMultidimensionalResponses(
+      items,
+      Array.from({ length: 200 }, () => [random.normal(), random.normal()]),
+      random,
+    );
+    const loadings = Object.fromEntries(data.itemIds.map((id, i) => [id, [i < 6 ? "F1" : "F2"]]));
     for (const standardErrors of ["hessian", "cross-product"] as const) {
-      const plain = calibrateMultidimensional(data, multidimensionalTwoParameterLogistic, {
-        loadings: m2pl.loadings,
-        points: 11,
-        tolerance: 1e-6,
-        standardErrors,
-      });
+      const options = { loadings, points: 11, tolerance: 1e-6, standardErrors };
+      const plain = calibrateMultidimensional(data, multidimensionalTwoParameterLogistic, options);
       const tight = calibrateMultidimensional(data, multidimensionalTwoParameterLogistic, {
-        loadings: m2pl.loadings,
-        points: 11,
-        tolerance: 1e-6,
-        standardErrors,
+        ...options,
         priors: { intercept: normalPrior(0, 0.01) },
       });
+      expect(tight.converged).toBe(true);
       tight.items.forEach((item, j) => {
+        expect(Math.max(...item.parameters.a.map(Math.abs)), `${standardErrors} slope ${j + 1}`).toBeLessThan(3);
         const error = defined(item.standardErrors?.intercept);
         expectClose(error, 0.01, 1e-4, `${standardErrors} intercept ${j + 1}`);
         expect(error).toBeLessThan(defined(plain.items[j]?.standardErrors?.intercept));
