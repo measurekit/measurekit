@@ -45,8 +45,8 @@ the reference function or the formula in the pull request, and add the reference
 
 ## Before opening a pull request
 
-Run `pnpm lint`, `pnpm check:standards`, `pnpm check:duplication`, `pnpm typecheck`, `pnpm test` and `pnpm knip`, then `pnpm build`,
-`pnpm check:packages`, `pnpm check:release`, `pnpm check:tarballs`, `pnpm check:rules`, `pnpm check:licenses`, `pnpm check:audit`, `pnpm compat:runtimes` and `pnpm docs:api`. A bug fix comes with a test that fails without it. A change to a package goes into the pending
+Run the commands of [AGENTS.md](AGENTS.md#commands); `pnpm check:rules packages/<package>` limits the mutation rules to the
+package you changed. A bug fix comes with a test that fails without it. A change to a package goes into the pending
 release's changeset for that package in `.changeset/`, or a new one made with `pnpm changeset` when none is pending
 ([AGENTS.md](AGENTS.md#releases)).
 

@@ -273,7 +273,7 @@ items, the test with their square, and the others linearly. The K index also cou
 
 ## Errors
 
-Invalid input throws `DataError` with the value found.
+Invalid input throws `DataError` naming the value found.
 
 | Cause                                                                           | What to do                                                                      |
 | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |

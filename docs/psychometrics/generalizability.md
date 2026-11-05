@@ -414,7 +414,7 @@ code on the seeded scores and compares it with the mean products to 1e-9.
 
 ## Errors
 
-Invalid input throws `DataError` naming the value found, also input of another type, as JavaScript or JSON passes it.
+Invalid input throws `DataError` naming the value found.
 
 | Function                | Error                                                                                                                                 | What to do                                                                                              |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |

@@ -71,17 +71,13 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 22.23.4 and R versi
 
 ## Size
 
-Each entry point bundled alone, as a host's bundler makes it: minified with esbuild and code splitting on, `export *` of
-the entry, core from its sources. The bytes and the modules are those of the entry chunk and the chunks it imports
-statically, which load with it; a module that a dynamic `import()` loads later is a chunk of its own and is not counted.
+Each entry point bundled alone with esbuild, as a host's bundler makes it ([method](../../validation/README.md#sizes-and-peak-memory)). The bytes and the
+modules are those of the entry chunk and the chunks it imports statically, which load with it; a module that a dynamic
+`import()` loads later is a chunk of its own and is not counted.
 The modules each holds are those the import rules of [AGENTS.md](../../AGENTS.md#dependencies) allow it.
 
 | Entry point        | Minified (bytes) | Gzip (bytes) | Modules it holds besides its own |
 | ------------------ | ---------------: | -----------: | -------------------------------- |
 | `@measurekit/core` |           16,671 |        6,924 | nothing                          |
 
-`scripts/test/entry-sizes.test.ts`, which `pnpm test --project scripts` runs without a build, bundles each entry point
-and fails when it takes more than its budget after gzip, or holds a module that its budget in `scripts/size-budgets.ts`
-does not list. A budget is 1.25 times the size measured after gzip, rounded up to the next 500 bytes. `node
-scripts/entry-sizes.ts` prints the sizes; the table gives them on Node.js 22, the version of the runner, and the gzip of
-Node.js 26 is up to 1.2 percent less.
+The table is of Node.js 22, the runner's version; the gzip of Node.js 26 is up to 1.2 percent less.

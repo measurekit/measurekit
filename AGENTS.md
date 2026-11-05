@@ -313,8 +313,7 @@ Where the code departs from `STANDARDS.md`, with the reason:
   `replaceChildren`, `Math.max`, `Math.min`): above about 100,000 values that throws a `RangeError`. Loop over the values, or
   spread into an array literal. `pnpm lint` fails on it in `packages/*/src` (`biome/no-spread-arguments.grit`).
 - A number with a meaning is a named constant with its source, such as the reference's name for it.
-- A capability is built when the sources of `docs/<package>/architecture.md` treat it as standard practice, a usable
-  reference exists and it fits a library. The guide lists the rest under "Not included", a table that opens with
+- A capability is built by the rule of `docs/<package>/architecture.md#sources`. The guide lists the rest under "Not included", a table that opens with
   `| Not included | Why |`, one row for each method, `| Method | Reason: why |`, with Reason one of No fit, No reference
   or Outside the sources. No speculative options, abstractions or modules.
 

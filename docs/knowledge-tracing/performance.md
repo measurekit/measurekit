@@ -113,9 +113,9 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 22.23.4 and R versi
 
 ## Size
 
-Each entry point bundled alone, as a host's bundler makes it: minified with esbuild and code splitting on, `export *` of
-the entry, core from its sources. The bytes and the modules are those of the entry chunk and the chunks it imports
-statically, which load with it; a module that a dynamic `import()` loads later is a chunk of its own and is not counted.
+Each entry point bundled alone with esbuild, as a host's bundler makes it ([method](../../validation/README.md#sizes-and-peak-memory)). The bytes and the
+modules are those of the entry chunk and the chunks it imports statically, which load with it; a module that a dynamic
+`import()` loads later is a chunk of its own and is not counted.
 The modules each holds are those the import rules of [AGENTS.md](../../AGENTS.md#dependencies) allow it. Every package
 declares `sideEffects: false`, so a named import holds only what that name needs.
 
@@ -132,17 +132,12 @@ declares `sideEffects: false`, so a named import holds only what that name needs
 | `@measurekit/knowledge-tracing/practice` |            6,712 |        2,482 | core, data, model                |
 | `@measurekit/knowledge-tracing/sim`      |            5,046 |        1,879 | core, data, model                |
 
-`scripts/test/entry-sizes.test.ts`, which `pnpm test --project scripts` runs without a build, bundles each entry point
-and fails when it takes more than its budget after gzip, or holds a module that its budget in `scripts/size-budgets.ts`
-does not list. A budget is 1.25 times the size measured after gzip, rounded up to the next 500 bytes. `node
-scripts/entry-sizes.ts` prints the sizes; the table gives them on Node.js 22, the version of the runner, and the gzip of
-Node.js 26 is up to 1.2 percent less.
+The table is of Node.js 22, the runner's version; the gzip of Node.js 26 is up to 1.2 percent less.
 
 ## Memory
 
 What each reader of untrusted input adds to the peak resident memory of a Node.js process, on its worst inputs within
-the limits of [SECURITY.md](../../SECURITY.md): the peak of a process that parses the input from JSON and reads it, less
-the peak of the same process that parses it and does not, the median of three pairs run one after the other. Each reader
+the limits of [SECURITY.md](../../SECURITY.md) ([method](../../validation/README.md#sizes-and-peak-memory)). Each reader
 grows in proportion to its input, but for the analyses of the relations between the elements of a knowledge structure,
 whose limits bound them.
 
@@ -162,13 +157,3 @@ whose limits bound them.
 A log takes at most about 1.2 times the bytes of its JSON, and stored BKT parameters about 3 times. The analyses of
 knowledge structures take up to about 240 MB within their limits: IITA's candidates from 18 MB of responses, and the
 masks of a model from a few hundred kilobytes of sets of skills.
-
-`scripts/test/peak-memory.test.ts`, which `pnpm test --project scripts` runs without a build, measures the readers of
-`scripts/peak-memory.ts`, every row of the table above among them, from the sources, each in a pair of child
-processes whose heap is bounded, as STANDARDS.md section 7 asks: twice the least heap in which the reading ended on
-Node.js 22, 24 and 26, rounded up to 16 MiB, so that a reading that keeps more alive at once fails, whenever the
-collector runs and however busy the machine is. The test fails too when a reading adds more than its budget to the peak:
-twice the largest rise measured on Node.js 22 and 24, on macOS and on Linux, rounded up to 10 MB, which bounds what the
-heap does not hold, the buffers of typed arrays. `node scripts/peak-memory.ts` prints the rises, the median of three
-pairs, with a heap of 8 GiB, as a host's process collects later than a bounded one, and `node scripts/peak-memory.ts
---heap` the least heap of each reading.

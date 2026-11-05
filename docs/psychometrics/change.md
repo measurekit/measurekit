@@ -127,7 +127,7 @@ not of the persons being assessed.
 
 ## Errors
 
-Invalid input throws `DataError` with the value found.
+Invalid input throws `DataError` naming the value found.
 
 | Cause                                                                 | What to do                                                                           |
 | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |

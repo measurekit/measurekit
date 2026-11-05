@@ -409,7 +409,7 @@ angoffCutScore([ratings]).cutScore; // => 14.35
 
 ## Errors
 
-Invalid input throws `DataError` naming the value found, also input of another type, as JavaScript or JSON passes it.
+Invalid input throws `DataError` naming the value found.
 
 | Function                                 | Error                                                                                                              | What to do                                                                                        |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |

@@ -192,7 +192,7 @@ scales and should leave the link.
 
 ## Errors
 
-Invalid input throws `DataError` with the value found.
+Invalid input throws `DataError` naming the value found.
 
 | Cause                                                        | What to do                                                             |
 | ------------------------------------------------------------ | ---------------------------------------------------------------------- |

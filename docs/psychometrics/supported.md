@@ -1,9 +1,8 @@
 # What psychometrics supports
 
 What each module of `@measurekit/psychometrics` builds, the references its tests compare it with, and where it lists what it
-leaves out. A capability is built when the sources of its module treat it as standard practice, a usable reference exists
-and it fits a library ([architecture](architecture.md)); each guide's Not included table gives the reason for each method
-it leaves out.
+leaves out. What is built follows the [sources](architecture.md#sources) of each module; each guide's Not included table
+gives the reason for each method it leaves out.
 
 ```mermaid
 flowchart LR
