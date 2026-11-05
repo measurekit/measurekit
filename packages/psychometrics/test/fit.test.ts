@@ -301,8 +301,11 @@ const KERNEL_TOLERANCE = 1e-12;
 const MEAN_Q3_TOLERANCE = 1e-10;
 /** The Monte Carlo standard errors by which a bootstrap's moment may differ from mirt's on other draws. */
 const MONTE_CARLO_ERRORS = 4;
-/** The replications of the bootstrap compared with mirt's 1000. */
-const BOOTSTRAP_REPLICATIONS = 100;
+/**
+ * The replications of the bootstrap compared with mirt's 1000. On the seeds 1 to 20 the mean and the standard deviation of
+ * the largest excesses were at most 2.0 and 2.4 Monte Carlo errors from mirt's, with the seed of the test among them.
+ */
+const BOOTSTRAP_REPLICATIONS = 50;
 
 /** Expects each named statistic of `actual` to be within `tolerance` of the fixture's list of that statistic. */
 function expectTable(

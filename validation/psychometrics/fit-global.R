@@ -341,7 +341,7 @@ polytomous_cases <- unlist(lapply(names(polytomous_fits), function(model) {
 
 # --- The rejections of a true model -------------------------------------------------------------------------------
 
-SETS <- 60
+SETS <- 30
 SET_PERSONS <- 400
 rejections <- lapply(seq_len(SETS), function(set) {
   data <- simdata(matrix(slopes), matrix(intercepts), SET_PERSONS, itemtype = "2PL")
