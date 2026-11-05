@@ -42,10 +42,16 @@ export function answerSets(log: EventLog, subject: string): AnswerSets {
   const firsts = new Map<string, Map<number, number>>();
   for (const event of log) {
     if (!isObserved(event)) continue;
-    const item = items.get(event.item) ?? items.size;
-    items.set(event.item, item);
-    const answers = firsts.get(event.learner) ?? new Map<number, number>();
-    firsts.set(event.learner, answers);
+    let item = items.get(event.item);
+    if (item === undefined) {
+      item = items.size;
+      items.set(event.item, item);
+    }
+    let answers = firsts.get(event.learner);
+    if (answers === undefined) {
+      answers = new Map<number, number>();
+      firsts.set(event.learner, answers);
+    }
     if (answers.has(item)) continue;
     if (event.outcome !== 0 && event.outcome !== 1) {
       throw new DataError(
@@ -55,11 +61,19 @@ export function answerSets(log: EventLog, subject: string): AnswerSets {
     answers.set(item, event.outcome);
   }
   checkElementCount(items.size, subject, "items");
-  const learners = Array.from(firsts.values(), (answers) => ({
-    items: Int32Array.from(answers.keys()),
-    outcomes: Uint8Array.from(answers.values()),
-  }));
-  return { items: [...items.keys()], learners };
+  return { items: [...items.keys()], learners: Array.from(firsts.values(), answersOf) };
+}
+
+/** Lays out one learner's answers, an item and its outcome at a time, as the typed arrays' `from` of an iterator is slow. */
+function answersOf(answered: ReadonlyMap<number, number>): Answers {
+  const items = new Int32Array(answered.size);
+  const outcomes = new Uint8Array(answered.size);
+  let k = 0;
+  for (const [item, outcome] of answered) {
+    items[k] = item;
+    outcomes[k++] = outcome;
+  }
+  return { items, outcomes };
 }
 
 /**
@@ -76,13 +90,12 @@ export function answerSets(log: EventLog, subject: string): AnswerSets {
 export function responsePatterns(log: EventLog, subject: string): ResponsePatterns {
   const { items, learners } = answerSets(log, subject);
   const m = items.length;
-  const learnerIds = learnerOrder(log);
   const patterns = learners.map((answers, learner) => {
     if (answers.items.length < m) {
       const answered = new Set(answers.items);
       const missing = items.find((_, item) => !answered.has(item));
       throw new DataError(
-        `${subject} needs every learner to answer every item; "${learnerIds[learner]}" has no answer to "${missing}".`,
+        `${subject} needs every learner to answer every item; "${learnerOrder(log)[learner]}" has no answer to "${missing}".`,
       );
     }
     const pattern = new Array<number>(m).fill(0);
