@@ -83,7 +83,7 @@ export default defineConfig({
       // One floor for each package: its branches over the package, and its statements, functions and lines over each
       // module on its own, so that a gap in the tests of a module fails its own floor and no other. CI checks core and knowledge tracing in the job of their project on Node.js 22, with the
       // files of that package alone, and rules.yml checks psychometrics each week and before a release. Psychometrics'
-      // floor is its measure on Node.js 22 rounded down; under coverage its tests take about 36 minutes, 4.6 times as long.
+      // floor is its measure on Node.js 22 rounded down; under coverage its tests take four times as long, about 7 minutes.
       thresholds: {
         ...packageFloors("core", { statements: 94, branches: 74, functions: 96, lines: 95 }),
         ...packageFloors("knowledge-tracing", { statements: 98, branches: 82, functions: 99, lines: 99 }),

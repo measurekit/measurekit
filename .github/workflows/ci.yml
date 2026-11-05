@@ -16,8 +16,7 @@ concurrency:
 
 # Every job has a `timeout-minutes` of about three times its last green run, and at least 10 for a job that downloads, so that a
 # hung job stops and does not run to the 360 minutes of GitHub, which the Actions minutes of the month cannot bear. A benchmark
-# ends within half its timeout (STANDARDS.md section 7). `runtimes` has not run on GitHub yet, so its limit is a guess to lower
-# after its first green run.
+# ends within half its timeout (STANDARDS.md section 7).
 jobs:
   # What a push or a pull request changed since the last commit of main whose run passed, or since the base of a pull request,
   # and so which jobs have something to check. A job that is skipped passes a required check. When nothing can be compared, for
@@ -199,12 +198,12 @@ jobs:
         run: pnpm changeset status --since=origin/main
 
   # The tests of each package, of the scripts that check the repository and of the examples that the change reaches, on each
-  # supported Node.js major. Psychometrics' take 27 minutes, the other projects 3 at most.
+  # supported Node.js major. Each project's take 3 minutes at most.
   test:
     needs: changes
     if: needs.changes.outputs.projects != '[]'
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ matrix.project == 'psychometrics' && 80 || 10 }}
+    timeout-minutes: 10
     strategy:
       matrix:
         project: ${{ fromJSON(needs.changes.outputs.projects) }}
@@ -220,18 +219,18 @@ jobs:
       - if: matrix.node != 22 || !contains(fromJSON('["core", "knowledge-tracing"]'), matrix.project)
         run: pnpm test --project ${{ matrix.project }}
       # On the oldest supported Node.js a package's tests also check its coverage floor (vitest.config.ts), on its files
-      # alone. Psychometrics' floor takes 36 minutes, so rules.yml checks it each week and at a release: per-push CI stays
-      # short, as Actions minutes are limited.
+      # alone. Psychometrics' tests take four times as long under coverage, about 10 minutes, so rules.yml checks its floor
+      # each week and at a release: per-push CI stays short, as Actions minutes are limited.
       - if: matrix.node == 22 && contains(fromJSON('["core", "knowledge-tracing"]'), matrix.project)
         run: pnpm test --project ${{ matrix.project }} --coverage --coverage.include='packages/${{ matrix.project }}/src/**'
 
   # The benchmarks of the packages, on seeded data. The job fails when the fastest sample of a benchmark is above its budget
-  # (docs/<package>/performance.md). Its last green run took 13 minutes, within a third of its limit.
+  # (docs/<package>/performance.md). Its last green run took 10 minutes, a third of its limit.
   bench:
     needs: changes
     if: needs.changes.outputs.bench == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -247,7 +246,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.runtimes == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6

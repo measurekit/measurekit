@@ -109,7 +109,7 @@ Use these words with these meanings in code, comments and docs.
 | `pnpm check:duplication` | jscpd over `packages/*/src`; fails on a repeat that [the table below](#repeats-left-on-purpose) does not list                                                                                                                                                                                                                                                                                                                                        |
 | `pnpm typecheck`         | `tsc` over the sources, tests, examples and scripts                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `pnpm test`              | Vitest, a project for each package, the scripts and the examples; `--project psychometrics` runs one                                                                                                                                                                                                                                                                                                                                                 |
-| `pnpm test:coverage`     | The tests of each package, held to the coverage floor of `vitest.config.ts`: branches over the package, statements, functions and lines over each module; psychometrics' take 36 minutes                                                                                                                                                                                                                                                             |
+| `pnpm test:coverage`     | The tests of each package, held to the coverage floor of `vitest.config.ts`: branches over the package, statements, functions and lines over each module; psychometrics' take about 7 minutes                                                                                                                                                                                                                                                        |
 | `pnpm bench`             | Builds, then the benchmarks of every package, one package at a time, against the budgets of `test/budgets.ts`                                                                                                                                                                                                                                                                                                                                        |
 | `pnpm knip`              | Unused files, exports and dependencies                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `pnpm build`             | Every package, from a clean `dist/`                                                                                                                                                                                                                                                                                                                                                                                                                  |
@@ -133,8 +133,8 @@ to the same ref cancels the run in progress, and `changes` compares with the las
 not check is checked by the newer one. Every job has a `timeout-minutes` of about three times its last green run.
 
 Per-push CI stays short, as Actions minutes are limited: `rules.yml` runs the slow checks each Monday, on `workflow_dispatch`
-and from `release.yml` before it publishes: `rules`, and `coverage`, the floor of psychometrics, whose tests take 36 minutes
-under coverage. A builder runs the rules of its package before a merge (`pnpm check:rules packages/<package>`).
+and from `release.yml` before it publishes: `rules`, and `coverage`, the floor of psychometrics, whose tests take about 10
+minutes on a runner under coverage, four times as long as without. A builder runs the rules of its package before a merge (`pnpm check:rules packages/<package>`).
 
 ## Releases
 
@@ -430,8 +430,8 @@ listed here with its reason. A file is written `<package>/<path below src>`, and
   record, such as Elo, has its equations written out in R and a seeded recovery study, with thresholds fixed before the
   simulation is first run.
 - One test file for each source folder, named after it, and `model.test.ts` for knowledge tracing's `model.ts`. The
-  bifactor models of `multidimensional/`, whose tests take minutes, have `bifactor.test.ts` and `bifactor.bench.ts`, so
-  that they run beside the folder's other tests. `test/assertions.ts` holds the shared assertions, such as
+  bifactor models of `multidimensional/` have `bifactor.test.ts` and `bifactor.bench.ts`, so that their tests run beside
+  the folder's other tests, which take about a minute. `test/assertions.ts` holds the shared assertions, such as
   `expectClose`, which compares with a reference value; `test/logs.ts` of knowledge tracing holds `online`, which runs a
   log through any model as an app would; psychometrics' `test/arbitraries.ts` holds the fast-check generators of items
   and `test/fixture-items.ts` reads the items of the fixtures. A file's `describe` blocks follow the order of the folder's source files or the

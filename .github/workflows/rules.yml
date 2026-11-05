@@ -2,7 +2,7 @@ name: Rules
 
 # The slow checks, which do not run on a push, as per-push CI stays short while Actions minutes are limited. `rules`
 # removes each rule that scripts/check-rules.ts lists from a copy of the code, and fails when its test still passes;
-# `coverage` runs the tests of psychometrics under coverage, 36 minutes, and fails below its floor in vitest.config.ts.
+# `coverage` runs the tests of psychometrics under coverage, about 10 minutes, and fails below its floor in vitest.config.ts.
 # A builder runs the rules of its package before a merge, with `pnpm check:rules packages/<package>`, and this workflow
 # runs both each Monday, on "Run workflow", and from release.yml, which publishes only when both pass.
 on:
@@ -36,9 +36,9 @@ jobs:
 
   coverage:
     runs-on: ubuntu-latest
-    # Its tests take 27 minutes on a runner without coverage and about 4.6 times as long with it, and no run has finished yet:
-    # lower this to three times the first green run.
-    timeout-minutes: 240
+    # Its tests take 2.5 minutes on a runner without coverage and four times as long with it, as on a developer's machine. No
+    # run has finished yet: this is three times the 10 minutes expected, to set to three times the first green run.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
