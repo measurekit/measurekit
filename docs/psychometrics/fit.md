@@ -413,11 +413,8 @@ The population is the calibration's group, with its nodes and weights. Δ has on
 | An anchor's, and one `fixedParameters` holds                        | None                                                  |
 | The mean and SD of an estimated normal group                        | Two, from the derivatives of the weights of the nodes |
 
-The estimated parameters must equal those in the calibration's AIC. A `Calibration` does not record its anchors or its
-held parameters, so give the anchors' ids in `fixed` and the held parameters in `fixedParameters`. The check catches
-lists of the wrong size; lists of the right size that swap anchors or held parameters for estimated ones pass and give
-a wrong Δ. The moments are unweighted: each person counts once, also
-for a calibration with [person weights](irt.md#person-weights), whose weights they do not read.
+The moments are unweighted: each person counts once, also for a calibration with [person weights](irt.md#person-weights),
+whose weights they do not read.
 
 Where the first- and second-order margins do not identify every parameter, Δ's rank is below its columns. The statistic
 then uses the whole complement of Δ's span, a column that adds nothing to it is left out, and the degrees of freedom
@@ -571,7 +568,7 @@ Invalid input throws `DataError` naming the value found.
 | Tables of local dependence of more than 2^24 cells        | Test fewer items, or group the categories of items of many                              |
 | `"m2"` with a polytomous item                             | Use `"m2-star"` or `"c2"`                                                               |
 | A nominal item                                            | Its categories have no order for the mean products to read                              |
-| Parameters that differ from the calibration's AIC         | Give the anchors' ids in `fixed`                                                        |
+| An item of the calibration without `estimated`            | Give the calibration as `calibrate` returns it                                          |
 | Fewer than two persons who answered every item            | Calibrate and test the persons with complete responses                                  |
 | A split into one group                                    | Give labels of at least two groups; `raschWaldTest` takes exactly two                   |
 | Fewer than two items left in a Rasch test                 | Split into fewer groups, or test more persons                                           |
