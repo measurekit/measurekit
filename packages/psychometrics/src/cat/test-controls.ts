@@ -1,5 +1,3 @@
-import type { WithinTestlet } from "./testlets.js";
-
 /** The options of an adaptive test that restrict which items it may administer, the same for every kind of test. */
 export interface TestControlOptions {
   /**
@@ -17,11 +15,12 @@ export interface TestControlOptions {
    */
   readonly enemies?: readonly (readonly string[])[];
   /**
-   * How the items of a testlet are ordered once the testlet is selected: `"in-order"`, in pool order; `"adaptive"`,
-   * each next item the one the selection rule scores highest among the testlet's remaining items. It applies to pool
-   * items that have a `testlet`.
+   * How the items of a testlet are ordered once the testlet is selected: `"in-order"`, in pool order, as a stimulus is
+   * shown with its questions in the order they are listed; `"adaptive"`, each next item the one the selection rule
+   * scores highest among the testlet's remaining items at the current estimate. It applies to pool items that have a
+   * `testlet`.
    *
    * @defaultValue `"in-order"`
    */
-  readonly withinTestlet?: WithinTestlet;
+  readonly withinTestlet?: "in-order" | "adaptive";
 }

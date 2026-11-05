@@ -7,7 +7,7 @@ import {
   buildResponseMatrix,
   type CalibratedItem,
   type Calibration,
-  type ConditionalModel,
+  type ConditionalCalibrationOptions,
   calibrate,
   correctedPersonFit,
   createRandom,
@@ -1144,7 +1144,7 @@ describe("limitedInformationFit", () => {
 
 describe("Rasch tests", () => {
   /** The model and split of a fixture case, read from its JSON. */
-  function modelOf(name: string): ConditionalModel {
+  function modelOf(name: string): NonNullable<ConditionalCalibrationOptions["model"]> {
     if (name === "rasch" || name === "partial-credit" || name === "rating-scale") return name;
     throw new Error(`Unknown model ${name}.`);
   }

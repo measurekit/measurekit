@@ -3,17 +3,14 @@ import { gradientProjection, type RotationCriterion } from "./gradient-projectio
 import { invert } from "./linear-algebra.js";
 import { multiply, transpose } from "./matrix.js";
 
-/** The rotations: `"varimax"` is orthogonal, `"oblimin"` oblique. */
-export type RotationMethod = "varimax" | "oblimin";
-
 /** Options of a rotation of loadings. */
 export interface RotationOptions {
   /**
-   * The rotation criterion.
+   * The rotation criterion: `"varimax"`, orthogonal, or `"oblimin"`, oblique.
    *
    * @defaultValue `"oblimin"`
    */
-  readonly method?: RotationMethod;
+  readonly method?: "varimax" | "oblimin";
   /**
    * Whether to scale each item's loadings to unit length before rotating and back after (Kaiser normalization).
    *
@@ -74,7 +71,7 @@ export interface RotatedMatrix {
   readonly iterations: number;
 }
 
-const METHODS: readonly RotationMethod[] = ["varimax", "oblimin"];
+const METHODS: readonly NonNullable<RotationOptions["method"]>[] = ["varimax", "oblimin"];
 const DEFAULT_TOLERANCE = 1e-10;
 const DEFAULT_MAX_ITERATIONS = 1000;
 

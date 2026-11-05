@@ -2,13 +2,10 @@ import { checkChoice, DataError, describe, isNonEmptyString } from "@measurekit/
 import type { ContentBalancing } from "./content-balancing.js";
 import type { PoolControls } from "./items.js";
 import type { AdaptiveTestContext, ItemSelectionRule } from "./selection.js";
+import type { TestControlOptions } from "./test-controls.js";
 
-/**
- * How the items of a testlet are ordered once the testlet is selected: `"in-order"`, in pool order, as a stimulus is
- * shown with its questions in the order they are listed; `"adaptive"`, each next item the one the selection rule scores
- * highest among the testlet's remaining items at the current estimate.
- */
-export type WithinTestlet = "in-order" | "adaptive";
+/** How the items of a testlet are ordered once the testlet is selected. */
+type WithinTestlet = NonNullable<TestControlOptions["withinTestlet"]>;
 
 const WITHIN_TESTLET: readonly WithinTestlet[] = ["in-order", "adaptive"];
 

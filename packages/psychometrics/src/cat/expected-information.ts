@@ -9,11 +9,6 @@ import {
 } from "../irt/internal.js";
 import type { ItemSelectionRule } from "./selection.js";
 
-/** The information of an item at an estimate: observed, of the response given, or Fisher's. */
-export type ExpectedInformationKind = "observed" | "fisher";
-
-const KINDS: readonly ExpectedInformationKind[] = ["observed", "fisher"];
-
 /** Options of {@link expectedInformation}. */
 export interface ExpectedInformationOptions {
   /**
@@ -29,8 +24,10 @@ export interface ExpectedInformationOptions {
    *
    * @defaultValue `"observed"`, as catR's `infoType`
    */
-  readonly information?: ExpectedInformationKind;
+  readonly information?: "observed" | "fisher";
 }
+
+const KINDS: readonly NonNullable<ExpectedInformationOptions["information"]>[] = ["observed", "fisher"];
 
 const EXPECTED_INFORMATION_OPTIONS: FieldNames<ExpectedInformationOptions> = { estimator: true, information: true };
 

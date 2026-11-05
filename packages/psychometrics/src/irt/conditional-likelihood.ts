@@ -24,9 +24,6 @@ import {
   type SymmetricFunctions,
 } from "./symmetric-functions.js";
 
-/** A model of the Rasch family that conditional maximum likelihood estimates. */
-export type ConditionalModel = "rasch" | "partial-credit" | "rating-scale";
-
 /** Options of {@link conditionalMaximumLikelihood}. */
 export interface ConditionalCalibrationOptions {
   /**
@@ -35,7 +32,7 @@ export interface ConditionalCalibrationOptions {
    *
    * @defaultValue `"rasch"` when every response is 0 or 1, otherwise `"partial-credit"`
    */
-  readonly model?: ConditionalModel;
+  readonly model?: "rasch" | "partial-credit" | "rating-scale";
   /**
    * Newton's method has converged when no parameter changes by more than this.
    *
@@ -78,6 +75,8 @@ export interface ConditionalCalibration {
   /** Newton steps taken. */
   readonly iterations: number;
 }
+
+type ConditionalModel = NonNullable<ConditionalCalibrationOptions["model"]>;
 
 const MODELS: readonly ConditionalModel[] = ["rasch", "partial-credit", "rating-scale"];
 const DEFAULT_TOLERANCE = 1e-6;

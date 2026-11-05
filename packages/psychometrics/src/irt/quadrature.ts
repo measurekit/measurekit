@@ -1,9 +1,6 @@
 import { checkChoice, checkFields, checkIntegerFrom, checkRecord, DataError, type FieldNames } from "@measurekit/core";
 import { gaussHermite, type Quadrature, rectangular } from "../math/internal.js";
 
-/** How to place quadrature nodes over theta. */
-export type QuadratureMethod = "rectangular" | "gauss-hermite";
-
 /** The quadrature rule that integrates over theta, in calibration and EAP estimation. */
 export interface QuadratureOptions {
   /**
@@ -12,7 +9,7 @@ export interface QuadratureOptions {
    *
    * @defaultValue `"rectangular"`
    */
-  readonly method?: QuadratureMethod;
+  readonly method?: "rectangular" | "gauss-hermite";
   /**
    * The number of nodes, from 2 to 1,000.
    *
@@ -23,7 +20,7 @@ export interface QuadratureOptions {
 
 const QUADRATURE_OPTIONS: FieldNames<QuadratureOptions> = { method: true, points: true };
 
-const METHODS: readonly QuadratureMethod[] = ["rectangular", "gauss-hermite"];
+const METHODS: readonly NonNullable<QuadratureOptions["method"]>[] = ["rectangular", "gauss-hermite"];
 
 /**
  * The most nodes of a rule: a spacing of 0.012 between -6 and 6, far finer than any integral over theta needs, and a size

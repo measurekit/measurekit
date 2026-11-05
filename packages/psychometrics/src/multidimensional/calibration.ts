@@ -2,7 +2,6 @@ import { checkChoice, checkOptions, checkSeed, checkStopping, DataError } from "
 import type { ResponseMatrix, ResponseRecords } from "../data/internal.js";
 import { type CompressedResponses, compressResponses, respondentsOf, STANDARD_ERROR_METHODS } from "../irt/internal.js";
 import {
-  type CalibrationMethod,
   MULTIDIMENSIONAL_CALIBRATION_OPTIONS,
   type MultidimensionalCalibrationOptions,
 } from "./calibration-options.js";
@@ -88,6 +87,8 @@ export const EM_MAX_ITERATIONS = 500;
 /** The defaults of MH-RM: mirt's `TOL` and `NCYCLES`. */
 const MHRM_TOLERANCE = 1e-3;
 const MHRM_MAX_ITERATIONS = 2000;
+type CalibrationMethod = NonNullable<MultidimensionalCalibrationOptions<unknown>["method"]>;
+
 const METHODS: readonly CalibrationMethod[] = ["em", "mhrm"];
 
 /**

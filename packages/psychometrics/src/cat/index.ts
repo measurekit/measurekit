@@ -48,7 +48,6 @@ export {
 export type { AdaptiveTest, AdaptiveTestState } from "./engine.js";
 export { untilMixed } from "./estimator.js";
 export {
-  type ExpectedInformationKind,
   type ExpectedInformationOptions,
   expectedInformation,
 } from "./expected-information.js";
@@ -77,7 +76,6 @@ export {
   type MultidimensionalAdaptiveTestOptions,
 } from "./multidimensional-test.js";
 export {
-  type MultistageCutsMethod,
   type MultistageCutsOptions,
   multistageCuts,
 } from "./multistage-cuts.js";
@@ -118,7 +116,6 @@ export {
   testLength,
 } from "./stopping.js";
 export type { TestControlOptions } from "./test-controls.js";
-export type { WithinTestlet } from "./testlets.js";
 export {
   discriminationIndex,
   expectedPosteriorVariance,

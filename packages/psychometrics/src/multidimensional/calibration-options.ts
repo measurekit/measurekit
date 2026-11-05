@@ -2,9 +2,6 @@ import type { FieldNames } from "@measurekit/core";
 import type { FixedParameters, ParameterPrior, StandardErrorMethod } from "../irt/internal.js";
 import type { LoadingPattern, MultidimensionalModel } from "./model.js";
 
-/** How a calibration estimates: `"em"`, by quadrature over a grid, or `"mhrm"`, by Metropolis-Hastings Robbins-Monro. */
-export type CalibrationMethod = "em" | "mhrm";
-
 /** Options of {@link calibrateMultidimensional}. */
 export interface MultidimensionalCalibrationOptions<TParameters> {
   /**
@@ -19,7 +16,7 @@ export interface MultidimensionalCalibrationOptions<TParameters> {
    *
    * @defaultValue `"em"` up to 3 dimensions, `"mhrm"` above
    */
-  readonly method?: CalibrationMethod;
+  readonly method?: "em" | "mhrm";
   /**
    * The number of dimensions of an exploratory model, a positive integer, at most 3 for EM: every item loads on every
    * dimension. The slopes of the first D - 1 items on later dimensions are fixed at 0 (item j loads on the first j

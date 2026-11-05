@@ -28,21 +28,16 @@ import {
 /** The stages of a panel, as {@link createMultistageTest} takes them. */
 type Stages = MultistageTestOptions["stages"];
 
-/**
- * How {@link multistageCuts} derives the cuts between the modules of a stage: `maximum-information`, at the theta where
- * the information of two adjacent modules is equal; `routing-shares`, at the thetas that send given shares of a
- * population to the modules.
- */
-export type MultistageCutsMethod = "maximum-information" | "routing-shares";
-
 /** Options of {@link multistageCuts}. */
 export interface MultistageCutsOptions {
   /**
-   * How the cuts between the modules of a stage are derived.
+   * How the cuts between the modules of a stage are derived: `"maximum-information"`, at the theta where the
+   * information of two adjacent modules is equal; `"routing-shares"`, at the thetas that send given shares of a
+   * population to the modules.
    *
    * @defaultValue `"maximum-information"`
    */
-  readonly method?: MultistageCutsMethod;
+  readonly method?: "maximum-information" | "routing-shares";
   /**
    * The scale of the cuts: `theta`, or `number-correct`, the total score of the responses so far, as
    * {@link MultistageTestOptions.routing} names them.
@@ -82,13 +77,12 @@ const MULTISTAGE_CUTS_OPTIONS: FieldNames<MultistageCutsOptions> = {
   shares: true,
 };
 
-const METHODS: readonly MultistageCutsMethod[] = ["maximum-information", "routing-shares"];
+type CutsMethod = NonNullable<MultistageCutsOptions["method"]>;
+
+const METHODS: readonly CutsMethod[] = ["maximum-information", "routing-shares"];
 
 /** The method that reads each option that only one method reads. */
-const OPTIONS_OF_METHOD: readonly (readonly [
-  option: "range" | "population" | "shares",
-  method: MultistageCutsMethod,
-])[] = [
+const OPTIONS_OF_METHOD: readonly (readonly [option: "range" | "population" | "shares", method: CutsMethod])[] = [
   ["range", "maximum-information"],
   ["population", "routing-shares"],
   ["shares", "routing-shares"],

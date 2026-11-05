@@ -7,7 +7,7 @@
  * @module @measurekit/psychometrics/multidimensional
  */
 
-export type { RotationMethod, RotationOptions } from "../math/internal.js";
+export type { RotationOptions } from "../math/internal.js";
 export { type BifactorOptions, calibrateBifactor } from "./bifactor.js";
 export {
   type CalibratedMultidimensionalItem,
@@ -15,7 +15,7 @@ export {
   type MultidimensionalCalibration,
   type MultidimensionalGroup,
 } from "./calibration.js";
-export type { CalibrationMethod, MultidimensionalCalibrationOptions } from "./calibration-options.js";
+export type { MultidimensionalCalibrationOptions } from "./calibration-options.js";
 export { multidimensionalDifficulty, multidimensionalDiscrimination } from "./direction.js";
 export { type MultidimensionalGradedParameters, multidimensionalGradedResponse } from "./graded.js";
 export { multidimensionalInformation } from "./information.js";

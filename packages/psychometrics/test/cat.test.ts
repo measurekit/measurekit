@@ -18,6 +18,7 @@ import {
   type AbilityEstimator,
   type AdaptiveTest,
   type AdaptiveTestContext,
+  type AdaptiveTestOptions,
   type AdaptiveTestState,
   type AssembledForm,
   allOf,
@@ -106,9 +107,11 @@ import {
   twoParameterLogistic,
   uniformDistribution,
   untilMixed,
-  type WithinTestlet,
   weightedLikelihoodEstimate,
 } from "../src/index.js";
+
+type WithinTestlet = NonNullable<AdaptiveTestOptions["withinTestlet"]>;
+
 import { arbitraryItem } from "./arbitraries.js";
 import { defined, expectClose } from "./assertions.js";
 import { item2pl, MODELS } from "./fixture-items.js";

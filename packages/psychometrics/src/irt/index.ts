@@ -34,7 +34,6 @@ export type { CalibrationOptions, FixedParameters, StandardErrorMethod } from ".
 export {
   type ConditionalCalibration,
   type ConditionalCalibrationOptions,
-  type ConditionalModel,
   conditionalMaximumLikelihood,
 } from "./conditional-likelihood.js";
 export { gradedResponse } from "./graded.js";
@@ -58,7 +57,7 @@ export { nominalResponse } from "./nominal.js";
 export type { ParameterCovariance } from "./parameter-covariance.js";
 export { generalizedPartialCredit, partialCredit } from "./partial-credit.js";
 export { betaPrior, logNormalPrior, normalPrior, type ParameterPrior } from "./prior.js";
-export type { QuadratureMethod, QuadratureOptions } from "./quadrature.js";
+export type { QuadratureOptions } from "./quadrature.js";
 export { type RatingScaleParameters, ratingScale } from "./rating-scale.js";
 export { empiricalReliability, marginalReliability } from "./reliability.js";
 export {
