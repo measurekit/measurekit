@@ -23,7 +23,6 @@ import {
   entry,
   isObserved,
   parametersOf,
-  type Steps,
 } from "../data/internal.js";
 import type { LearnerModel, ModelFit } from "../model.js";
 import { estimate } from "./estimation.js";
@@ -327,12 +326,6 @@ function create(options: LogisticOptions): LogisticModel {
     return sigmoid(theta + total);
   };
 
-  const steps: Steps<LogisticState> = {
-    initialState: (learner) => ({ learner, skills: {} }),
-    predict: probability,
-    update: (state, event) => advanceState(state, event, needs),
-  };
-
   const model: LogisticModel = {
     parameters,
     fit(log) {
@@ -363,7 +356,7 @@ function create(options: LogisticOptions): LogisticModel {
     },
     initialState(learner) {
       checkLearnerId(learner);
-      return steps.initialState(learner);
+      return { learner, skills: {} };
     },
     update(state, event) {
       checkEvent(event, "The event");
