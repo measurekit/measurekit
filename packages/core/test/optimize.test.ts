@@ -42,6 +42,23 @@ describe("bfgs", () => {
     expect(loose.iterations).toBeLessThan(tight.iterations);
   });
 
+  it("stops where rounding hides any further decrease, below a tolerance that rounding does not let it reach", () => {
+    // Minimal where e^x + y / 2 = 3 and sinh(y - 0.7) + x / 2 = 0, a point no double holds exactly.
+    const smooth: GradientFunction = (x, gradient) => {
+      const [a = 0, b = 0] = x;
+      gradient[0] = Math.exp(a) - 3 + 0.5 * b;
+      gradient[1] = Math.sinh(b - 0.7) + 0.5 * a;
+      return Math.exp(a) - 3 * a + Math.cosh(b - 0.7) + 0.5 * a * b;
+    };
+    const result = bfgs(smooth, [2, -1], { tolerance: Number.MIN_VALUE });
+    expect(result.converged).toBe(true);
+    expect(result.iterations).toBeLessThan(100);
+    const gradient = new Float64Array(2);
+    smooth(result.x as Float64Array, gradient);
+    // A step of a gradient g decreases the value by about g², which the rounding of a value near 1 hides below g = 1e-8.
+    expect(Math.max(...gradient.map(Math.abs))).toBeLessThan(1e-6);
+  });
+
   it("does not report convergence at a point where the value or the gradient is not finite", () => {
     const undefinedAtStart: GradientFunction = (_, gradient) => {
       gradient[0] = Number.NaN;

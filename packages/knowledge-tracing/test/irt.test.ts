@@ -441,6 +441,7 @@ describe("IRT edge cases", () => {
     expect(build({ a: 1, b: 0, c: "0.2" })).toThrow('Item "x" needs 0 ≤ c < d ≤ 1, found c = "0.2" and d = 1.');
     expect(build({ a: 1, b: 0, d: null })).toThrow('Item "x" needs 0 ≤ c < d ≤ 1, found c = 0 and d = null.');
     expect(build({ a: Number.NaN, b: 0 })).toThrow('Item "x" needs a, a finite number, found NaN.');
+    expect(build({ a: 1, b: "0" })).toThrow('Item "x" needs b, a finite number, found "0".');
     expect(build({ model: "graded", a: 1, b: [1, 0] })).toThrow(
       'Item "x" is graded, so needs thresholds b strictly increasing when a > 0 and decreasing when a < 0, found a = 1, b = 1, 0.',
     );
@@ -524,6 +525,9 @@ describe("IRT edge cases", () => {
     expect(model.update(state, { ...event, item: "g1", outcome: 1 / 3 }).learner).toBe("ana");
     expect(() => model.predict(state, { ...event, learner: "budi" })).toThrow('given the state of learner "ana"');
     expect(() => model.predict({ ...state, slope: [] }, event)).toThrow("needs slope, an array of 61 finite numbers");
+    expect(() => model.predict({ ...state, slope: state.logDensity.map(() => Number.NaN) }, event)).toThrow(
+      "needs slope, an array of 61 finite numbers",
+    );
     expect(() => model.predict({ ...state, logDensity: state.logDensity.map((value) => value + 800) }, event)).toThrow(
       "needs logDensity less its maximum, so that its largest value is 0",
     );

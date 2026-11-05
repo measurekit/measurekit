@@ -132,6 +132,15 @@ describe("normalQuantile", () => {
     expect(normalQuantile(Number.NaN)).toBeNaN();
   });
 
+  it("inverts the normal distribution function in the centre, the near tails and the far tails", () => {
+    // AS 241 switches its rational function at |p - 1/2| = 0.425 and at a tail distance sqrt(-ln p) of 5, p near 1.4e-11.
+    for (const p of [1e-300, 1e-100, 1e-20, 1e-12, 1e-6, 0.01, 0.2, 0.6, 0.99]) {
+      const tail = Math.min(p, 1 - p);
+      const x = normalQuantile(p);
+      expect(Math.abs((x < 0 ? normalCdf(x) : normalCdf(-x)) - tail) / tail, `p = ${p}`).toBeLessThan(1e-12);
+    }
+  });
+
   it("is 0 at one half and odd around it", () => {
     expect(normalQuantile(0.5)).toBe(0);
     for (const p of [0.001, 0.025, 0.1, 0.3]) expect(normalQuantile(1 - p)).toBeCloseTo(-normalQuantile(p), 12);

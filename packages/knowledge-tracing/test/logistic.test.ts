@@ -1675,6 +1675,19 @@ describe("logistic options of terms from JavaScript", () => {
     expect(model.predict(stored, { ...attempt, time: 5 })).toBeGreaterThan(0);
   });
 
+  it("rejects a stored history whose time, outcome of the last attempt, first time, times or outcomes are malformed", () => {
+    const model = logistic({ features: [{ recencySuccess: 1 }, { base: 1 }, { windowOpportunities: 10 }] });
+    const attempt = { learner: "ana", item: "q", skills: ["s"], time: 9 };
+    const good = { successes: 1, failures: 0, last: 1, decayed: {}, previous: 1, first: 1, times: [1], outcomes: [1] };
+    const predict = (history: object) => () =>
+      model.predict(JSON.parse(JSON.stringify({ learner: "ana", skills: { s: { ...good, ...history } } })), attempt);
+    expect(predict({ last: "1" })).toThrow('skill "s", needs last, the time of the last attempt, found "1".');
+    expect(predict({ previous: 2 })).toThrow('skill "s", needs previous from 0 to 1, found 2.');
+    expect(predict({ first: "1" })).toThrow('skill "s", needs first to be a finite number, found "1".');
+    expect(predict({ times: [1, 2] })).toThrow('skill "s", needs times of finite numbers and one outcome for each.');
+    expect(predict({ outcomes: [2] })).toThrow('skill "s", needs outcomes from 0 to 1.');
+  });
+
   it("checks the histories and exposures of the skills and item a call reads, so that its cost does not grow with the others", () => {
     const model = logistic({
       features: ["successes", { feature: "successes", over: "item" }, { decayedExposures: 0.5 }],
