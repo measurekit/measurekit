@@ -738,7 +738,9 @@ Several results of the reference packages are not references:
   `calibrateCdm` maximizes each M-step exactly and runs to `tolerance: 1e-10` for the comparison, where its
   log-likelihood is at least GDINA's. A MAP between posteriors within 1e-4 of the best counts as a tie in these
   fixtures, as GDINA's precision moves it. Persons and accuracy are compared at GDINA's own estimates, to which a
-  posterior is sensitive. The G-DINA, DINA and DINO coefficients are compared in the per-item mix.
+  posterior is sensitive. The G-DINA, DINA and DINO coefficients are compared in the per-item mix. The tests fit
+  `sim30GDINA`; ECPE's 2,922 persons take EM 700 to 1,100 cycles a model, so `validation/psychometrics/cdm-additive-ecpe.ts`
+  fits them within the same tolerances (1.9e-6 found, and a log-likelihood at least GDINA's).
 - **The additive M-step on fixed counts.** No solver reaches 1e-8 on boundary solutions: `constrOptim` fails on them,
   and the candidates of `slsqp` and the augmented Lagrangian stop short. The reference is Newton's method on the
   face of the bounds that a candidate meets, kept only when the KKT conditions hold: the objective is convex, so a

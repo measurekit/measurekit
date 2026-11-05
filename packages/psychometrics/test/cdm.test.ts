@@ -481,7 +481,9 @@ describe("calibrateCdm", () => {
     }
   }
 
-  for (const reference of additiveFixture.cases) {
+  // ECPE's 2,922 persons take EM 700 to 1,100 cycles, 9 to 13 s a model under coverage:
+  // validation/psychometrics/cdm-additive-ecpe.ts compares them with GDINA within the same tolerances.
+  for (const reference of additiveFixture.cases.filter(({ name }) => name !== "ECPE")) {
     const matrix = buildResponseMatrix(reference.responses, { itemIds: reference.itemIds });
     for (const fit of reference.fits) {
       it(`matches GDINA's ${fitName(fit.model)} models on ${reference.name} data`, () => {

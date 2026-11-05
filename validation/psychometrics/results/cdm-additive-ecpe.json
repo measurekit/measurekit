@@ -1,0 +1,80 @@
+{
+  "source": "calibrateCdm of GDINA's realdata_ECPE, 2,922 persons, 28 items and 3 attributes, to a tolerance of 1e-10, against GDINA's A-CDM, LLM, R-RUM and a per-item mix of all six models.",
+  "sizes": {
+    "persons": 2922,
+    "items": 28,
+    "attributes": 3
+  },
+  "tolerances": {
+    "parameters": 0.00001,
+    "logLikelihood": 1e-8,
+    "criteria": 0.000001
+  },
+  "fits": [
+    {
+      "model": "acdm",
+      "parameters": 4.0299555259526443e-7,
+      "logLikelihoodAboveGdina": 4.220055416226387e-10,
+      "criteria": 0,
+      "within": true,
+      "iterations": 718,
+      "seconds": 1.4
+    },
+    {
+      "model": "llm",
+      "parameters": 0.000001887299184488711,
+      "logLikelihoodAboveGdina": 4.2928149923682213e-10,
+      "criteria": 0,
+      "within": true,
+      "iterations": 694,
+      "seconds": 1.4
+    },
+    {
+      "model": "rrum",
+      "parameters": 0.000001367261072360293,
+      "logLikelihoodAboveGdina": 2.546585164964199e-10,
+      "criteria": 0,
+      "within": true,
+      "iterations": 853,
+      "seconds": 1.8
+    },
+    {
+      "model": [
+        "acdm",
+        "llm",
+        "rrum",
+        "gdina",
+        "dina",
+        "dino",
+        "acdm",
+        "llm",
+        "rrum",
+        "gdina",
+        "dina",
+        "dino",
+        "acdm",
+        "llm",
+        "rrum",
+        "gdina",
+        "dina",
+        "dino",
+        "acdm",
+        "llm",
+        "rrum",
+        "gdina",
+        "dina",
+        "dino",
+        "acdm",
+        "llm",
+        "rrum",
+        "gdina"
+      ],
+      "parameters": 0.0000013967580239082622,
+      "logLikelihoodAboveGdina": 0.000012582313502207398,
+      "criteria": 0,
+      "within": true,
+      "iterations": 1088,
+      "seconds": 2.3
+    }
+  ]
+}

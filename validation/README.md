@@ -169,6 +169,7 @@ a fit misses the threshold it states.
 | `psychometrics/multidimensional-mhrm-recovery.ts`   | About 2 minutes  | 30 items on 5 dimensions by MH-RM, 2,000 persons, three seeds: each fit's largest errors in standard errors against 4 and its slopes' root mean square error against 0.2, and the worst over the seeds                                                                             |
 | `psychometrics/multidimensional-mhrm-mirt.ts`       | About 2 minutes  | MH-RM on the 25 graded items of `bfi`, 800 persons, 5 dimensions, seeds 1 to 4: each fit's largest differences from the mean of mirt's runs against 0.3 and 0.08, its ratios of standard errors against 1 ± 0.1 and 0.6 to 1.6, and the worst over the seeds                       |
 | `psychometrics/multidimensional-groups-mirt.ts`     | About 10 seconds | Two groups on three dimensions, the case `three` of `multidimensional-groups.json`: the largest differences from mirt's estimates, moments and log-likelihood against 2e-4, 5e-4 and 5e-6                                                                                          |
+| `psychometrics/cdm-additive-ecpe.ts`                | About 10 seconds | GDINA's additive models on ECPE, 2,922 persons and 28 items: each model's largest differences from GDINA's probabilities, coefficients and proportions against 1e-5, its log-likelihood above GDINA's, iterations and seconds                                                      |
 
 ## Knowledge tracing
 
