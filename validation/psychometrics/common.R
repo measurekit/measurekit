@@ -3,6 +3,12 @@
 
 suppressPackageStartupMessages(library(jsonlite))
 
+# One BLAS thread, as validation/README.md runs every script: several sum in another order, which moves the last digits
+# of some fixtures, such as the exploratory cases of multidimensional.R. R cannot set it once it has started.
+for (variable in c("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS")) {
+  if (Sys.getenv(variable) != "1") stop("Set ", variable, "=1: the references run with one thread.")
+}
+
 # Writes `x` as packages/psychometrics/test/fixtures/<name>.json, with 17 significant digits and NA as null.
 write_fixture <- function(name, x) {
   path <- file.path("packages/psychometrics/test/fixtures", paste0(name, ".json"))
