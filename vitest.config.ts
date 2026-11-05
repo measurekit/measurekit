@@ -52,18 +52,22 @@ interface Floor {
 }
 
 /**
- * Returns the thresholds of a package's modules, each held to the package's floor on its own, as STANDARDS section 7 asks,
- * so that a module whose tests fall short fails, whatever the others reach: a glob for each folder of `src/`, and one for
- * each file beside them, the modules of core's flat `src/`, a root's entry and the files the modules share.
+ * Returns the thresholds of a package, as STANDARDS section 7 sets them: its branches over the package, as V8 counts the
+ * fallback of `a[i] ?? 0`, which no test can take, as a branch, and its statements, functions and lines over each module
+ * on its own, so that a module whose tests fall short fails, whatever the others reach. A module is a folder of `src/`,
+ * or a file beside them: the modules of core's flat `src/`, a root's entry and the files the modules share.
  */
-function moduleFloors(name: string, floor: Floor): Record<string, Floor> {
+function packageFloors(name: string, { branches, ...perModule }: Floor): Record<string, Partial<Floor>> {
   const source = new URL(`./packages/${name}/src/`, import.meta.url);
-  return Object.fromEntries(
-    readdirSync(source, { withFileTypes: true }).map((entry) => [
-      `packages/${name}/src/${entry.name}${entry.isDirectory() ? "/**" : ""}`,
-      floor,
-    ]),
-  );
+  return {
+    [`packages/${name}/src/**`]: { branches },
+    ...Object.fromEntries(
+      readdirSync(source, { withFileTypes: true }).map((entry) => [
+        `packages/${name}/src/${entry.name}${entry.isDirectory() ? "/**" : ""}`,
+        perModule,
+      ]),
+    ),
+  };
 }
 
 /** The timeout of a benchmark that takes minutes: 30 minutes. */
@@ -76,15 +80,15 @@ export default defineConfig({
       provider: "v8",
       include: ["packages/*/src/**/*.ts"],
       reporter: ["text-summary"],
-      // One floor for each package, which each of its modules meets on its own: a gap in the tests of a module fails its
-      // own floor and no other. CI checks core and knowledge tracing in the job of their project on Node.js 22, with the
+      // One floor for each package: its branches over the package, and its statements, functions and lines over each
+      // module on its own, so that a gap in the tests of a module fails its own floor and no other. CI checks core and knowledge tracing in the job of their project on Node.js 22, with the
       // files of that package alone, and rules.yml checks psychometrics each week and before a release. Psychometrics'
       // floor is its measure on Node.js 22 rounded down; under coverage its tests take about 36 minutes, 4.6 times as long,
       // and the timeouts of the slowest calibrations hold that.
       thresholds: {
-        ...moduleFloors("core", { statements: 94, branches: 74, functions: 96, lines: 95 }),
-        ...moduleFloors("knowledge-tracing", { statements: 98, branches: 82, functions: 99, lines: 99 }),
-        ...moduleFloors("psychometrics", { statements: 99, branches: 72, functions: 99, lines: 99 }),
+        ...packageFloors("core", { statements: 94, branches: 74, functions: 96, lines: 95 }),
+        ...packageFloors("knowledge-tracing", { statements: 98, branches: 82, functions: 99, lines: 99 }),
+        ...packageFloors("psychometrics", { statements: 99, branches: 72, functions: 99, lines: 99 }),
       },
     },
     projects: [
