@@ -144,7 +144,8 @@ accuracy, which no analysis here needs, and takes 4 to 8 times as long as the QL
 rounding relative to the largest, as LAPACK's are. Written in `math/`, with no dependency, the QL method takes 0.7 to
 0.8 times as long as `ml-matrix`'s on the same matrices, alternated in one process, and adds 16 MB to the peak at 1,000
 items, the most that the analyses of a matrix of items take. Base R's `eigen`, LAPACK's dsyevr through OpenBLAS, is
-faster above about 100 items ([performance](performance.md)): it reduces the matrix in blocks by native kernels, and
-finds the eigenvectors of the tridiagonal matrix by MRRR, in a time that grows with the square of its order, where the
-rotations of the QL method take half of its time. A caller that reads the eigenvalues alone, as parallel analysis and
-the check of smoothing do, skips the eigenvectors, in a fifth of the time at 1,000 items.
+faster above about 100 items, 0.24 s at 1,000 as the reference of smoothing in [performance](performance.md), which
+takes the eigenvectors too: it reduces the matrix in blocks by native kernels, and finds the eigenvectors of the
+tridiagonal matrix by MRRR, in a time that grows with the square of its order, where the rotations of the QL method take
+half of its time. A caller that reads the eigenvalues alone, as parallel analysis and the check of smoothing do, skips
+the eigenvectors, in a fifth of the time at 1,000 items.
