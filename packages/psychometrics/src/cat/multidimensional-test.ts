@@ -1,4 +1,4 @@
-import { checkOptions, type FieldNames, type Random } from "@measurekit/core";
+import { checkOptions, type FieldNames } from "@measurekit/core";
 import { checkFunction } from "../checks.js";
 import {
   checkDimensions,
@@ -8,7 +8,7 @@ import {
   type MultidimensionalEstimator,
   multidimensionalPosteriorModeEstimate,
 } from "../multidimensional/internal.js";
-import { type AdaptiveState, adaptiveEngine, checkRules } from "./engine.js";
+import { type AdaptiveTest, adaptiveEngine, checkRules } from "./engine.js";
 import { checkCategory } from "./items.js";
 import { maximumDeterminant } from "./maximum-determinant.js";
 import type { MultidimensionalPoolItem } from "./multidimensional-items.js";
@@ -46,29 +46,6 @@ const MULTIDIMENSIONAL_ADAPTIVE_TEST_OPTIONS: FieldNames<MultidimensionalAdaptiv
   enemies: true,
   withinTestlet: true,
 };
-
-/** The state of a multidimensional adaptive test: plain data, which JSON serializes, so that a test can resume from it. */
-export interface MultidimensionalAdaptiveTestState extends AdaptiveState<MultidimensionalEstimate> {}
-
-/** A multidimensional adaptive test: a pool with the rules that select its items, estimate theta and end the test. */
-export interface MultidimensionalAdaptiveTest {
-  /** The item pool. */
-  readonly pool: readonly MultidimensionalPoolItem[];
-  /**
-   * Returns the state before the first response: the estimate without responses and the first item.
-   *
-   * @throws `DataError` when `random` is not a random number generator.
-   */
-  start(random: Random): MultidimensionalAdaptiveTestState;
-  /**
-   * Returns the state after a response to the state's next item: the new estimate, and the next item unless the test
-   * ends.
-   *
-   * @throws `DataError` when the test has ended, the state is malformed, names items the pool does not have or an item
-   * twice, administers enemies, a response is not a category of its item, or `random` is not a random number generator.
-   */
-  answer(state: MultidimensionalAdaptiveTestState, response: number, random: Random): MultidimensionalAdaptiveTestState;
-}
 
 /**
  * Returns an adaptive test of a pool of multidimensional items, which estimates a vector of thetas.
@@ -114,7 +91,7 @@ export interface MultidimensionalAdaptiveTest {
  */
 export function createMultidimensionalAdaptiveTest(
   options: MultidimensionalAdaptiveTestOptions,
-): MultidimensionalAdaptiveTest {
+): AdaptiveTest<MultidimensionalPoolItem, MultidimensionalEstimate> {
   checkOptions(options, MULTIDIMENSIONAL_ADAPTIVE_TEST_OPTIONS);
   const {
     pool,

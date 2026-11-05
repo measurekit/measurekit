@@ -1,6 +1,8 @@
 import { checkArray, checkRandom, type Random } from "@measurekit/core";
+import type { ProfileEstimate } from "../cdm/internal.js";
 import { simulateCdmResponses } from "../sim/internal.js";
-import type { DiagnosticAdaptiveTest, DiagnosticAdaptiveTestState } from "./diagnostic-test.js";
+import type { DiagnosticAdaptiveTest } from "./diagnostic-test.js";
+import type { AdaptiveTestState } from "./engine.js";
 import {
   type AdaptiveSimulationOptions,
   administer,
@@ -16,7 +18,7 @@ export interface SimulatedDiagnosticPerson {
   /** The person's true profile, in the test's attribute order. */
   readonly profile: readonly number[];
   /** The state at the end of the test. */
-  readonly state: DiagnosticAdaptiveTestState;
+  readonly state: AdaptiveTestState<ProfileEstimate>;
 }
 
 /** The result of simulated administrations of a diagnostic test. */

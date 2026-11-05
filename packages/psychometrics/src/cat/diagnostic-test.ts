@@ -1,8 +1,8 @@
-import { checkOptions, type FieldNames, type Random } from "@measurekit/core";
+import { checkOptions, type FieldNames } from "@measurekit/core";
 import { type ProfileEstimate, type ProfileProportion, profileEstimate } from "../cdm/internal.js";
 import { bindPool, checkPool, type DiagnosticPoolItem, type DiagnosticTestItem } from "./diagnostic-items.js";
 import { gdinaDiscriminationIndex } from "./diagnostic-selection.js";
-import { type AdaptiveState, adaptiveEngine, checkRules } from "./engine.js";
+import { type AdaptiveTest, adaptiveEngine, checkRules } from "./engine.js";
 import { checkCategory } from "./items.js";
 import { profilePosterior } from "./profile-posterior.js";
 import { checkAttributes, profileSpace } from "./profile-space.js";
@@ -45,29 +45,10 @@ const DIAGNOSTIC_ADAPTIVE_TEST_OPTIONS: FieldNames<DiagnosticAdaptiveTestOptions
   withinTestlet: true,
 };
 
-/** The state of a diagnostic adaptive test: plain data, which JSON serializes, so that a test can resume from it. */
-export interface DiagnosticAdaptiveTestState extends AdaptiveState<ProfileEstimate> {}
-
-/** A diagnostic adaptive test: a pool with the rules that select its items and end the test. */
-export interface DiagnosticAdaptiveTest {
-  /** The item pool. */
-  readonly pool: readonly DiagnosticPoolItem[];
+/** A diagnostic adaptive test: a pool with the rules that select its items and end the test, and its attributes. */
+export interface DiagnosticAdaptiveTest extends AdaptiveTest<DiagnosticPoolItem, ProfileEstimate> {
   /** The attributes, in the order of the profiles. */
   readonly attributes: readonly string[];
-  /**
-   * Returns the state before the first response: the prior as the estimate, and the first item.
-   *
-   * @throws `DataError` when `random` is not a random number generator.
-   */
-  start(random: Random): DiagnosticAdaptiveTestState;
-  /**
-   * Returns the state after a response to the state's next item: the new estimate, and the next item unless the test
-   * ends.
-   *
-   * @throws `DataError` when the test has ended, the state is malformed, names items the pool does not have or an item
-   * twice, a response is not 0 or 1, or `random` is not a random number generator.
-   */
-  answer(state: DiagnosticAdaptiveTestState, response: number, random: Random): DiagnosticAdaptiveTestState;
 }
 
 /**

@@ -1,7 +1,7 @@
-import { checkOptions, type FieldNames, type Random } from "@measurekit/core";
+import { checkOptions, type FieldNames } from "@measurekit/core";
 import { checkFunction } from "../checks.js";
-import { type AbilityEstimate, type AbilityEstimator, indexItems, posteriorMeanEstimate } from "../irt/internal.js";
-import { type AdaptiveState, adaptiveEngine, checkRules } from "./engine.js";
+import { type AbilityEstimator, indexItems, posteriorMeanEstimate } from "../irt/internal.js";
+import { type AdaptiveTest, adaptiveEngine, checkRules } from "./engine.js";
 import { checkResponse, type PoolItem } from "./items.js";
 import { type ItemSelectionRule, maximumInformation } from "./selection.js";
 import type { StoppingRule } from "./stopping.js";
@@ -36,29 +36,6 @@ const ADAPTIVE_TEST_OPTIONS: FieldNames<AdaptiveTestOptions> = {
   enemies: true,
   withinTestlet: true,
 };
-
-/** The state of an adaptive test: plain data, which JSON serializes, so that a test can resume from a stored state. */
-export interface AdaptiveTestState extends AdaptiveState<AbilityEstimate> {}
-
-/** An adaptive test: a pool with the rules that select its items, estimate theta and end the test. */
-export interface AdaptiveTest {
-  /** The item pool. */
-  readonly pool: readonly PoolItem[];
-  /**
-   * Returns the state before the first response: the estimate without responses and the first item.
-   *
-   * @throws `DataError` when `random` is not a random number generator.
-   */
-  start(random: Random): AdaptiveTestState;
-  /**
-   * Returns the state after a response to the state's next item: the new estimate, and the next item unless the test
-   * ends.
-   *
-   * @throws `DataError` when the test has ended, the state is malformed, names items the pool does not have or an item
-   * twice, a response is not a category of its item, or `random` is not a random number generator.
-   */
-  answer(state: AdaptiveTestState, response: number, random: Random): AdaptiveTestState;
-}
 
 /**
  * Returns an adaptive test of a pool.

@@ -7,7 +7,7 @@ import {
   type ThetaPrior,
 } from "../irt/internal.js";
 import type { PoolItem } from "./items.js";
-import type { ItemSelectionRule, SelectionContext } from "./selection.js";
+import type { AdaptiveTestContext, ItemSelectionRule } from "./selection.js";
 
 // catR's default integration grid, parInt = c(-4, 4, 33): equally spaced nodes, which the trapezoid rule weights.
 const GRID_LOWER = -4;
@@ -63,7 +63,7 @@ export function priorOnGrid(options: WeightedRuleOptions): Float64Array {
  * for it. `probabilities` is scratch space for the largest item of the pool.
  */
 export function gridWeights(
-  { pool, administered, responses }: SelectionContext,
+  { pool, administered, responses }: AdaptiveTestContext,
   { prior, trapezoid }: GridWeighting,
   probabilities: Float64Array,
 ): Float64Array {

@@ -1,8 +1,9 @@
 import { checkMethod, checkRandom, DataError, type Random } from "@measurekit/core";
+import type { AbilityEstimate } from "../irt/internal.js";
 import { contentBalancing, restrictToArea } from "./content-balancing.js";
 import { checkEnemies, enemyIndices, excludeEnemies } from "./enemies.js";
-import { indexOf, itemById, type PoolControls } from "./items.js";
-import type { AdaptiveTestContext, ItemSelectionRule, SelectionContext } from "./selection.js";
+import { indexOf, itemById, type PoolControls, type PoolItem } from "./items.js";
+import type { AdaptiveTestContext, ItemSelectionRule } from "./selection.js";
 import { checkDistinct, checkState, type TestState } from "./state.js";
 import type { StoppingRule } from "./stopping.js";
 import { checkExposure, selectItem } from "./sympson-hetter.js";
@@ -22,7 +23,7 @@ import {
  *
  * @typeParam TEstimate - The estimate of what the test measures.
  */
-export interface AdaptiveState<TEstimate> extends TestState<TEstimate> {
+export interface AdaptiveTestState<TEstimate = AbilityEstimate> extends TestState<TEstimate> {
   /** The ids of the items exposure control withheld: they are not administered in this test. */
   readonly withheld: readonly string[];
   /** The id of the item to administer next, or `null` when the test has ended. */
@@ -45,22 +46,34 @@ export interface AdaptiveEngineOptions<TItem extends PoolControls, TEstimate> ex
   readonly checkResponse: (item: TItem, response: number) => void;
 }
 
-/** The steps of an adaptive test: its state before the first response, and after each. */
-export interface AdaptiveEngine<TEstimate> {
+/**
+ * An adaptive test: a pool with the rules that select its items, estimate and end the test.
+ *
+ * @typeParam TItem - The items of the pool.
+ * @typeParam TEstimate - The estimate of what the test measures.
+ */
+export interface AdaptiveTest<TItem extends PoolControls = PoolItem, TEstimate = AbilityEstimate> {
+  /** The item pool. */
+  readonly pool: readonly TItem[];
   /**
-   * Returns the state before the first response.
+   * Returns the state before the first response: the estimate without responses, such as a diagnostic test's prior,
+   * and the first item.
    *
    * @throws `DataError` when `random` is not a random number generator.
    */
-  start(random: Random): AdaptiveState<TEstimate>;
+  start(random: Random): AdaptiveTestState<TEstimate>;
   /**
-   * Returns the state after a response to the state's next item.
+   * Returns the state after a response to the state's next item: the new estimate, and the next item unless the test
+   * ends.
    *
    * @throws `DataError` when the test has ended, the state is malformed, names items the pool does not have or an item
-   * twice, administers enemies, a response is not one of its item, or `random` is not a random number generator.
+   * twice, administers enemies, a response is not a category of its item, or `random` is not a random number generator.
    */
-  answer(state: AdaptiveState<TEstimate>, response: number, random: Random): AdaptiveState<TEstimate>;
+  answer(state: AdaptiveTestState<TEstimate>, response: number, random: Random): AdaptiveTestState<TEstimate>;
 }
+
+/** The steps of an adaptive test, which every kind shares: its state before the first response, and after each. */
+type AdaptiveEngine<TEstimate> = Omit<AdaptiveTest<PoolControls, TEstimate>, "pool">;
 
 /**
  * Checks the rules that an adaptive test takes.
@@ -121,7 +134,7 @@ export function adaptiveEngine<TItem extends PoolControls, TEstimate>(
   const enemies = enemyIndices(pool, indices, enemySets);
 
   /** Returns the item to administer next, or `null` when the test ends: the rest of a testlet, else a selection. */
-  const selectNext = (context: SelectionContext<TItem, TEstimate>, withheld: number[]): number | null => {
+  const selectNext = (context: AdaptiveTestContext<TItem, TEstimate>, withheld: number[]): number | null => {
     const { administered, eligible, random } = context;
     const remaining = testlets === null ? null : remainingInTestlet(testlets, administered, eligible);
     if (remaining !== null) return nextInTestlet(selection, context, remaining, withinTestlet);
@@ -136,7 +149,7 @@ export function adaptiveEngine<TItem extends PoolControls, TEstimate>(
     responses: readonly number[],
     withheld: number[],
     random: Random,
-  ): AdaptiveState<TEstimate> => {
+  ): AdaptiveTestState<TEstimate> => {
     const current = estimate(
       administered.flatMap((index) => pool[index] ?? []),
       responses,
@@ -151,8 +164,9 @@ export function adaptiveEngine<TItem extends PoolControls, TEstimate>(
       responses,
       estimate: current,
       eligible,
+      random,
     };
-    const next = selectNext({ ...context, random }, withheld);
+    const next = selectNext(context, withheld);
     const ids = (list: readonly number[]): string[] => list.flatMap((index) => pool[index]?.id ?? []);
     return {
       items: ids(administered),

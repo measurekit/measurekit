@@ -8,9 +8,7 @@
  */
 export { aStratified } from "./a-stratified.js";
 export {
-  type AdaptiveTest,
   type AdaptiveTestOptions,
-  type AdaptiveTestState,
   createAdaptiveTest,
 } from "./adaptive-test.js";
 export { contentBounds } from "./bounds.js";
@@ -46,9 +44,8 @@ export {
   createDiagnosticAdaptiveTest,
   type DiagnosticAdaptiveTest,
   type DiagnosticAdaptiveTestOptions,
-  type DiagnosticAdaptiveTestState,
 } from "./diagnostic-test.js";
-export type { AdaptiveState } from "./engine.js";
+export type { AdaptiveTest, AdaptiveTestState } from "./engine.js";
 export { untilMixed } from "./estimator.js";
 export {
   type ExpectedInformationKind,
@@ -77,9 +74,7 @@ export {
 } from "./multidimensional-simulation.js";
 export {
   createMultidimensionalAdaptiveTest,
-  type MultidimensionalAdaptiveTest,
   type MultidimensionalAdaptiveTestOptions,
-  type MultidimensionalAdaptiveTestState,
 } from "./multidimensional-test.js";
 export {
   type MultistageCutsMethod,
@@ -101,7 +96,6 @@ export {
   type AdaptiveTestContext,
   type ItemSelectionRule,
   maximumInformation,
-  type SelectionContext,
 } from "./selection.js";
 export {
   type AdaptiveSimulationOptions,

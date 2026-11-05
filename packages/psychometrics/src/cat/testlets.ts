@@ -1,7 +1,7 @@
 import { checkChoice, DataError, describe, isNonEmptyString } from "@measurekit/core";
 import type { ContentBalancing } from "./content-balancing.js";
 import type { PoolControls } from "./items.js";
-import type { ItemSelectionRule, SelectionContext } from "./selection.js";
+import type { AdaptiveTestContext, ItemSelectionRule } from "./selection.js";
 
 /**
  * How the items of a testlet are ordered once the testlet is selected: `"in-order"`, in pool order, as a stimulus is
@@ -98,7 +98,7 @@ export function remainingInTestlet(
  */
 export function nextInTestlet<TItem extends PoolControls, TEstimate>(
   rule: ItemSelectionRule<TItem, TEstimate>,
-  context: SelectionContext<TItem, TEstimate>,
+  context: AdaptiveTestContext<TItem, TEstimate>,
   remaining: readonly number[],
   withinTestlet: WithinTestlet,
 ): number {

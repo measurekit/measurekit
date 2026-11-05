@@ -9,8 +9,8 @@ import {
   normalQuantile,
 } from "@measurekit/core";
 import { checkOpenUnitInterval } from "../checks.js";
-import { type AbilityEstimate, largestCategoryCount, logProbability } from "../irt/internal.js";
-import type { PoolControls, PoolItem } from "./items.js";
+import { largestCategoryCount, logProbability } from "../irt/internal.js";
+import type { PoolItem } from "./items.js";
 import type { AdaptiveTestContext } from "./selection.js";
 import type { StoppingRule } from "./stopping.js";
 
@@ -21,25 +21,18 @@ const DEFAULT_ALPHA = 0.05;
 const DEFAULT_BETA = 0.05;
 
 /** What a classification reads of an adaptive test: its pool, and the responses so far with the estimate from them. */
-export type ClassificationContext<TItem extends PoolControls = PoolItem, TEstimate = AbilityEstimate> = Pick<
-  AdaptiveTestContext<TItem, TEstimate>,
-  "pool" | "administered" | "responses" | "estimate"
->;
+export type ClassificationContext = Pick<AdaptiveTestContext, "pool" | "administered" | "responses" | "estimate">;
 
 /**
  * A stopping rule that classifies the person into categories separated by cuts on theta: it stops once it has decided
  * the category.
- *
- * @typeParam TItem - The items of the pool.
- * @typeParam TEstimate - The estimate of what the test measures.
  */
-export interface ClassificationRule<TItem extends PoolControls = PoolItem, TEstimate = AbilityEstimate>
-  extends StoppingRule<TItem, TEstimate> {
+export interface ClassificationRule extends StoppingRule {
   /**
    * Returns the category the rule has decided, from 0, below every cut, to the number of cuts, above every one; `null`
    * while a cut is undecided.
    */
-  classify(context: ClassificationContext<TItem, TEstimate>): number | null;
+  classify(context: ClassificationContext): number | null;
 }
 
 /** Options of {@link classificationThreshold}. */
@@ -70,10 +63,10 @@ const CLASSIFICATION_OPTIONS: FieldNames<ClassificationOptions> = { level: true 
  * between 0 and 1.
  * @see {@link https://doi.org/10.1007/978-0-387-85461-8_19 | Eggen (2010)}
  */
-export function classificationThreshold<TItem extends PoolControls, TEstimate extends AbilityEstimate>(
+export function classificationThreshold(
   cuts: readonly number[],
   options: ClassificationOptions = {},
-): ClassificationRule<TItem, TEstimate> {
+): ClassificationRule {
   const checked = checkCuts(cuts, (cut, i) => {
     checkFinite(cut, `Cut ${i + 1}`);
     return [cut, cut];
@@ -83,7 +76,7 @@ export function classificationThreshold<TItem extends PoolControls, TEstimate ex
   checkOpenUnitInterval(level, "The option level");
   // catR's z: the quantile of 1 - alpha / 2, alpha = 1 - level.
   const z = normalQuantile(1 - (1 - level) / 2);
-  const classify = ({ estimate: { theta, standardError } }: ClassificationContext<TItem, TEstimate>): number | null => {
+  const classify = ({ estimate: { theta, standardError } }: ClassificationContext): number | null => {
     const lower = theta - z * standardError;
     const upper = theta + z * standardError;
     let category = 0;
@@ -141,10 +134,7 @@ const SPRT_OPTIONS: FieldNames<SprtOptions> = { alpha: true, beta: true };
  * @see {@link https://doi.org/10.1177/01466219922031365 | Eggen (1999)}
  * @see {@link https://doi.org/10.1007/978-0-387-85461-8_19 | Eggen (2010)}
  */
-export function sequentialProbabilityRatio(
-  cuts: readonly SprtCut[],
-  options: SprtOptions = {},
-): ClassificationRule<PoolItem, AbilityEstimate> {
+export function sequentialProbabilityRatio(cuts: readonly SprtCut[], options: SprtOptions = {}): ClassificationRule {
   const regions = checkCuts(cuts, (cut, i) => {
     if (!isRecord(cut)) throw new DataError(`Cut ${i + 1} must be an object { lower, upper }, found ${describe(cut)}.`);
     checkFinite(cut.lower, `The lower bound of cut ${i + 1}`);
@@ -163,7 +153,7 @@ export function sequentialProbabilityRatio(
   }
   const below = Math.log(beta / (1 - alpha));
   const above = Math.log((1 - beta) / alpha);
-  const classify = ({ pool, administered, responses }: ClassificationContext<PoolItem, AbilityEstimate>) => {
+  const classify = ({ pool, administered, responses }: ClassificationContext) => {
     const answers = administered.flatMap((index, j) => {
       const item = pool[index];
       return item === undefined ? [] : [{ item, response: responses[j] ?? 0 }];

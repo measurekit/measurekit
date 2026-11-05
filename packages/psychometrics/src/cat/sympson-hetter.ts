@@ -1,6 +1,6 @@
 import { checkUnitInterval } from "@measurekit/core";
 import type { PoolControls } from "./items.js";
-import { highestScore, type ItemSelectionRule, type SelectionContext } from "./selection.js";
+import { type AdaptiveTestContext, highestScore, type ItemSelectionRule } from "./selection.js";
 
 /**
  * Checks an item's Sympson-Hetter exposure parameter.
@@ -30,7 +30,7 @@ export function checkExposure(item: PoolControls): void {
  */
 export function selectItem<TItem extends PoolControls, TEstimate>(
   rule: ItemSelectionRule<TItem, TEstimate>,
-  context: SelectionContext<TItem, TEstimate>,
+  context: AdaptiveTestContext<TItem, TEstimate>,
   withheld: number[],
   membersOf: (index: number) => readonly number[] = (index) => [index],
 ): number | null {

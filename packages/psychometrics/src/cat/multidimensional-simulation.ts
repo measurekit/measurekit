@@ -1,6 +1,8 @@
 import { checkRandom, mean, type Random } from "@measurekit/core";
+import type { MultidimensionalEstimate } from "../multidimensional/internal.js";
 import { simulateMultidimensionalResponses } from "../sim/internal.js";
-import type { MultidimensionalAdaptiveTest, MultidimensionalAdaptiveTestState } from "./multidimensional-test.js";
+import type { AdaptiveTest, AdaptiveTestState } from "./engine.js";
+import type { MultidimensionalPoolItem } from "./multidimensional-items.js";
 import {
   type AdaptiveSimulationOptions,
   administer,
@@ -16,7 +18,7 @@ export interface SimulatedMultidimensionalPerson {
   /** The person's true theta in each dimension. */
   readonly theta: readonly number[];
   /** The state at the end of the test. */
-  readonly state: MultidimensionalAdaptiveTestState;
+  readonly state: AdaptiveTestState<MultidimensionalEstimate>;
 }
 
 /** The result of simulated administrations of a multidimensional adaptive test. */
@@ -50,7 +52,7 @@ export interface MultidimensionalTestSimulation {
  * have dimensions.
  */
 export function simulateMultidimensionalAdaptiveTest(
-  test: MultidimensionalAdaptiveTest,
+  test: AdaptiveTest<MultidimensionalPoolItem, MultidimensionalEstimate>,
   thetas: readonly (readonly number[])[],
   random: Random,
   options: AdaptiveSimulationOptions = {},

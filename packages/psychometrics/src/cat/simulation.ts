@@ -10,7 +10,7 @@ import {
 import { checkFunction } from "../checks.js";
 import { indexItems, largestCategoryCount, type TestItem } from "../irt/internal.js";
 import { checkThetas, simulateResponse } from "../sim/internal.js";
-import type { AdaptiveTest, AdaptiveTestState } from "./adaptive-test.js";
+import type { AdaptiveTest, AdaptiveTestState } from "./engine.js";
 import { itemById } from "./items.js";
 import { locateModules, type MultistageTest, type MultistageTestState } from "./multistage-test.js";
 import type { TestState } from "./state.js";

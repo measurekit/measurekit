@@ -37,7 +37,6 @@ import {
   createRandom,
   DataError,
   type DiagnosticAdaptiveTest,
-  type DiagnosticAdaptiveTestState,
   type DiagnosticPoolItem,
   diagnosticKullbackLeibler,
   discriminationIndex,
@@ -53,8 +52,6 @@ import {
   itemInformation,
   kullbackLeibler,
   likelihoodWeightedInformation,
-  type MultidimensionalAdaptiveTest,
-  type MultidimensionalAdaptiveTestState,
   type MultidimensionalEstimate,
   type MultidimensionalPoolItem,
   type MultistageCutsOptions,
@@ -89,7 +86,6 @@ import {
   type Random,
   randomesque,
   ratingScale,
-  type SelectionContext,
   type SprtCut,
   type StoppingRule,
   sequentialProbabilityRatio,
@@ -582,7 +578,7 @@ function contextAfter(
   count: number,
   estimate: AbilityEstimate,
   random: Random = createRandom(0),
-): SelectionContext {
+): AdaptiveTestContext {
   const administered = steps.slice(0, count).map((step) => poolIndex(pool, step.nextItem));
   const eligible = new Uint8Array(pool.length).fill(1);
   for (const index of administered) eligible[index] = 0;
@@ -613,7 +609,7 @@ function administer(test: AdaptiveTest, respond: (id: string) => number, random 
 function contextOf(pool: readonly PoolItem[], count: number, estimate: AbilityEstimate): AdaptiveTestContext {
   const administered = Array.from({ length: count }, (_, i) => i);
   const eligible = Uint8Array.from(pool, (_, i) => (i < count ? 0 : 1));
-  return { pool, administered, responses: administered.map(() => 1), estimate, eligible };
+  return { pool, administered, responses: administered.map(() => 1), estimate, eligible, random: createRandom(0) };
 }
 
 describe("aStratified", () => {
@@ -1036,7 +1032,7 @@ describe("content bounds", () => {
     pool: readonly PoolItem[],
     given: readonly string[],
     ineligible: readonly string[] = [],
-  ): SelectionContext => {
+  ): AdaptiveTestContext => {
     const administered = indicesOf(given, pool);
     const eligible = new Uint8Array(pool.length).fill(1);
     for (const index of [...administered, ...indicesOf(ineligible, pool)]) eligible[index] = 0;
@@ -1049,13 +1045,13 @@ describe("content bounds", () => {
       random: createRandom(0),
     };
   };
-  const scoresOf = (rule: ItemSelectionRule, context: SelectionContext): Float64Array => {
+  const scoresOf = (rule: ItemSelectionRule, context: AdaptiveTestContext): Float64Array => {
     const out = new Float64Array(context.pool.length).fill(Number.NaN);
     rule.scores(context, out);
     return out;
   };
   /** The ids of the eligible items that a rule scores above -Infinity. */
-  const allowed = (rule: ItemSelectionRule, context: SelectionContext): string[] => {
+  const allowed = (rule: ItemSelectionRule, context: AdaptiveTestContext): string[] => {
     const out = scoresOf(rule, context);
     return context.pool.flatMap((item, i) => (context.eligible[i] === 1 && (out[i] ?? 0) > -Infinity ? [item.id] : []));
   };
@@ -1824,7 +1820,7 @@ describe("testlets", () => {
   it("scores a testlet by the mean score of its items, at its first item to be administered", () => {
     const pool = [solo, ...lopsided];
     const testlets = defined(poolTestlets(pool));
-    const context: SelectionContext = {
+    const context: AdaptiveTestContext = {
       ...contextOf(pool, 0, { theta: 0, standardError: 1 }),
       random: createRandom(0),
     };
@@ -1846,7 +1842,7 @@ describe("testlets", () => {
     const pool = [solo, ...lopsided];
     const testlets = defined(poolTestlets(pool));
     // t3 is not eligible: the mean of t2 and t1 is 0.51125, at t1.
-    const context: SelectionContext = {
+    const context: AdaptiveTestContext = {
       ...contextOf(pool, 0, { theta: 0, standardError: 1 }),
       eligible: Uint8Array.from([1, 1, 0, 1]),
       random: createRandom(0),
@@ -3313,7 +3309,7 @@ describe("selection rules of catR beyond MFI and KL", () => {
   });
 
   describe("the weighted rules", () => {
-    const context = (pool: readonly PoolItem[], count: number, theta = 0): SelectionContext => ({
+    const context = (pool: readonly PoolItem[], count: number, theta = 0): AdaptiveTestContext => ({
       ...contextOf(pool, count, { theta, standardError: 1 }),
       random: createRandom(1),
     });
@@ -4035,7 +4031,7 @@ function administerDiagnostic(
   test: DiagnosticAdaptiveTest,
   respond: (id: string) => number,
   random = createRandom(1),
-): DiagnosticAdaptiveTestState[] {
+): AdaptiveTestState<ProfileEstimate>[] {
   const states = [test.start(random)];
   for (let state = defined(states[0]); state.next !== null; ) {
     state = test.answer(state, respond(state.next), random);
@@ -4320,7 +4316,7 @@ describe("createDiagnosticAdaptiveTest", () => {
     const respond = respondOf(reference, 2);
     const states = administerDiagnostic(test, respond, createRandom(3));
     const middle = defined(states[4]);
-    const stored: DiagnosticAdaptiveTestState = JSON.parse(JSON.stringify(middle));
+    const stored: AdaptiveTestState<ProfileEstimate> = JSON.parse(JSON.stringify(middle));
     expect(stored).toEqual(middle);
     let resumed = stored;
     while (resumed.next !== null) resumed = test.answer(resumed, respond(resumed.next), createRandom(3));
@@ -4331,7 +4327,7 @@ describe("createDiagnosticAdaptiveTest", () => {
     const test = createDiagnosticAdaptiveTest({ pool: SKILL_POOL, attributes: SKILLS, stopping: testLength(2) });
     const random = createRandom(1);
     const state = test.start(random);
-    const copy: DiagnosticAdaptiveTestState = JSON.parse(JSON.stringify(state));
+    const copy: AdaptiveTestState<ProfileEstimate> = JSON.parse(JSON.stringify(state));
     test.answer(state, 1, random);
     expect(state).toEqual(copy);
   });
@@ -4486,7 +4482,7 @@ describe("diagnostic selection rules", () => {
           run.steps.forEach((step, k) => {
             const administered = run.items.slice(0, k).map((item) => item - 1);
             const eligible = Uint8Array.from(items, (_, i) => (administered.includes(i) ? 0 : 1));
-            const context: SelectionContext<DiagnosticTestItem, ProfileEstimate> = {
+            const context: AdaptiveTestContext<DiagnosticTestItem, ProfileEstimate> = {
               pool: items,
               administered,
               responses: run.steps.slice(0, k).map((earlier) => earlier.response),
@@ -4671,6 +4667,7 @@ describe("diagnostic stopping rules", () => {
             responses: administered.map(() => 1),
             estimate: profileEstimate(defined(state).posterior, profiles),
             eligible: new Uint8Array(items.length).fill(1),
+            random: createRandom(0),
           };
           catCdm.thresholds.forEach((threshold, t) => {
             const label = `person ${run.person}, ${decision.administered} items, threshold ${threshold}`;
@@ -4884,7 +4881,7 @@ function multidimensionalPool(reference: MirtReference): MultidimensionalPoolIte
 function multidimensionalTest(
   reference: MirtReference,
   stopping: StoppingRule<MultidimensionalPoolItem, MultidimensionalEstimate> = testLength(catMirt.length),
-): MultidimensionalAdaptiveTest {
+): AdaptiveTest<MultidimensionalPoolItem, MultidimensionalEstimate> {
   const prior = priorOf(reference);
   return createMultidimensionalAdaptiveTest({
     pool: multidimensionalPool(reference),
@@ -4898,10 +4895,10 @@ function multidimensionalTest(
 
 /** Administers a multidimensional test to its end with the response `respond` gives each item; returns every state. */
 function administerMultidimensional(
-  test: MultidimensionalAdaptiveTest,
+  test: AdaptiveTest<MultidimensionalPoolItem, MultidimensionalEstimate>,
   respond: (id: string) => number,
   random = createRandom(1),
-): MultidimensionalAdaptiveTestState[] {
+): AdaptiveTestState<MultidimensionalEstimate>[] {
   const states = [test.start(random)];
   for (let state = defined(states[0]); state.next !== null; ) {
     state = test.answer(state, respond(state.next), random);
@@ -4965,7 +4962,7 @@ function multidimensionalContext(
   pool: readonly MultidimensionalPoolItem[],
   count: number,
   estimate: MultidimensionalEstimate,
-): SelectionContext<MultidimensionalPoolItem, MultidimensionalEstimate> {
+): AdaptiveTestContext<MultidimensionalPoolItem, MultidimensionalEstimate> {
   const administered = Array.from({ length: count }, (_, i) => i);
   return {
     pool,
@@ -5007,6 +5004,7 @@ describe("createMultidimensionalAdaptiveTest", () => {
               responses: [],
               estimate: state.estimate,
               eligible: new Uint8Array(test.pool.length),
+              random: createRandom(0),
             };
             expect(
               standardErrorThreshold<MultidimensionalPoolItem, MultidimensionalEstimate>(threshold).stops(context),
@@ -5023,7 +5021,7 @@ describe("createMultidimensionalAdaptiveTest", () => {
       for (const run of reference.runs) {
         run.steps.forEach((step, k) => {
           const administered = run.items.slice(0, k).map((item) => item - 1);
-          const context: SelectionContext<MultidimensionalPoolItem, MultidimensionalEstimate> = {
+          const context: AdaptiveTestContext<MultidimensionalPoolItem, MultidimensionalEstimate> = {
             pool,
             administered,
             responses: administered.map(() => 1),
@@ -5148,7 +5146,7 @@ describe("createMultidimensionalAdaptiveTest", () => {
     const pool = Array.from({ length: 30 }, (_, i) =>
       multidimensionalItem(`q${i}`, [i % 2 === 0 ? 1.4 : 0.3, i % 2 === 1 ? 1.4 : 0.3], random.normal() * 0.5),
     );
-    const run = (threshold: number): MultidimensionalAdaptiveTestState[] =>
+    const run = (threshold: number): AdaptiveTestState<MultidimensionalEstimate>[] =>
       administerMultidimensional(
         createMultidimensionalAdaptiveTest({
           pool,
@@ -5222,12 +5220,12 @@ describe("createMultidimensionalAdaptiveTest", () => {
     const row = defined(reference.responses[1]);
     const respond = (id: string) => defined(row[reference.items.findIndex((item) => item.id === id)]);
     const states = administerMultidimensional(test, respond, createRandom(3));
-    const stored: MultidimensionalAdaptiveTestState = JSON.parse(JSON.stringify(defined(states[4])));
+    const stored: AdaptiveTestState<MultidimensionalEstimate> = JSON.parse(JSON.stringify(defined(states[4])));
     expect(stored).toEqual(states[4]);
     let resumed = stored;
     while (resumed.next !== null) resumed = test.answer(resumed, respond(resumed.next), createRandom(3));
     expect(resumed).toEqual(states.at(-1));
-    const copy: MultidimensionalAdaptiveTestState = JSON.parse(JSON.stringify(stored));
+    const copy: AdaptiveTestState<MultidimensionalEstimate> = JSON.parse(JSON.stringify(stored));
     test.answer(stored, respond(defined(stored.next)), createRandom(3));
     expect(stored).toEqual(copy);
   });
@@ -5555,6 +5553,7 @@ describe("rules of tests of other items and estimates", () => {
     responses: [1, 0, 1],
     estimate,
     eligible: new Uint8Array(0),
+    random: createRandom(0),
   });
 
   it("stops at a standard error threshold once every standard error of a multidimensional estimate is below it", () => {

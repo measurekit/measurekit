@@ -1,7 +1,7 @@
 import type { ProfileEstimate } from "../cdm/internal.js";
 import { logProbability } from "../irt/internal.js";
 import type { DiagnosticTestItem } from "./diagnostic-items.js";
-import type { ItemSelectionRule, SelectionContext } from "./selection.js";
+import type { AdaptiveTestContext, ItemSelectionRule } from "./selection.js";
 
 /**
  * The Kullback-Leibler divergence of the response distribution at a probability of success q from that at p, as a
@@ -38,7 +38,7 @@ function groupRule(
   score: (probabilities: readonly number[], masses: Float64Array, mapGroup: number) => number,
 ): ItemSelectionRule<DiagnosticTestItem, ProfileEstimate> {
   return {
-    scores({ pool, eligible, estimate }: SelectionContext<DiagnosticTestItem, ProfileEstimate>, out) {
+    scores({ pool, eligible, estimate }: AdaptiveTestContext<DiagnosticTestItem, ProfileEstimate>, out) {
       const masses = new Float64Array(largestGroupCount(pool));
       const mode = modeOf(estimate.posterior);
       pool.forEach((item, index) => {

@@ -594,8 +594,8 @@ The test checks its stopping rule before every item, the first included, and als
 
 `testLength` is a maximum length alone or in `anyOf`, and a minimum length in `allOf`:
 `anyOf(testLength(30), allOf(testLength(10), standardErrorThreshold(0.3)))` gives 10 to 30 items. A custom rule
-implements `StoppingRule`: `stops(context)` with the context of [item selection](#item-selection) without `random`,
-`eligible` marking the items not administered or withheld.
+implements `StoppingRule`: `stops(context)` with the context of [item selection](#item-selection), `eligible` marking
+the items not administered or withheld.
 
 ### Classification
 
@@ -698,12 +698,17 @@ person?.state.items.length; // => 25: the 25th response moved θ̂ by less than 
 Contexts, rules and states are generic in the type of the pool's items and of the estimate, and the diagnostic and
 other adaptive tests run on the same engine as `createAdaptiveTest`.
 
-| Type                                                | Parameters                                | Defaults                      |
-| --------------------------------------------------- | ----------------------------------------- | ----------------------------- |
-| `AdaptiveTestContext`, `SelectionContext`           | `TItem extends PoolControls`, `TEstimate` | `PoolItem`, `AbilityEstimate` |
-| `ItemSelectionRule`, `StoppingRule`                 | `TItem extends PoolControls`, `TEstimate` | `PoolItem`, `AbilityEstimate` |
-| `TestState`                                         | `TEstimate`                               | `AbilityEstimate`             |
-| `AdaptiveState`: a state with `withheld` and `next` | `TEstimate`                               | none                          |
+| Type                                                    | Parameters                                | Defaults                      |
+| ------------------------------------------------------- | ----------------------------------------- | ----------------------------- |
+| `AdaptiveTestContext`                                   | `TItem extends PoolControls`, `TEstimate` | `PoolItem`, `AbilityEstimate` |
+| `ItemSelectionRule`, `StoppingRule`                     | `TItem extends PoolControls`, `TEstimate` | `PoolItem`, `AbilityEstimate` |
+| `AdaptiveTest`                                          | `TItem extends PoolControls`, `TEstimate` | `PoolItem`, `AbilityEstimate` |
+| `TestState`                                             | `TEstimate`                               | `AbilityEstimate`             |
+| `AdaptiveTestState`: a state with `withheld` and `next` | `TEstimate`                               | `AbilityEstimate`             |
+
+A diagnostic test is an `AdaptiveTest<DiagnosticPoolItem, ProfileEstimate>` with its `attributes`, and a multidimensional
+one an `AdaptiveTest<MultidimensionalPoolItem, MultidimensionalEstimate>`. A classification rule reads a single theta, so
+`ClassificationRule` is a stopping rule of `createAdaptiveTest`.
 
 `PoolControls` is what every adaptive test needs of an item: `id`, `contentAreas`, `testlet` and `exposure`. `PoolItem` adds the
 model and parameters of an IRT item. The context of a rule has the fields of the [table above](#item-selection) whatever

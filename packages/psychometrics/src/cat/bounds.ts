@@ -7,7 +7,7 @@ import {
   readBounds,
 } from "./content-constraints.js";
 import type { PoolControls } from "./items.js";
-import type { ItemSelectionRule, SelectionContext } from "./selection.js";
+import type { AdaptiveTestContext, ItemSelectionRule } from "./selection.js";
 import { poolTestlets, remainingInTestlet, type Testlets } from "./testlets.js";
 
 /** What the filter reads of a pool, computed once for each pool array. */
@@ -169,7 +169,7 @@ function startStep(
   bounds: ContentBounds,
   length: number,
   bounded: BoundedPool,
-  { administered, eligible }: SelectionContext<PoolControls, unknown>,
+  { administered, eligible }: AdaptiveTestContext<PoolControls, unknown>,
 ): Step {
   const given = countAreas(administered, bounded.itemAreas, bounds.areas.length);
   const needs = Int32Array.from(given, (count, k) => Math.max(0, (bounds.minimums[k] ?? 0) - count));
@@ -194,7 +194,7 @@ function filter<TItem extends PoolControls, TEstimate>(
   bounds: ContentBounds,
   length: number,
   bounded: BoundedPool,
-  context: SelectionContext<TItem, TEstimate>,
+  context: AdaptiveTestContext<TItem, TEstimate>,
   out: Float64Array,
 ): void {
   const { eligible } = context;

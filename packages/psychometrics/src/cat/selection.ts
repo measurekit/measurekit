@@ -19,16 +19,6 @@ export interface AdaptiveTestContext<TItem extends PoolControls = PoolItem, TEst
   readonly estimate: TEstimate;
   /** 1 for each pool item that may be administered next, 0 for the others. */
   readonly eligible: Uint8Array;
-}
-
-/**
- * The context of item selection: the test, the eligible items and a source of random numbers.
- *
- * @typeParam TItem - The items of the pool.
- * @typeParam TEstimate - The estimate of what the test measures.
- */
-export interface SelectionContext<TItem extends PoolControls = PoolItem, TEstimate = AbilityEstimate>
-  extends AdaptiveTestContext<TItem, TEstimate> {
   /** The source of random numbers, for rules that select at random. */
   readonly random: Random;
 }
@@ -46,7 +36,7 @@ export interface ItemSelectionRule<TItem extends PoolControls = PoolItem, TEstim
    * Writes a score for each eligible item to `out`, which has one entry per pool item; the entries of other items are
    * ignored. An item scored `-Infinity` is not selected. Rules that select at random draw from `context.random`.
    */
-  scores(context: SelectionContext<TItem, TEstimate>, out: Float64Array): void;
+  scores(context: AdaptiveTestContext<TItem, TEstimate>, out: Float64Array): void;
 }
 
 /** Maximum Fisher information (MFI): scores each item by its information at the current estimate, catR's `MFI`. */
