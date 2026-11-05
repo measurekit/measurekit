@@ -12,6 +12,8 @@ export const STANDARD_ERROR_METHODS = ["none", "hessian", "cross-product"] as co
  * How calibration computes standard errors: `"none"`; `"hessian"`, the observed information, the Hessian of the
  * log-posterior by central differences of its exact gradient, as mirt's `SE.type = "Richardson"`; `"cross-product"`,
  * the sum over persons of the outer products of their score vectors, as mirt's `SE.type = "crossprod"`.
+ *
+ * @useDeclaredType
  */
 export type StandardErrorMethod = (typeof STANDARD_ERROR_METHODS)[number];
 
