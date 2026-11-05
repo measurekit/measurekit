@@ -130,13 +130,21 @@ write_fixture("kst-blim-constraints", list(
 ))
 
 # Local identifiability: the rank of pks's Jacobian at the parameters, without the columns of fixed rates, at qr's
-# tolerance of 1e-7. The parameters are generic draws, so the rank is the structure's, not that of a boundary.
-identifiability_case <- function(name, K, fixed = list()) {
+# tolerance of 1e-7. The parameters are generic draws, so the rank is the structure's, not that of a boundary. With
+# `on`, the case is the trace of K on those items: the parameters are drawn for K, and a state of the trace has the sum
+# of the probabilities of the states of K that leave it.
+identifiability_case <- function(name, K, fixed = list(), on = colnames(K)) {
   items <- colnames(K)
   cut <- c(0, sort(runif(nrow(K) - 1)), 1)
   probabilities <- diff(cut)
   slip <- setNames(runif(length(items), 0.05, 0.25), items)
   guess <- setNames(runif(length(items), 0.05, 0.25), items)
+  key <- apply(K[, on, drop = FALSE], 1, paste, collapse = "")
+  probabilities <- unname(as.vector(tapply(probabilities, factor(key, levels = unique(key)), sum)))
+  K <- unique(K[, on, drop = FALSE])
+  items <- on
+  slip <- slip[on]
+  guess <- guess[on]
   betafix <- by_item(fixed$slip %||% list(), items)
   etafix <- by_item(fixed$guess %||% list(), items)
   slip[!is.na(betafix)] <- betafix[!is.na(betafix)]
@@ -163,7 +171,9 @@ write_fixture("kst-identifiability", list(
                        fixed = list(guess = list(q1 = 0.1), slip = list(q6 = 0.1))),
   identifiability_case("two chains of 2", two_chains),
   identifiability_case("all subsets of 3", subsets(3)),
-  identifiability_case("chess, the first structure", chess$dst1)
+  # The first structure of chess on its first 12 items, 27 states: 4,096 patterns by 50 parameters, where its 16 items
+  # take 65,536 by 88, 50 times the work, which under coverage on the CI runner passes half the test's timeout.
+  identifiability_case("chess, the first structure on its first 12 items", chess$dst1, on = colnames(chess$dst1)[1:12])
 ))
 
 # Gradedness: pks's is.forward.graded and is.backward.graded, on the example structures and on random families of
