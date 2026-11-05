@@ -617,6 +617,159 @@ export function checkModuleExamples(files: Files): Violation[] {
     }));
 }
 
+/** The superscript of each digit, as SECURITY.md writes an exponent. */
+const SUPERSCRIPTS = "⁰¹²³⁴⁵⁶⁷⁸⁹";
+
+/** The constants of a file of a package, by name, with the line of each. */
+function constantsOf(
+  source: ts.SourceFile,
+): Map<string, { readonly initializer: ts.Expression; readonly line: number }> {
+  const constants = new Map<string, { readonly initializer: ts.Expression; readonly line: number }>();
+  for (const statement of source.statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    for (const { name, initializer } of statement.declarationList.declarations) {
+      if (!ts.isIdentifier(name) || initializer === undefined) continue;
+      constants.set(name.text, {
+        initializer,
+        line: source.getLineAndCharacterOfPosition(name.getStart(source)).line + 1,
+      });
+    }
+  }
+  return constants;
+}
+
+/**
+ * The value of a numeric constant: a literal, or the arithmetic of literals and of other constants, of its file or, for one
+ * it imports, exported by a file of the packages.
+ */
+function numberOf(node: ts.Expression, constants: ReadonlyMap<string, ts.Expression>): number | undefined {
+  if (ts.isNumericLiteral(node)) return Number(node.text.replaceAll("_", ""));
+  if (ts.isParenthesizedExpression(node)) return numberOf(node.expression, constants);
+  if (ts.isIdentifier(node)) {
+    const initializer = constants.get(node.text);
+    return initializer === undefined ? undefined : numberOf(initializer, constants);
+  }
+  if (!ts.isBinaryExpression(node)) return undefined;
+  const left = numberOf(node.left, constants);
+  const right = numberOf(node.right, constants);
+  if (left === undefined || right === undefined) return undefined;
+  const operations: Partial<Record<ts.SyntaxKind, number>> = {
+    [ts.SyntaxKind.AsteriskAsteriskToken]: left ** right,
+    [ts.SyntaxKind.AsteriskToken]: left * right,
+    [ts.SyntaxKind.SlashToken]: left / right,
+    [ts.SyntaxKind.PlusToken]: left + right,
+    [ts.SyntaxKind.MinusToken]: left - right,
+  };
+  return operations[node.operatorToken.kind];
+}
+
+/** The ways SECURITY.md writes a number: 1,000; 2^28 and 2²⁸; 2³¹ - 1; 10⁶ and 1e7; 24 million. */
+function writtenForms(value: number): string[] {
+  const superscript = (exponent: number): string =>
+    [...String(exponent)].map((digit) => SUPERSCRIPTS[Number(digit)]).join("");
+  const forms = [value.toLocaleString("en-US")];
+  if (value >= 1e6 && value % 1e6 === 0) forms.push(`${value / 1e6} million`);
+  const two = Math.log2(value);
+  if (Number.isInteger(two) && two >= 10) forms.push(`2^${two}`, `2${superscript(two)}`);
+  const below = Math.log2(value + 1);
+  if (Number.isInteger(below) && below >= 10) forms.push(`2^${below} - 1`, `2${superscript(below)} - 1`);
+  const ten = Math.log10(value);
+  if (Number.isInteger(ten) && ten >= 6) forms.push(`10${superscript(ten)}`, `1e${ten}`);
+  return forms;
+}
+
+/** The name of the option whose default a constant `DEFAULT_MAX_*` is: `maxStates` for `DEFAULT_MAX_STATES`. */
+function optionOf(name: string): string {
+  return name
+    .slice("DEFAULT_".length)
+    .toLowerCase()
+    .replace(/_(\w)/g, (_, letter: string) => letter.toUpperCase());
+}
+
+/**
+ * The limits of a file of a package, each with its line and value: each constant `MAX_*`, of the file or exported by
+ * another, that a `DataError` names, as its message states the limit, and the default `DEFAULT_MAX_*` of each option `max*` that a `DataError` names,
+ * as passing it is refused; an option such as `maxIterations` ends a loop and refuses nothing.
+ */
+function limitsOf(
+  file: string,
+  text: string,
+  shared: ReadonlyMap<string, ts.Expression>,
+): { line: number; name: string; value: number | undefined }[] {
+  const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+  const declared = constantsOf(source);
+  const constants = new Map([
+    ...shared,
+    ...[...declared].map(([name, { initializer }]) => [name, initializer] as const),
+  ]);
+  const named = new Set<string>();
+  const lines = new Map([...declared].map(([name, { line }]) => [name, line] as const));
+  const errors: string[] = [];
+  const visit = (node: ts.Node, inError: boolean): void => {
+    const error = inError || (ts.isNewExpression(node) && node.expression.getText(source) === "DataError");
+    if (error && !inError) errors.push(node.getText(source));
+    if (error && ts.isIdentifier(node) && node.text.startsWith("MAX_") && constants.has(node.text)) {
+      named.add(node.text);
+      lines.set(
+        node.text,
+        lines.get(node.text) ?? source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1,
+      );
+    }
+    ts.forEachChild(node, (child) => visit(child, error));
+  };
+  visit(source, false);
+  for (const name of declared.keys()) {
+    if (name.startsWith("DEFAULT_MAX_") && errors.some((error) => error.includes(optionOf(name)))) named.add(name);
+  }
+  return [...named].map((name) => {
+    const initializer = constants.get(name);
+    return { line: lines.get(name) ?? 0, name, value: initializer && numberOf(initializer, constants) };
+  });
+}
+
+/** The constants `MAX_*` that the files of the packages export, which another file may import and name in a `DataError`. */
+function exportedLimits(files: Files): Map<string, ts.Expression> {
+  const exported = new Map<string, ts.Expression>();
+  for (const [file, text] of files) {
+    if (!isLibrary(file) || !/export const MAX_/.test(text)) continue;
+    const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+    for (const [name, { initializer }] of constantsOf(source))
+      if (name.startsWith("MAX_")) exported.set(name, initializer);
+  }
+  return exported;
+}
+
+/** Returns whether the section Default limits of SECURITY.md writes a number in one of its forms, not inside another number. */
+function statesNumber(security: string): (value: number) => boolean {
+  const heading = security.indexOf("\n## Default limits");
+  const table = heading < 0 ? "" : security.slice(heading, security.indexOf("\n## ", heading + 1) >>> 0);
+  const literal = (form: string): string => form.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return (value) =>
+    writtenForms(value).some((form) => new RegExp(`(?<![\\d.^]|\\d,)${literal(form)}(?!\\d|,\\d)`).test(table));
+}
+
+/**
+ * SECURITY.md states every limit of the packages in its section Default limits, so that a limit added without its row, or
+ * the file emptied by a merge, fails: the value of each constant `MAX_*` that a `DataError` names, and of the default
+ * `DEFAULT_MAX_*` of each option that one names, in one of the ways the table writes a number.
+ */
+export function checkSecurityLimits(files: Files): Violation[] {
+  const states = statesNumber(files.get("SECURITY.md") ?? "");
+  const exported = exportedLimits(files);
+  return [...files].flatMap(([file, text]) =>
+    isLibrary(file) && /\bMAX_/.test(text)
+      ? limitsOf(file, text, exported)
+          .filter(({ value }) => value === undefined || !states(value))
+          .map(({ line, name, value }) => ({
+            file,
+            line,
+            rule: "security-limit",
+            message: `The limit ${name}${value === undefined ? "" : `, ${value},`} is not stated in the Default limits of SECURITY.md; give it a row with its value.`,
+          }))
+      : [],
+  );
+}
+
 /** Every check, in the order of the standards. */
 export const CHECKS: readonly ((files: Files) => Violation[])[] = [
   checkSectionSigns,
@@ -638,6 +791,7 @@ export const CHECKS: readonly ((files: Files) => Violation[])[] = [
   checkClaimWords,
   checkReadmeLinks,
   checkEvidencePages,
+  checkSecurityLimits,
 ];
 
 /** Runs every check over the files. */

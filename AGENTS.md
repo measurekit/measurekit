@@ -454,6 +454,9 @@ listed here with its reason. A file is written `<package>/<path below src>`, and
   `validation/README.md` the method of the benchmarks, how to refresh the pages and how the budgets were measured.
 - A bug fix comes with a test that fails without it, in the test file of the fixed folder. A rule that keeps untrusted
   input from being misread, or from costing what its size does not, has an entry in `scripts/check-rules.ts`.
+- A limit is a constant `MAX_*` that the message of its `DataError` names, or the default `DEFAULT_MAX_*` of an option
+  `max*` that a `DataError` names, with a row in [Default limits](SECURITY.md#default-limits) that states its value:
+  `pnpm check:standards` fails on a limit whose value the section does not state (`security-limit`).
 
 ## Where things go
 

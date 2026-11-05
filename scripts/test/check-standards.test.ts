@@ -13,6 +13,7 @@ import {
   checkReadmeSections,
   checkReadonlyResults,
   checkSectionSigns,
+  checkSecurityLimits,
   checkStandards,
   checkTestTitles,
   type Files,
@@ -470,5 +471,55 @@ describe("all checks", () => {
         message: "Name the rule in words, or link the specification; no section signs.",
       },
     ]);
+  });
+});
+
+describe("security limits", () => {
+  const limits = `const MAX_CELLS = 2 ** 28;
+const MAX_ITEMS = 1_000;
+export const MAX_WIDE = 24_000_000;
+const DEFAULT_MAX_STATES = 10_000;
+const DEFAULT_MAX_ITERATIONS = 500;
+export function f(cells: number, items: number, maxStates = DEFAULT_MAX_STATES): void {
+  if (cells > MAX_CELLS) throw new DataError(\`At most \${MAX_CELLS} cells.\`);
+  if (items > MAX_ITEMS) throw new DataError(\`At most \${MAX_ITEMS} items.\`);
+  if (items > maxStates) throw new DataError(\`More than \${maxStates} states: raise maxStates.\`);
+}
+`;
+  const importer = `import { MAX_WIDE } from "./a.js";
+export const g = (n: number) => { if (n > MAX_WIDE * 2) throw new DataError(\`\${MAX_WIDE}\`); };
+`;
+  const security = (table: string): string =>
+    `# Security\n\n## Default limits\n\n${table}\n\n## Runtime dependencies\n\n2^28, 1,000\n`;
+
+  it("reports each limit whose value the section Default limits does not state: a constant MAX_* that a DataError names, or the default of an option max* that one names", () => {
+    const files = repository({
+      "packages/a/src/a.ts": limits,
+      "packages/a/src/b.ts": importer,
+      "SECURITY.md": security("| x | 7 |"),
+    });
+    expect(
+      checkSecurityLimits(files).map(({ file, line, message }) => [file, line, message.split(",")[0]]),
+    ).toStrictEqual([
+      ["packages/a/src/a.ts", 1, "The limit MAX_CELLS"],
+      ["packages/a/src/a.ts", 2, "The limit MAX_ITEMS"],
+      ["packages/a/src/a.ts", 4, "The limit DEFAULT_MAX_STATES"],
+      ["packages/a/src/b.ts", 2, "The limit MAX_WIDE"],
+    ]);
+  });
+
+  it("finds a value in each way the table writes a number, and not inside another number", () => {
+    const files = (table: string) =>
+      repository({ "packages/a/src/a.ts": limits, "packages/a/src/b.ts": importer, "SECURITY.md": security(table) });
+    expect(checkSecurityLimits(files("| a | 2^28; 1,000; 10,000; 24 million |"))).toStrictEqual([]);
+    expect(checkSecurityLimits(files("| a | 2²⁸, 1,000, as R's; `maxStates`, 10,000 | 24,000,000 |"))).toStrictEqual(
+      [],
+    );
+    expect(checkSecurityLimits(files("| a | 2^280; 21,000; 110,000; 124 million |")).length).toBe(4);
+  });
+
+  it("reports every limit when SECURITY.md is lost", () => {
+    const files = repository({ "packages/a/src/a.ts": limits, "packages/a/src/b.ts": importer });
+    expect(checkSecurityLimits(files)).toHaveLength(4);
   });
 });
