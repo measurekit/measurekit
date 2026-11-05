@@ -1,5 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { continuedFraction } from "../src/continued-fraction.js";
 import { chiSquareUpperTail, logGamma, studentLowerTail } from "../src/index.js";
 
 /** Relative tolerance of tails that have a closed form, at the precision of the continued fractions. */
@@ -110,5 +111,43 @@ describe("studentLowerTail", () => {
         },
       ),
     );
+  });
+});
+
+describe("continuedFraction", () => {
+  /** Evaluates 1 / (b₀ + a₁ / (b₁ + ...)) from the term `depth` upward, which meets no division by 0 where the tail is positive. */
+  function fromTheTail(a: (n: number) => number, b: (n: number) => number, depth: number): number {
+    let tail = b(depth);
+    for (let n = depth - 1; n >= 0; n--) tail = b(n) + a(n + 1) / tail;
+    return 1 / tail;
+  }
+
+  it("is 1 / √2 for 1 / (1 + 1 / (2 + 1 / (2 + ...))), as 1 + 1 / (2 + ...) is √2", () => {
+    const result = continuedFraction(
+      () => 1,
+      (n) => (n === 0 ? 1 : 2),
+    );
+    expect(Math.abs(result - Math.SQRT1_2)).toBeLessThanOrEqual(CLOSED_FORM_TOLERANCE);
+  });
+
+  it("goes through a convergent whose denominator is 0, which is infinite, to the limit of the fraction", () => {
+    // b₀ + a₁ / b₁ = 1 - 1 / 1 = 0, so the first convergent is infinite; the tail 2 + 1 / (2 + ...) is 1 + √2, which makes
+    // the fraction 1 / (1 - 1 / √2) = 2 + √2.
+    const a = (n: number): number => (n === 1 ? -1 : 1);
+    const b = (n: number): number => (n <= 1 ? 1 : 2);
+    const result = continuedFraction(a, b);
+    expect(Number.isFinite(result)).toBe(true);
+    expect(Math.abs(result - (2 + Math.SQRT2)) / (2 + Math.SQRT2)).toBeLessThanOrEqual(CLOSED_FORM_TOLERANCE);
+    expect(Math.abs(result - fromTheTail(a, b, 200)) / result).toBeLessThanOrEqual(CLOSED_FORM_TOLERANCE);
+  });
+
+  it("goes through a convergent whose numerator is 0 to the limit of the fraction", () => {
+    // b₁ + a₂ / b₂ = 1 - 2 / 2 = 0 makes the second convergent 0, which the ratio of its numerators to the first's
+    // takes to 0 and the next to infinity.
+    const a = (n: number): number => (n === 1 ? 3 : n === 2 ? -2 : 1);
+    const b = (n: number): number => (n <= 1 ? 1 : 2);
+    const result = continuedFraction(a, b);
+    expect(Number.isFinite(result)).toBe(true);
+    expect(Math.abs(result - fromTheTail(a, b, 200)) / result).toBeLessThanOrEqual(CLOSED_FORM_TOLERANCE);
   });
 });

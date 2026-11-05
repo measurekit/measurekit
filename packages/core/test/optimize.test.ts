@@ -104,6 +104,33 @@ describe("bfgs", () => {
     expect(bfgs(undefinedSlope, [1])).toMatchObject({ iterations: 0, converged: false });
   });
 
+  it("minimizes a function whose curvature differs by a factor of 1e16, where rounding takes the definiteness of the approximation", () => {
+    // f = Σ (z² / 2 + 0.3 sin z) with z = scale (x - shift): convex, with its minimum at z = z* in each coordinate. The
+    // curvature runs from 1e-4 to 1e12, the precision of a double, so the update of the inverse Hessian, positive
+    // definite in exact arithmetic, loses its definiteness in rounding and gives a direction that does not descend.
+    const scale = [0.01, 0.01, 1e6];
+    const shift = [1.2, 0.8, -0.6];
+    const badlyScaled: GradientFunction = (x, gradient) => {
+      let value = 0;
+      for (let i = 0; i < scale.length; i++) {
+        const z = (scale[i] ?? 1) * ((x[i] ?? 0) - (shift[i] ?? 0));
+        value += (z * z) / 2 + 0.3 * Math.sin(z);
+        gradient[i] = (scale[i] ?? 1) * (z + 0.3 * Math.cos(z));
+      }
+      return value;
+    };
+    // z* solves z + 0.3 cos z = 0; the map z -> -0.3 cos z contracts by at most 0.3.
+    let zStar = 0;
+    for (let i = 0; i < 40; i++) zStar = -0.3 * Math.cos(zStar);
+    const minimum = scale.length * ((zStar * zStar) / 2 + 0.3 * Math.sin(zStar));
+    const result = bfgs(badlyScaled, [1, -2, 8]);
+    expect(result.converged).toBe(true);
+    // Steepest descent cannot move the two flat coordinates once the steep one is at its minimum, as the step that
+    // suits 1e12 is 1e-16 of the one that suits 1e-4, so the value is within 1e-5 of the minimum, not to rounding.
+    expect(Math.abs(result.value - minimum)).toBeLessThan(1e-5);
+    expect(result.x[2]).toBeCloseTo(-0.6 + zStar / 1e6, 12);
+  });
+
   it("does not change its start", () => {
     const start = [-1.2, 1];
     bfgs(rosenbrock, start);
