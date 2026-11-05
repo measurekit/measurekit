@@ -324,7 +324,7 @@ bfi_items <- function(scales) {
 }
 
 if (selected("graded")) {
-  graded_data <- bfi_items(c("A", "C"))
+  graded_data <- bfi_items(c("A", "C"))[1:800, ]
   graded <- mirt(graded_data, mirt.model("F1 = 1-5\nF2 = 6-10\nCOV = F1*F2"), itemtype = "graded", quadpts = 31,
                  TOL = TOL, SE = TRUE, SE.type = "Oakes", verbose = FALSE, technical = list(NCYCLES = 20000))
   stopifnot_converged(graded)
@@ -333,8 +333,7 @@ if (selected("graded")) {
 
   write_fixture("multidimensional-graded", c(
     list(
-      source = sprintf("psych::bfi items A1-A5 and C1-C5, complete cases (n = %d), coded 0-5, under the graded model.",
-                      nrow(graded_data)),
+      source = "psych::bfi items A1-A5 and C1-C5, the first 800 complete cases, coded 0-5, under the graded model.",
       model = "mgrm", points = 31, itemIds = colnames(graded_data), responses = unname(as.matrix(graded_data)),
       loadings = confirmatory_pattern(colnames(graded_data), graded_groups), dimensionNames = c("A", "C"),
       items = graded_items

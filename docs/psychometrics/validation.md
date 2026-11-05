@@ -101,7 +101,7 @@ each case (0.441 and 0.135 at worst).
 | Parameters held: estimates, SEs, correlation, log-likelihood, AIC, BIC | The same with `pars` and `est = FALSE` on `g` of 3PL items, 1 of them on both dimensions, and on `a1` of a 2PL item; 31 points, Oakes and `crossprod` |
 | Graded: `bfi` A and C on two dimensions, A, C and E on three           | `mirt(itemtype = "graded")` with `COV`; 31 points and 15 points                                                                                       |
 | Cross-product standard errors                                          | `mirt(SE.type = "crossprod")`                                                                                                                         |
-| Several groups: estimates, SEs, moments, log-likelihood                | `multipleGroup(invariance = c("slopes", "intercepts", "free_means", "free_var"))`, `TOL = 1e-10`, 31 and 15 points                                    |
+| Several groups: estimates, SEs, moments, log-likelihood                | `multipleGroup(invariance = c("slopes", "intercepts", "free_means", "free_var"))`, `TOL = 1e-10`, 21 and 15 points                                    |
 | Fixed items that set the scale                                         | `multipleGroup` with `pars` and `est = FALSE` for the fixed items, and the other items named in `invariance`                                          |
 | Longitudinal: items, moments, changes, log-likelihood                  | `mirt`: a dimension per occasion, items tied by `constrain`, `MEAN` and `COV` for later occasions, `TOL = 1e-9`; changes in base R                    |
 | Longitudinal: Rasch model                                              | `tam.mml` with `Q` and `A`, on the scale of the first occasion; `mirt` with equal slopes                                                              |
@@ -1071,9 +1071,13 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
   `validation/psychometrics/results/bifactor-recovery.json`: root mean square errors of the primary slopes below 0.10 and of
   the specific slopes below 0.14, and a correlation within 0.04 of 0.5 (0.083, 0.117 and 0.018 found).
 - **Multidimensional recovery in several groups.** 120 simulated M2PL items, 40 on each of 3 dimensions, from 1,900
-  simulated persons in three groups with their own means and covariances: at 21 nodes per dimension every mean within
-  0.18 and every covariance within 0.25 of the true value (0.13 and 0.18 found); at the default 15 nodes the errors are
-  0.24 and 0.61, which is why the guide advises 21 above 20 items per dimension.
+  simulated persons in three groups with their own means and covariances, three seeds: at 21 nodes per dimension every
+  mean within 0.18 and every covariance within 0.25 of the true value (0.13 and 0.18 found); at the default 15 nodes the
+  errors are up to 0.24 and 0.66, which is why the guide advises 21 above 20 items per dimension.
+  `validation/psychometrics/multidimensional-groups-recovery.ts` runs it in about ten minutes and records it in
+  `results/`. The test recovers three groups on two dimensions from 500 persons each and 10 items per dimension: every
+  mean within 0.25 and every covariance within 0.5 of the moments of the simulated abilities, on the scale of the first
+  group's sample (0.146 and 0.305 at most over seeds 1 to 20).
 - **Factor recovery.** 12 simulated dichotomous items, 6 on each of 2 factors correlated 0.3, from 1,500 simulated
   persons, with loadings 0.7 and 0.6: the tetrachoric factors give mean loadings within 0.05 of the truth and a
   correlation within 0.07 (0.010, 0.006 and 0.016 found), and the minimum average partial test finds 2 factors.
@@ -1103,7 +1107,9 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
   correlations within 1.5 times the worst error of `mirt` on 10 items and the same design, rounded up to a multiple of
   0.005 (0.03, 0.025 and 0.02 at 2 occasions, 0.03, 0.035 and 0.02 at 3). The errors are distances from the moments of the
   simulated abilities, not of their distribution. At 40 items and 3 occasions, 15 nodes miss these thresholds, and 21
-  nodes are within 0.03 of 31 where 15 are 0.10 away.
+  nodes are within 0.03 of 31 where 15 are 0.10 away. `validation/psychometrics/longitudinal-recovery.ts` runs these in
+  about five minutes and records them in `results/`. The test recovers the moments of 2 occasions from 300 persons and 10
+  items within four standard errors of the estimates (2.4 at most over seeds 1 to 20).
 - **Kernel equating.** The population of 40 Rasch items with difficulties from -1.5 to 1.5 and theta N(0, 1), form X
   easier and form Y harder by 0.2; the truth is the kernel equating of the population presmoothed at degree 12. On 200
   sets of 1,000 persons per form presmoothed at degree 6, over the scores 5 to 35: the bias within three of its Monte Carlo
@@ -1163,7 +1169,7 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
 | `multidimensional-missing.json`          | The same data with 8% of the responses missing completely at random                                                                                                                                                                                                                                                                                                      | Missing responses                                                                                                                                                     |
 | `multidimensional-not-at-random.json`    | `set.seed(20261102)`: 1,500 persons, 8 two-parameter items and 8 indicators of whether each was answered, on a propensity correlated 0.5 with the ability                                                                                                                                                                                                                |
 | `multidimensional-m3pl.json`             | `simdata`, `set.seed(20261029)`: 1000 persons, 12 3PL items with g = 0.15, 6 on each of 2 dimensions                                                                                                                                                                                                                                                                     | Normal priors on logit c                                                                                                                                              |
-| `multidimensional-graded.json`           | `psych::bfi` A1-A5 and C1-C5, 2632 complete cases, coded 0-5                                                                                                                                                                                                                                                                                                             | Six categories, two dimensions, EAP and MAP of 24 patterns                                                                                                            |
+| `multidimensional-graded.json`           | `psych::bfi` A1-A5 and C1-C5, the first 800 complete cases, coded 0-5                                                                                                                                                                                                                                                                                                    | Six categories, two dimensions, EAP and MAP of 24 patterns                                                                                                            |
 | `multidimensional-graded3.json`          | `psych::bfi` A1-A5, C1-C5 and E1-E5, the first 500 complete cases                                                                                                                                                                                                                                                                                                        | Three dimensions, 15 points                                                                                                                                           |
 | `multidimensional-mhrm.json`             | `psych::bfi`, the 25 items, the first 800 complete cases, coded 0-5; mirt's MH-RM with seeds 1 to 4; the score and Hessian of two items at given thetas                                                                                                                                                                                                                  | Five dimensions, the Monte Carlo error of mirt's runs, mirt's complete-data derivatives                                                                               |
 | `multidimensional-groups.json`           | `mirt::simdata` with `set.seed(20261029)`: five cases of two or three groups on 2 or 3 dimensions, with items missing by design, graded items, and 4 fixed items                                                                                                                                                                                                         |                                                                                                                                                                       |
@@ -1528,15 +1534,15 @@ one item, two persons) are tested against values derived by hand in `test/ctt.te
 | Bifactor against the full grid after 40 iterations: parameters, log-likelihood                          | 1e-9 absolute                                                   | 1e-12                     |
 | Bifactor against the full grid after 40 iterations: standard errors                                     | 1e-7 relative                                                   | 8e-10                     |
 | Bifactor with priors against the full grid after 60 iterations: parameters; log-likelihood              | 1e-6 absolute                                                   | 2.1e-8; 2.1e-8            |
-| Multidimensional groups: parameters, correlations                                                       | 2e-4 absolute; 5e-5 for two correlated groups                   | 9.2e-5; 9.3e-6            |
-| Multidimensional groups: means and covariances                                                          | 5e-4 absolute; 1e-4 for two correlated groups                   | 2.5e-4; 3.0e-5            |
-| Multidimensional groups: standard errors                                                                | 5e-4 relative; 1e-4 for two correlated groups                   | 7.7e-5; 5.8e-6            |
-| Multidimensional groups: log-likelihood, AIC, BIC                                                       | 5e-6 absolute; 1e-6 for two correlated groups                   | 1.8e-6; 6.2e-8            |
+| Multidimensional groups: parameters, correlations                                                       | 2e-4 absolute; 5e-5 for two correlated groups                   | 5.4e-5; 9.8e-6            |
+| Multidimensional groups: means and covariances                                                          | 5e-4 absolute; 1e-4 for two correlated groups                   | 1.5e-4; 3.1e-5            |
+| Multidimensional groups: standard errors                                                                | 5e-4 relative; 1e-4 for two correlated groups                   | 4.6e-5; 6.3e-6            |
+| Multidimensional groups: log-likelihood, AIC, BIC                                                       | 5e-6 absolute; 1e-6 for two correlated groups                   | 6.8e-7; 5.0e-8            |
 | Longitudinal: parameters, moments, changes; 2 occasions                                                 | 1e-4 absolute                                                   | 1.0e-5                    |
-| Longitudinal: parameters, moments, changes; 3 occasions                                                 | 1e-3 absolute                                                   | 6.5e-4                    |
+| Longitudinal: parameters, moments, changes; 3 occasions                                                 | 1e-3 absolute                                                   | 3.4e-5                    |
 | Longitudinal: parameters, moments, changes; Rasch model                                                 | 5e-4 absolute                                                   | 1.1e-4                    |
 | Longitudinal: log-likelihood against mirt                                                               | 1e-2 absolute; at least mirt's less 1e-6                        | 4.7e-5; never below       |
-| Longitudinal: parameters and moments; log-likelihood against TAM                                        | 5e-3 absolute; 1e-2 absolute                                    | 1.2e-4; 2.9e-3            |
+| Longitudinal: parameters and moments; log-likelihood against TAM                                        | 5e-3 absolute; 1e-2 absolute                                    | 1.3e-5; 2.1e-4            |
 | Longitudinal: standard errors, Hessian; cross-product                                                   | 1e-5 absolute                                                   | 5.1e-7; 2.4e-7            |
 | MH-RM 2PL parameters; correlation against mirt's EM                                                     | 0.12; 0.05 absolute                                             | 0.057; 0.025              |
 | MH-RM 2PL standard errors against mirt's Oakes                                                          | 0.15 relative                                                   | 0.065                     |
@@ -1596,13 +1602,16 @@ specific dimensions and 15 points. The tests against the full grid run both EM c
 40 iterations with `tolerance: 0`: the two are one sequence of estimates, so they agree to rounding, in about a second
 where the full grid takes half a minute to converge.
 
-The calibrations of groups run with `tolerance: 1e-9`. The likelihood is flat in the groups' moments, so mirt's EM stops
-before its estimates settle, and they differ from this library's by up to 2.5e-4; this library's estimates move by less
-than 1e-7 when the tolerance is 1e-11, and their log-likelihood is at least mirt's.
+The calibrations of groups run with `tolerance: 1e-7`, and the one of three dimensions with 1e-6, which moves their
+distances from mirt's estimates by less than 1e-5 against 1e-9. The likelihood is flat in the groups' moments, so mirt's
+EM stops before its estimates settle, and they differ from this library's by up to 1.5e-4; this library's estimates move
+by less than 1e-7 between the tolerances 1e-9 and 1e-11, and their log-likelihood is at least mirt's. Two dimensions are
+on 21 nodes, where the distances are those on 31.
 
 The longitudinal calibrations run with `tolerance: 1e-6`. On three occasions mirt's EM stops before its estimates settle,
-so they differ from this library's by up to 6.5e-4; this library's estimates move by less than 1.6e-5 when the tolerance
-is 1e-10, and their log-likelihood is never below mirt's. TAM's Rasch model has the slopes at 1 and the first occasion's
+so they differ from this library's by up to 3.4e-5; this library's estimates move by less than 1e-5 when the tolerance
+is 1e-10, and their log-likelihood is never below mirt's. Three occasions are on 15 nodes and the Rasch model on 2
+occasions: on 15 nodes per occasion, mirt's Rasch estimates of 3 occasions are 4e-3 from this library's. TAM's Rasch model has the slopes at 1 and the first occasion's
 variance free; the comparison converts it to the scale of that standard deviation, which the 1PL's slope carries.
 
 The MH-RM calibrations run with the default `tolerance` of 1e-3 and the seed 1; the five-dimensional case takes under a

@@ -89,7 +89,7 @@ Rscript validation/psychometrics/multidimensional-groups.R # multidimensional IR
 Rscript validation/psychometrics/missing-not-at-random.R # responses missing not at random: mirt's two-dimensional 2PL of the responses and their indicators
 Rscript validation/psychometrics/bifactor.R           # bifactor and two-tier models: mirt's bfactor; case names as arguments run only those cases
 Rscript validation/psychometrics/longitudinal.R      # the same persons over two or three occasions: mirt with one dimension per occasion and tied items; TAM's tam.mml for the Rasch model
-Rscript validation/psychometrics/longitudinal-recovery.R # how well mirt recovers the moments of the occasions, which bounds the recovery tests and the number of occasions
+Rscript validation/psychometrics/longitudinal-recovery.R # how well mirt recovers the moments of the occasions, which bounds longitudinal-recovery.ts and the number of occasions
 Rscript validation/psychometrics/change.R            # gains, reliability of a difference and reliable change: clinicalsignificance and base R
 Rscript validation/psychometrics/parameterization.R  # mirt's coefficient forms of every item type, multidimensional ones included
 Rscript validation/psychometrics/math.R              # normal, logistic and chi-square functions, Gauss-Hermite rules, eigendecompositions; reads the fixture of exploratory-factors.R
@@ -130,7 +130,7 @@ similarity call its internal functions. Install it at its commit into a library 
 `git clone https://github.com/jaminsore/CopyDetect.git && git -C CopyDetect checkout 32bdd322fba438b654b4ccc1e78406e208a361ad`,
 `R CMD INSTALL --no-test-load -l <library> CopyDetect`, then `R_LIBS=<library> Rscript validation/psychometrics/similarity.R`.
 `multidimensional-groups.R` writes one fixture of five cases, two groups of correlated dimensions, the same data with fixed
-items, three groups with items missing by design, the graded model and three dimensions, and takes about a minute.
+items, three groups with items missing by design, the graded model and three dimensions, and takes about 20 seconds.
 `exploratory-factors.R` writes one fixture of ten correlation matrices, simulated, `bfi`, `SAT12`, Harman's tests and a Heywood case,
 with their minres solutions in base R and psych, and takes seconds. `factor-solutions.R` holds the base R solutions by
 minres and maximum likelihood and their rotations, which it, `efa-fit.R` and `factor-hierarchy.R` share.
@@ -140,7 +140,7 @@ all of them without; it takes about 5 minutes, mirt's EM at `TOL = 1e-10` runnin
 whether mirt stopped before its limit of 5,000. `recovery` writes the data and the truth only: `bifactor-recovery.ts` reads them.
 
 `longitudinal.R` writes one fixture of five cases, two occasions with persons missing from the second, three occasions, items
-that only one occasion has, the graded model and the Rasch model, and takes about ten minutes; `longitudinal-mirt.R` holds the
+that only one occasion has, the graded model and the Rasch model, and takes about three minutes; `longitudinal-mirt.R` holds the
 simulation and the mirt model that it, `longitudinal-recovery.R` and the benchmark share. `longitudinal-recovery.R` fits mirt
 to 5,000 persons on 4 cores, writes each row as it finishes, takes about ten minutes and stops after 60.
 
@@ -157,12 +157,14 @@ same rule at a size that runs in seconds. `validation/` is a package of the work
 packages by name and `pnpm typecheck` checks them; no Vitest project and no job of CI runs them. A study exits with 1 when
 a fit misses the threshold it states.
 
-| Study                                          | Time             | Its results record                                                                                                                                                                                                                                                                 |
-| ---------------------------------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `psychometrics/bifactor-recovery.ts`           | About 10 seconds | A two-tier model of 80 items and 3,000 persons on 21 nodes, from the data of `bifactor.R`'s `recovery`: the root mean square errors of the primary and the specific slopes against 0.10 and 0.14, and the correlation's error against 0.04                                         |
-| `psychometrics/irt-error-recovery.ts`          | About 20 minutes | The guide's bootstrap of 400 resamples on 20 seeds: each error against the Hessian's and their root mean square; the coverage of the pretest items' intervals under fixed items calibrated on 150 other persons and on the same 1,000, with their error carried and taken as known |
-| `psychometrics/ctt-interval-coverage.ts`       | About 2 minutes  | The coverage of the percentile intervals of alpha and omega, 500 samples of 200 persons and 1,000 resamples, against 0.92 to 0.98                                                                                                                                                  |
-| `psychometrics/parallel-analysis-quantiles.ts` | About 2 minutes  | The means and the 0.95 quantiles of parallel analysis' random eigenvalues against base R's 2,000 permutations of `bfi`, 1,000 replications on 20 seeds, in Monte Carlo errors against 4 and 6                                                                                      |
+| Study                                               | Time             | Its results record                                                                                                                                                                                                                                                                 |
+| --------------------------------------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `psychometrics/bifactor-recovery.ts`                | About 10 seconds | A two-tier model of 80 items and 3,000 persons on 21 nodes, from the data of `bifactor.R`'s `recovery`: the root mean square errors of the primary and the specific slopes against 0.10 and 0.14, and the correlation's error against 0.04                                         |
+| `psychometrics/irt-error-recovery.ts`               | About 20 minutes | The guide's bootstrap of 400 resamples on 20 seeds: each error against the Hessian's and their root mean square; the coverage of the pretest items' intervals under fixed items calibrated on 150 other persons and on the same 1,000, with their error carried and taken as known |
+| `psychometrics/ctt-interval-coverage.ts`            | About 2 minutes  | The coverage of the percentile intervals of alpha and omega, 500 samples of 200 persons and 1,000 resamples, against 0.92 to 0.98                                                                                                                                                  |
+| `psychometrics/parallel-analysis-quantiles.ts`      | About 2 minutes  | The means and the 0.95 quantiles of parallel analysis' random eigenvalues against base R's 2,000 permutations of `bfi`, 1,000 replications on 20 seeds, in Monte Carlo errors against 4 and 6                                                                                      |
+| `psychometrics/longitudinal-recovery.ts`            | About 5 minutes  | The moments of 5,000 persons on 2 and 3 occasions at 10 and 40 items, seeds 1 to 3: each fit's errors against 1.5 times mirt's worst, and the worst over the seeds; 40 items on 3 occasions at 15 nodes; the distances between 15, 21 and 31 nodes                                 |
+| `psychometrics/multidimensional-groups-recovery.ts` | About 10 minutes | Three groups of 700, 600 and 600 persons, 40 items on each of 3 dimensions, three seeds at 21 and 15 nodes: each fit's errors of the means and covariances against 0.18 and 0.25, and the worst at each number of nodes                                                            |
 
 ## Knowledge tracing
 

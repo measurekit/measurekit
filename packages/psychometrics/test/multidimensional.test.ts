@@ -159,26 +159,6 @@ interface LongitudinalFixture {
 }
 const longitudinal = readFixture<LongitudinalFixture>("longitudinal.json");
 
-interface LongitudinalRecoveryFixture {
-  source: string;
-  truth: { means: number[]; sds: number[]; rho: number };
-  recovery: {
-    persons: number;
-    occasions: number;
-    points: number;
-    fits: { seed: number; mean: number; sd: number; correlation: number; iterations: number; converged: boolean }[];
-    worst: { mean: number; sd: number; correlation: number };
-  }[];
-  grid: {
-    persons: number;
-    occasions: number;
-    points: number;
-    fits: { seed: number; mean: number; sd: number; correlation: number; iterations: number; converged: boolean }[];
-    worst: { mean: number; sd: number; correlation: number };
-  }[];
-}
-const longitudinalRecovery = readFixture<LongitudinalRecoveryFixture>("longitudinal-recovery.json");
-
 interface MultidimensionalExploratoryFixture {
   flat: {
     source: string;
@@ -616,11 +596,6 @@ interface MhrmFixture extends Pick<Fixture, "model" | "itemIds" | "responses" | 
 }
 
 const mirtMhrm: MhrmFixture = mhrm;
-/**
- * The time a calibration of several groups may take under coverage, which CI's job of Node.js 22 runs and which makes it
- * about five times as long: the slowest took 79 to 213 s under it, and 20 s without it.
- */
-const UNDER_COVERAGE = 600_000;
 
 function modelOf(name: string): MultidimensionalModel<Parameters> {
   return defined(MODELS[name as ModelName]);
@@ -728,6 +703,18 @@ function calibrateFixture(
       ...extra,
     },
   );
+}
+
+/**
+ * Returns a function that computes a value on its first call and returns that value after, so that the tests that read one
+ * calibration share it and only the first that runs pays for it.
+ */
+function once<T>(compute: () => T): () => T {
+  let value: T | undefined;
+  return () => {
+    value ??= compute();
+    return value;
+  };
 }
 
 describe("models", () => {
@@ -1044,15 +1031,22 @@ describe("latent distribution", () => {
 });
 
 describe("calibration", () => {
+  /**
+   * The calibrations of the M2PL fixture with each kind of standard errors, which several tests read. At a tolerance of
+   * 1e-7 the estimates are within 2e-6 of mirt's, as at 1e-9.
+   */
+  const m2plHessian = once(() => calibrateFixture(m2pl, "hessian", { tolerance: 1e-7 }));
+  const m2plCrossProduct = once(() => calibrateFixture(m2pl, "cross-product", { tolerance: 1e-7 }));
+
   it("matches mirt for a confirmatory model of two correlated dimensions", () => {
-    const fit = calibrateFixture(m2pl, "hessian", { tolerance: 1e-9 });
+    const fit = m2plHessian();
     expectCalibration(fit, m2pl, { parameters: 1e-5, errors: 1e-4, likelihood: 1e-6 }, "M2PL");
     expect(fit.converged).toBe(true);
     expect(fit.dimensions).toEqual(["F1", "F2"]);
   });
 
   it("matches mirt's cross-product standard errors", () => {
-    const fit = calibrateFixture(m2pl, "cross-product", { tolerance: 1e-9 });
+    const fit = m2plCrossProduct();
     const expected = m2pl.crossProduct;
     m2pl.items.forEach((item, i) => {
       const errors = defined(expected.standardErrors[i]);
@@ -1070,7 +1064,8 @@ describe("calibration", () => {
   });
 
   it("matches mirt with missing responses", () => {
-    const fit = calibrateFixture(missing, "hessian", { tolerance: 1e-9 });
+    // At a tolerance of 1e-7 the estimates are as close to mirt's as at 1e-9, about 1e-6.
+    const fit = calibrateFixture(missing, "hessian", { tolerance: 1e-7 });
     expectCalibration(fit, missing, { parameters: 1e-5, errors: 1e-4, likelihood: 1e-6 }, "missing");
   });
 
@@ -1086,7 +1081,7 @@ describe("calibration", () => {
   });
 
   it("matches mirt for the graded model on three dimensions", () => {
-    const fit = calibrateFixture(graded3, "none", { tolerance: 1e-8 });
+    const fit = calibrateFixture(graded3, "none", { tolerance: 1e-7 });
     expectCalibration(fit, graded3, { parameters: 2e-4, errors: 1e-3, likelihood: 1e-4 }, "graded, three dimensions");
     expect(fit.correlations).toHaveLength(3);
     expect(fit.correlationStandardErrors).toBeNull();
@@ -1182,14 +1177,14 @@ describe("calibration", () => {
   });
 
   it("reports the log-likelihood, AIC and BIC from the number of estimated parameters", () => {
-    const fit = calibrateFixture(m2pl, "none", { tolerance: 1e-6 });
+    const fit = m2plHessian();
     // 12 slopes, 12 intercepts and one correlation; 1,500 persons.
     expectClose(fit.aic, -2 * fit.logLikelihood + 2 * 25, 1e-9);
     expectClose(fit.bic, -2 * fit.logLikelihood + 25 * Math.log(1500), 1e-9);
   });
 
   it("fixes the correlations at 0 when they are not estimated", () => {
-    const free = calibrateFixture(m2pl, "none", { tolerance: 1e-6 });
+    const free = m2plHessian();
     const fit = calibrateMultidimensional(
       buildResponseMatrix(m2pl.responses, { itemIds: [...m2pl.itemIds] }),
       multidimensionalTwoParameterLogistic,
@@ -1366,13 +1361,13 @@ describe("calibration", () => {
       const plain = calibrateMultidimensional(data, multidimensionalTwoParameterLogistic, {
         loadings: m2pl.loadings,
         points: 15,
-        tolerance: 1e-8,
+        tolerance: 1e-6,
         standardErrors,
       });
       const tight = calibrateMultidimensional(data, multidimensionalTwoParameterLogistic, {
         loadings: m2pl.loadings,
         points: 15,
-        tolerance: 1e-8,
+        tolerance: 1e-6,
         standardErrors,
         priors: { intercept: normalPrior(0, 0.01) },
       });
@@ -1437,7 +1432,7 @@ describe("calibration", () => {
   });
 
   it("reports standard errors only for the estimated parameters", () => {
-    const fit = calibrateFixture(m2pl, "cross-product", { tolerance: 1e-6 });
+    const fit = m2plCrossProduct();
     expect(Object.keys(defined(fit.items[0]?.standardErrors)).sort()).toEqual(["a1", "intercept"]);
     expect(Object.keys(defined(fit.items[6]?.standardErrors)).sort()).toEqual(["a2", "intercept"]);
     const gradedFit = calibrateMultidimensional(
@@ -1478,16 +1473,21 @@ describe("calibration", () => {
 describe("fixed parameters", () => {
   const matrix = buildResponseMatrix(held.responses, { itemIds: held.itemIds });
   const optionsModel = held.models.map(modelOf);
+  // At a tolerance of 1e-7 the estimates and standard errors are within 5e-6 of mirt's, as at 1e-9.
   const options = {
     loadings: held.loadings,
     fixedParameters: held.fixedParameters,
     points: held.points,
-    tolerance: 1e-9,
+    tolerance: 1e-7,
     maxIterations: 5000,
   };
-  const hessian = calibrateMultidimensional(matrix, optionsModel, { ...options, standardErrors: "hessian" });
+  /** The calibration with Hessian standard errors, which several tests read. */
+  const hessianFit = once(() =>
+    calibrateMultidimensional(matrix, optionsModel, { ...options, standardErrors: "hessian" }),
+  );
 
   it("match mirt with est = FALSE on a shared 3PL item's asymptote and a 2PL item's slope", () => {
+    const hessian = hessianFit();
     expectCalibration(hessian, held, { parameters: 1e-5, errors: 1e-5, likelihood: 1e-8 }, "held");
     expect(hessian.converged).toBe(true);
     expect(hessian.dimensions).toEqual(["F1", "F2"]);
@@ -1511,6 +1511,7 @@ describe("fixed parameters", () => {
   });
 
   it("keep each held value exactly, list it in no standard errors, and count it in no criterion", () => {
+    const hessian = hessianFit();
     const parameters = (id: string): MultidimensionalLogisticParameters =>
       defined(hessian.items.find((item) => item.id === id)).parameters as MultidimensionalLogisticParameters;
     expect(parameters("q01").c).toBe(0.25);
@@ -1559,6 +1560,7 @@ describe("fixed parameters", () => {
   });
 
   it("hold with anchors and groups too, which set the scale as they do without them", () => {
+    const hessian = hessianFit();
     const id = defined(hessian.items[0]).id;
     const anchors = Object.fromEntries(
       [hessian.items[2], hessian.items[8]].map((item) => [defined(item).id, defined(item).parameters]),
@@ -1566,6 +1568,7 @@ describe("fixed parameters", () => {
     const groups = held.responses.map((_, p) => (p % 2 === 0 ? "reference" : "focal"));
     const fit = calibrateMultidimensional(matrix, optionsModel, {
       ...options,
+      points: 15,
       tolerance: 1e-5,
       fixed: anchors,
       groups,
@@ -1815,7 +1818,7 @@ describe("MH-RM", () => {
   }, 120_000);
 
   describe("small data", () => {
-    const rows = m2pl.responses.slice(0, 250);
+    const rows = m2pl.responses.slice(0, 150);
     const data = buildResponseMatrix(rows, { itemIds: [...m2pl.itemIds] });
     const options = { loadings: m2pl.loadings, method: "mhrm" } as const;
 
@@ -1862,7 +1865,7 @@ describe("MH-RM", () => {
         maxIterations: 5,
       });
       expectClose(fit.aic, -2 * fit.logLikelihood + 2 * 25, 1e-9);
-      expectClose(fit.bic, -2 * fit.logLikelihood + 25 * Math.log(250), 1e-9);
+      expectClose(fit.bic, -2 * fit.logLikelihood + 25 * Math.log(150), 1e-9);
     });
 
     it("fixes the correlations at 0 when they are not estimated and has none in one dimension", () => {
@@ -2217,7 +2220,9 @@ describe("multiple groups", () => {
   const twoGroups: GroupsFixture = groups.correlated;
   const anchored: GroupsFixture = groups.anchors;
   // The likelihood is flat in the moments of the groups, and mirt's EM stops before its estimates settle: measurekit's,
-  // run to a tolerance of 1e-11, stay where they were at 1e-9 and reach a log-likelihood at least as high as mirt's.
+  // run to a tolerance of 1e-11, stay where they were at 1e-9 and reach a log-likelihood at least as high as mirt's. The
+  // calibrations here run to 1e-7, which moves their distances from mirt's estimates by less than 1e-5 against 1e-9.
+  // Two dimensions are on 21 nodes, where the calibrations agree with mirt's as closely as on 31 in a fraction of the time.
   const mirtTolerances = { parameters: 2e-4, errors: 5e-4, likelihood: 5e-6 };
 
   /** Calibrates a fixture's groups, whatever its model and anchors, as mirt's multipleGroup does. */
@@ -2241,12 +2246,15 @@ describe("multiple groups", () => {
             }),
         ...(correlated === undefined ? {} : { correlated }),
         standardErrors,
-        tolerance: 1e-9,
+        tolerance: 1e-7,
         maxIterations: 2000,
         ...extra,
       },
     );
   }
+
+  /** The calibration of the two groups of correlated dimensions with Hessian standard errors, which several tests read. */
+  const twoGroupsFit = once(() => calibrateGroups(twoGroups, "hessian"));
 
   /** Compares the means and covariance of each group with mirt's. */
   function expectGroups(fit: MultidimensionalCalibration<Parameters>, fixture: GroupsFixture, tolerance: number): void {
@@ -2270,79 +2278,70 @@ describe("multiple groups", () => {
   }
 
   it("matches mirt's multipleGroup for two groups of correlated dimensions, with standard errors", () => {
-    const fit = calibrateGroups(twoGroups, "hessian");
+    const fit = twoGroupsFit();
     expectCalibration(fit, twoGroups, { parameters: 5e-5, errors: 1e-4, likelihood: 1e-6 }, "two groups");
     expectGroups(fit, twoGroups, 1e-4);
     expect(fit.converged).toBe(true);
     // The first group is the reference: means 0 and variances 1.
     expect(fit.groups?.[0]?.means).toEqual([0, 0]);
     expect(fit.groups?.[0]?.covariance.map((row, i) => row[i])).toEqual([1, 1]);
-  }, 120_000);
+  });
 
-  it(
-    "matches mirt when fixed items set the scale and every group's means and covariance are free",
-    () => {
-      const fit = calibrateGroups(anchored, "hessian");
-      expectCalibration(fit, anchored, mirtTolerances, "fixed items");
-      expectGroups(fit, anchored, 5e-4);
-      // Fixed items keep their parameters and have no standard errors.
-      for (const [id, parameters] of Object.entries(defined(anchored.fixed))) {
-        const item = defined(fit.items.find((each) => each.id === id));
-        expect(item.parameters).toEqual(parametersOf(anchored.model, parameters));
-        expect(item.standardErrors).toBeNull();
-      }
-      expect(defined(fit.groups?.[0]).means.some((mean) => mean !== 0)).toBe(true);
-    },
-    UNDER_COVERAGE,
-  );
+  it("matches mirt when fixed items set the scale and every group's means and covariance are free", () => {
+    const fit = calibrateGroups(anchored, "hessian");
+    expectCalibration(fit, anchored, mirtTolerances, "fixed items");
+    expectGroups(fit, anchored, 5e-4);
+    // Fixed items keep their parameters and have no standard errors.
+    for (const [id, parameters] of Object.entries(defined(anchored.fixed))) {
+      const item = defined(fit.items.find((each) => each.id === id));
+      expect(item.parameters).toEqual(parametersOf(anchored.model, parameters));
+      expect(item.standardErrors).toBeNull();
+    }
+    expect(defined(fit.groups?.[0]).means.some((mean) => mean !== 0)).toBe(true);
+  });
 
-  it(
-    "matches mirt for three groups of uncorrelated dimensions with items missing by design",
-    () => {
-      const uncorrelated: GroupsFixture = groups.uncorrelated;
-      const fit = calibrateGroups(uncorrelated, "hessian");
-      expectCalibration(fit, uncorrelated, mirtTolerances, "three groups");
-      expectGroups(fit, uncorrelated, 5e-4);
-      expect(fit.correlationStandardErrors).toBeNull();
-      // The covariance of every group is diagonal.
-      expect(fit.groups?.every(({ covariance }) => covariance[0]?.[1] === 0)).toBe(true);
-    },
-    UNDER_COVERAGE,
-  );
+  it("matches mirt for three groups of uncorrelated dimensions with items missing by design", () => {
+    const uncorrelated: GroupsFixture = groups.uncorrelated;
+    const fit = calibrateGroups(uncorrelated, "hessian");
+    expectCalibration(fit, uncorrelated, mirtTolerances, "three groups");
+    expectGroups(fit, uncorrelated, 5e-4);
+    expect(fit.correlationStandardErrors).toBeNull();
+    // The covariance of every group is diagonal.
+    expect(fit.groups?.every(({ covariance }) => covariance[0]?.[1] === 0)).toBe(true);
+  });
 
   it("matches mirt for the graded model in two groups", () => {
     const graded: GroupsFixture = groups.graded;
     const fit = calibrateGroups(graded, "none");
     expectCalibration(fit, graded, mirtTolerances, "graded groups");
     expectGroups(fit, graded, 5e-4);
-  }, 120_000);
+  });
 
-  it(
-    "matches mirt for two groups on three dimensions",
-    () => {
-      const three: GroupsFixture = groups.three;
-      const fit = calibrateGroups(three, "none");
-      expectCalibration(fit, three, mirtTolerances, "three dimensions");
-      expectGroups(fit, three, 5e-4);
-    },
-    UNDER_COVERAGE,
-  );
+  // Under coverage this calibration takes about 40 s, and two to three times as long on a runner.
+  it("matches mirt for two groups on three dimensions", () => {
+    const three: GroupsFixture = groups.three;
+    // Each cycle of EM estimates the 3 × 3 covariances of both groups over 15 ** 3 nodes, so this calibration runs to
+    // 1e-6, which moves its distances from mirt's estimates by less than 1e-5 against 1e-7.
+    const fit = calibrateGroups(three, "none", { tolerance: 1e-6 });
+    expectCalibration(fit, three, mirtTolerances, "three dimensions");
+    expectGroups(fit, three, 5e-4);
+  }, 300_000);
 
   it("gives the same calibration with the cross-product standard errors for the same groups", () => {
-    const hessian = calibrateGroups(twoGroups, "hessian");
     const cross = calibrateGroups(twoGroups, "cross-product");
-    hessian.items.forEach((item, i) => {
+    twoGroupsFit().items.forEach((item, i) => {
       for (const [name, error] of Object.entries(defined(item.standardErrors))) {
         expectClose(defined(cross.items[i]?.standardErrors?.[name]) / error, 1, 0.2, `${item.id} ${name}`);
       }
     });
-  }, 120_000);
+  });
 
   it("reports no groups without the options groups and fixed", () => {
     const { itemIds, responses, loadings, points, model } = twoGroups;
     const fit = calibrateMultidimensional(buildResponseMatrix(responses, { itemIds: [...itemIds] }), modelOf(model), {
       loadings,
       points,
+      maxIterations: 1,
     });
     expect(fit.groups).toBeUndefined();
   });
@@ -2399,7 +2398,7 @@ describe("multiple groups", () => {
     const fromRecords = calibrateMultidimensional(records, optionsModel, options);
     expect(fromRecords.groups).toEqual(fromMatrix.groups);
     expect(fromRecords.logLikelihood).toBeCloseTo(fromMatrix.logLikelihood, 8);
-  }, 120_000);
+  });
 
   it("keeps the estimates when the persons are shuffled together with their groups", () => {
     const first = twoGroups.personGroups.map((_, k) => k).filter((k) => twoGroups.personGroups[k] === "A");
@@ -2411,11 +2410,11 @@ describe("multiple groups", () => {
       responses: order.map((k) => defined(twoGroups.responses[k])),
       personGroups: order.map((k) => defined(twoGroups.personGroups[k])),
     };
-    const expected = calibrateGroups(twoGroups, "none");
+    const expected = twoGroupsFit();
     const fit = calibrateGroups(shuffled, "none");
     expectGroups(fit, { ...twoGroups, groupMoments: defined(expected.groups).map((g) => g) }, 1e-6);
     expectClose(fit.logLikelihood, expected.logLikelihood, 1e-6, "log-likelihood");
-  }, 120_000);
+  });
 
   it("stops at the largest number of iterations and says so", () => {
     const fit = calibrateGroups(twoGroups, "none", { maxIterations: 3, tolerance: 1e-12 });
@@ -2427,45 +2426,42 @@ describe("multiple groups", () => {
     const fit = calibrateGroups(twoGroups, "none", { points: 5, tolerance: 1e-6 });
     expect(fit.iterations).toBeLessThan(2000);
     expect(fit.converged).toBe(false);
-  }, 120_000);
+  });
 
+  // validation/psychometrics/multidimensional-groups-recovery.ts recovers three groups on three dimensions from 40 items
+  // per dimension, the size of the guide's advice of 21 nodes, which takes minutes.
   describe("recovery", () => {
-    const dimensions = 3;
-    const perDimension = 40;
+    const dimensions = 2;
+    const perDimension = 10;
+    const persons = 500;
     const truth = [
       {
         group: "A",
-        means: [0, 0, 0],
-        persons: 700,
+        means: [0, 0],
         covariance: [
-          [1, 0.3, 0.2],
-          [0.3, 1, 0.4],
-          [0.2, 0.4, 1],
+          [1, 0.3],
+          [0.3, 1],
         ],
       },
       {
         group: "B",
-        means: [0.4, -0.3, 0.5],
-        persons: 600,
+        means: [0.4, -0.3],
         covariance: [
-          [1.4, 0.4, 0.3],
-          [0.4, 0.7, 0.2],
-          [0.3, 0.2, 1.2],
+          [1.4, 0.4],
+          [0.4, 0.8],
         ],
       },
       {
         group: "C",
-        means: [-0.5, 0.3, 0.2],
-        persons: 600,
+        means: [-0.5, 0.3],
         covariance: [
-          [0.8, 0.2, 0.1],
-          [0.2, 1.3, 0.5],
-          [0.1, 0.5, 0.9],
+          [0.9, 0.2],
+          [0.2, 1.3],
         ],
       },
     ];
 
-    /** Simulates responses to 40 items on each of 3 dimensions in three groups of the given moments. */
+    /** Simulates responses to 10 items on each of 2 dimensions in three groups of the given moments. */
     function simulate(seed: number) {
       const random = createRandom(seed);
       const items = Array.from({ length: dimensions * perDimension }, (_, i) => ({
@@ -2481,7 +2477,7 @@ describe("multiple groups", () => {
       }));
       const thetas: number[][] = [];
       const labels: string[] = [];
-      for (const { group, means, persons, covariance } of truth) {
+      for (const { group, means, covariance } of truth) {
         const factor = defined(cholesky(Float64Array.from(covariance.flat()), dimensions));
         for (let p = 0; p < persons; p++) {
           const z = Array.from({ length: dimensions }, () => random.normal());
@@ -2494,43 +2490,59 @@ describe("multiple groups", () => {
           labels.push(group);
         }
       }
-      return { matrix: simulateMultidimensionalResponses(items, thetas, random), labels };
+      return { matrix: simulateMultidimensionalResponses(items, thetas, random), labels, thetas };
     }
 
-    // Under coverage this recovery took 541 to 880 s.
-    it(
-      "recovers the means and covariances of three groups on three dimensions from 40 items per dimension",
-      () => {
-        const { matrix, labels } = simulate(20261031);
-        const fit = calibrateMultidimensional(matrix, multidimensionalTwoParameterLogistic, {
-          loadings: Object.fromEntries(matrix.itemIds.map((id, i) => [id, [`D${Math.floor(i / perDimension) + 1}`]])),
-          groups: labels,
-          points: 21,
-          maxIterations: 1000,
+    /** The mean and the covariance of the thetas of a group. */
+    function momentsOf(thetas: readonly (readonly number[])[]) {
+      const means = Array.from({ length: dimensions }, (_, d) => mean(thetas.map((theta) => defined(theta[d]))));
+      const covariance = means.map((mi, i) =>
+        means.map(
+          (mj, j) =>
+            thetas.reduce((sum, theta) => sum + (defined(theta[i]) - mi) * (defined(theta[j]) - mj), 0) /
+            (thetas.length - 1),
+        ),
+      );
+      return { means, covariance };
+    }
+
+    it("recovers the means and covariances of three groups on two dimensions from 10 items per dimension", () => {
+      const { matrix, labels, thetas } = simulate(1);
+      const fit = calibrateMultidimensional(matrix, multidimensionalTwoParameterLogistic, {
+        loadings: Object.fromEntries(matrix.itemIds.map((id, i) => [id, [`D${Math.floor(i / perDimension) + 1}`]])),
+        groups: labels,
+        points: 21,
+        tolerance: 1e-6,
+      });
+      expect(fit.converged).toBe(true);
+      // The errors are distances from the moments of the simulated abilities, in units of the first group's sample
+      // standard deviations and from its sample means, so that the sampling of the persons is no part of them. Over seeds
+      // 1 to 20 they were at most 0.146 for a mean and 0.305 for a covariance; the limits are 1.5 times as large, rounded
+      // up to a multiple of 0.05.
+      const sample = truth.map(({ group }) => momentsOf(thetas.filter((_, p) => labels[p] === group)));
+      const first = defined(sample[0]);
+      const spread = first.covariance.map((row, d) => Math.sqrt(defined(row[d])));
+      truth.forEach(({ group }, g) => {
+        const found = defined(fit.groups?.[g]);
+        const { means, covariance } = defined(sample[g]);
+        expect(found.group).toBe(group);
+        means.forEach((value, d) => {
+          const expected = (value - defined(first.means[d])) / defined(spread[d]);
+          expectClose(defined(found.means[d]), expected, 0.25, `mean ${d + 1} of group ${group}`);
         });
-        expect(fit.converged).toBe(true);
-        // The first group is the reference and has the moments of its scale. On this seed the errors are at most 0.13 for a
-        // mean and 0.18 for a covariance at 21 nodes, and 0.24 and 0.61 at the default 15, which the tolerances exclude.
-        truth.forEach(({ group, means, covariance }, g) => {
-          const found = defined(fit.groups?.[g]);
-          expect(found.group).toBe(group);
-          means.forEach((value, d) => {
-            expectClose(defined(found.means[d]), value, 0.18, `mean ${d + 1} of group ${group}`);
-          });
-          covariance.forEach((row, i) => {
-            row.forEach((value, j) => {
-              expectClose(
-                defined(found.covariance[i]?.[j]),
-                value,
-                0.25,
-                `covariance ${i + 1},${j + 1} of group ${group}`,
-              );
-            });
+        covariance.forEach((row, i) => {
+          row.forEach((value, j) => {
+            const expected = value / (defined(spread[i]) * defined(spread[j]));
+            expectClose(
+              defined(found.covariance[i]?.[j]),
+              expected,
+              0.5,
+              `covariance ${i + 1},${j + 1} of group ${group}`,
+            );
           });
         });
-      },
-      3 * UNDER_COVERAGE,
-    );
+      });
+    });
   });
 });
 
@@ -3058,44 +3070,40 @@ describe("longitudinal calibration", () => {
     return found;
   }
 
-  it.each(names)(
-    "matches mirt on the %s case: items, moments, changes and log-likelihood",
-    (name) => {
-      const fit = fitOf(name);
-      const source = cases[name];
-      const tolerance = Tolerances[name];
-      expect(fit.converged).toBe(true);
-      expect(fit.items.map(({ id }) => id)).toEqual(source.items.map(({ id }) => id));
-      fit.items.forEach(({ id, parameters }, i) => {
-        expectParameters(parameters, source.items[i]?.parameters, tolerance, `item ${id}`);
+  it.each(names)("matches mirt on the %s case: items, moments, changes and log-likelihood", (name) => {
+    const fit = fitOf(name);
+    const source = cases[name];
+    const tolerance = Tolerances[name];
+    expect(fit.converged).toBe(true);
+    expect(fit.items.map(({ id }) => id)).toEqual(source.items.map(({ id }) => id));
+    fit.items.forEach(({ id, parameters }, i) => {
+      expectParameters(parameters, source.items[i]?.parameters, tolerance, `item ${id}`);
+    });
+    source.means.forEach((mean, t) => {
+      expectClose(defined(fit.occasions[t]).mean, mean, tolerance, `mean ${t}`);
+      expectClose(defined(fit.occasions[t]).sd, defined(source.sds[t]), tolerance, `sd ${t}`);
+    });
+    source.correlations.forEach((row, i) => {
+      row.forEach((value, j) => {
+        expectClose(defined(fit.correlations[i]?.[j]), value, tolerance, `correlation ${i},${j}`);
       });
-      source.means.forEach((mean, t) => {
-        expectClose(defined(fit.occasions[t]).mean, mean, tolerance, `mean ${t}`);
-        expectClose(defined(fit.occasions[t]).sd, defined(source.sds[t]), tolerance, `sd ${t}`);
-      });
-      source.correlations.forEach((row, i) => {
-        row.forEach((value, j) => {
-          expectClose(defined(fit.correlations[i]?.[j]), value, tolerance, `correlation ${i},${j}`);
-        });
-      });
-      source.changes.forEach((change, k) => {
-        const found = defined(fit.changes[k]);
-        expect([found.from, found.to]).toEqual([change.from, change.to]);
-        expectClose(found.mean, change.mean, 2 * tolerance, `mean of change ${k}`);
-        expectClose(found.sd, change.sd, 2 * tolerance, `sd of change ${k}`);
-        expectClose(
-          found.correlationWithStart,
-          change.correlationWithStart,
-          2 * tolerance,
-          `correlation with start ${k}`,
-        );
-      });
-      expectClose(fit.logLikelihood, source.logLikelihood, 1e-2, "log-likelihood");
-      // Where mirt's EM stops short of the maximum its log-likelihood is lower; it is never higher.
-      expect(fit.logLikelihood).toBeGreaterThanOrEqual(source.logLikelihood - 1e-6);
-    },
-    120_000,
-  );
+    });
+    source.changes.forEach((change, k) => {
+      const found = defined(fit.changes[k]);
+      expect([found.from, found.to]).toEqual([change.from, change.to]);
+      expectClose(found.mean, change.mean, 2 * tolerance, `mean of change ${k}`);
+      expectClose(found.sd, change.sd, 2 * tolerance, `sd of change ${k}`);
+      expectClose(
+        found.correlationWithStart,
+        change.correlationWithStart,
+        2 * tolerance,
+        `correlation with start ${k}`,
+      );
+    });
+    expectClose(fit.logLikelihood, source.logLikelihood, 1e-2, "log-likelihood");
+    // Where mirt's EM stops short of the maximum its log-likelihood is lower; it is never higher.
+    expect(fit.logLikelihood).toBeGreaterThanOrEqual(source.logLikelihood - 1e-6);
+  });
 
   it("matches TAM's Rasch model, whose scale is that of the first occasion's standard deviation", () => {
     const { tam } = longitudinal.rasch;
@@ -3113,7 +3121,7 @@ describe("longitudinal calibration", () => {
       });
     });
     expectClose(fit.logLikelihood, tam.logLikelihood, 1e-2, "log-likelihood");
-  }, 120_000);
+  });
 
   describe("standard errors", () => {
     const { two } = longitudinal;
@@ -3132,14 +3140,14 @@ describe("longitudinal calibration", () => {
       two.standardErrors.forEach((se, k) => {
         expectClose(defined(errors[k]), se, 1e-5, `standard error ${k}`);
       });
-    }, 120_000);
+    });
 
     it("matches mirt's cross-product errors by the persons' scores", () => {
       const errors = errorVector(run("cross-product"));
       two.crossProductStandardErrors.forEach((se, k) => {
         expectClose(defined(errors[k]), se, 1e-5, `standard error ${k}`);
       });
-    }, 120_000);
+    });
   });
 
   describe("grid", () => {
@@ -3147,9 +3155,18 @@ describe("longitudinal calibration", () => {
     const three = simulateOccasions(6, 150, 6, { means: [0, 0.3, 0.6], sds: [1, 1.1, 1.2], rho: 0.8 });
 
     it("has 31 nodes per occasion for two occasions and 21 for three by default", () => {
-      expectSameFit(calibrateLongitudinal(small), calibrateLongitudinal(small, { points: 31 }));
-      expectSameFit(calibrateLongitudinal(three), calibrateLongitudinal(three, { points: 21 }));
-    }, 120_000);
+      // Two cycles of EM show the grid: on the default grid they give the calibration on 31 or 21 nodes to the last bit,
+      // and another on a grid of two nodes fewer.
+      const twoCycles = { maxIterations: 2 };
+      for (const [occasions, points] of [
+        [small, 31],
+        [three, 21],
+      ] as const) {
+        const byDefault = calibrateLongitudinal(occasions, twoCycles);
+        expect(byDefault).toEqual(calibrateLongitudinal(occasions, { ...twoCycles, points }));
+        expect(byDefault).not.toEqual(calibrateLongitudinal(occasions, { ...twoCycles, points: points - 2 }));
+      }
+    });
 
     it("changes the estimates a little with the number of nodes on short tests", () => {
       const coarse = calibrateLongitudinal(small, { points: 21 });
@@ -3160,20 +3177,10 @@ describe("longitudinal calibration", () => {
   });
 });
 
+// validation/psychometrics/longitudinal-recovery.ts recovers the moments of 5,000 persons on 2 and 3 occasions at 10 and 40
+// items within 1.5 times the worst error of mirt on the same design, and shows why the default is 21 nodes at 3 occasions.
 describe("longitudinal recovery", () => {
-  const moments = { means: [0, 0.3, 0.6], sds: [1, 1.15, 1.3], rho: 0.85 } as const;
-  /** The thresholds are rounded up to a multiple of this. */
-  const Step = 0.005;
-  /**
-   * The largest errors of the means, standard deviations and correlations that the recovery of 5,000 persons may have:
-   * 1.5 times the worst of the three seeds of mirt on the same design, from the fixture, rounded up to a multiple of
-   * 0.005. With more items per occasion the errors are smaller, so the same thresholds hold for 40 items.
-   */
-  function thresholds(occasionCount: number) {
-    const { worst } = defined(longitudinalRecovery.recovery.find((row) => row.occasions === occasionCount));
-    const limit = (error: number): number => Math.ceil((1.5 * error) / Step - 1e-9) * Step;
-    return { mean: limit(worst.mean), sd: limit(worst.sd), correlation: limit(worst.correlation) };
-  }
+  const moments = { means: [0, 0.3], sds: [1, 1.15], rho: 0.85 } as const;
   const column = (thetas: readonly (readonly number[])[], t: number): number[] =>
     thetas.map((theta) => defined(theta[t]));
   const spread = (values: readonly number[]): number => {
@@ -3186,90 +3193,23 @@ describe("longitudinal recovery", () => {
     return cross / Math.sqrt(x.reduce((s, v) => s + (v - cx) ** 2, 0) * y.reduce((s, v) => s + (v - cy) ** 2, 0));
   };
 
-  /**
-   * Returns the largest distance of the estimates from the moments of the abilities that the persons were given, so
-   * that the sampling of the persons is no part of it: the means and standard deviations of the occasions after the
-   * first, in units of the first occasion's sample standard deviation and from its sample mean, and the correlations.
-   */
-  function errorsOf(fit: LongitudinalCalibration, thetas: readonly (readonly number[])[]) {
-    const first = column(thetas, 0);
-    const errors = { mean: 0, sd: 0, correlation: 0 };
-    fit.occasions.forEach(({ mean: estimated, sd }, t) => {
-      const values = column(thetas, t);
-      if (t > 0) {
-        errors.mean = Math.max(errors.mean, Math.abs(estimated - (mean(values) - mean(first)) / spread(first)));
-        errors.sd = Math.max(errors.sd, Math.abs(sd - spread(values) / spread(first)));
-      }
-      for (let u = 0; u < t; u++) {
-        errors.correlation = Math.max(
-          errors.correlation,
-          Math.abs(defined(fit.correlations[t]?.[u]) - correlate(values, column(thetas, u))),
-        );
-      }
-    });
-    return errors;
-  }
-
-  /** Calibrates the persons of a seed at the default nodes, or at `points`. */
-  function recover(seed: number, occasionCount: number, itemCount: number, points?: number) {
-    const { occasions, thetas } = simulateTrait(seed, 5000, itemCount, {
-      ...moments,
-      means: moments.means.slice(0, occasionCount),
-      sds: moments.sds.slice(0, occasionCount),
-    });
-    const fit = calibrateLongitudinal(occasions, { ...(points === undefined ? {} : { points }), maxIterations: 1000 });
-    return { fit, errors: errorsOf(fit, thetas) };
-  }
-
-  it.each([
-    [2, 10],
-    [2, 40],
-    [3, 10],
-    [3, 40],
-  ] as const)(
-    "recovers the moments of %i occasions from 5,000 persons and %i items on each",
-    (occasionCount, itemCount) => {
-      for (const seed of [1, 2, 3]) {
-        const { fit, errors } = recover(seed, occasionCount, itemCount);
-        expect(fit.converged).toBe(true);
-        const limits = thresholds(occasionCount);
-        expect(errors.mean, `mean, seed ${seed}`).toBeLessThanOrEqual(limits.mean);
-        expect(errors.sd, `sd, seed ${seed}`).toBeLessThanOrEqual(limits.sd);
-        expect(errors.correlation, `correlation, seed ${seed}`).toBeLessThanOrEqual(limits.correlation);
-      }
-    },
-    600_000,
-  );
-
-  it("misses the thresholds at 40 items on three occasions with 15 nodes, which is why 21 is the default", () => {
-    const { errors } = recover(1, 3, 40, 15);
-    expect(errors.mean).toBeGreaterThan(thresholds(3).mean);
-    expect(errors.sd).toBeGreaterThan(thresholds(3).sd);
-  }, 600_000);
-
-  /** Returns the largest difference between the means, standard deviations and correlations of two calibrations. */
-  function momentDistance(a: LongitudinalCalibration, b: LongitudinalCalibration): number {
-    const differences = a.occasions.flatMap(({ mean: m, sd }, t) => [
-      Math.abs(m - defined(b.occasions[t]).mean),
-      Math.abs(sd - defined(b.occasions[t]).sd),
-    ]);
-    for (const [i, row] of a.correlations.entries()) {
-      for (const [j, value] of row.entries()) differences.push(Math.abs(value - defined(b.correlations[i]?.[j])));
-    }
-    return Math.max(...differences);
-  }
-
-  it("settles by 21 nodes per occasion at 40 items and 3 occasions, where 15 are far from 31", () => {
-    for (const seed of [101, 102]) {
-      const { occasions } = simulateTrait(seed, 2000, 40, moments);
-      const [coarse, usual, fine] = [15, 21, 31].map((points) =>
-        calibrateLongitudinal(occasions, { points, maxIterations: 1000 }),
-      );
-      expect(defined(fine).converged).toBe(true);
-      expect(momentDistance(defined(usual), defined(fine)), `21 against 31, seed ${seed}`).toBeLessThan(0.03);
-      expect(momentDistance(defined(coarse), defined(fine)), `15 against 31, seed ${seed}`).toBeGreaterThan(0.05);
-    }
-  }, 900_000);
+  it("recovers the moments of 2 occasions from 300 persons and 10 items within four standard errors", () => {
+    // The errors are distances from the moments of the abilities that the persons were given, so that the sampling of the
+    // persons is no part of them: the mean and standard deviation of the second occasion in units of the first occasion's
+    // sample standard deviation and from its sample mean, and the correlation. Over seeds 1 to 20 the largest was 2.4
+    // standard errors.
+    const { occasions, thetas } = simulateTrait(1, 300, 10, moments);
+    const fit = calibrateLongitudinal(occasions, { standardErrors: "hessian" });
+    expect(fit.converged).toBe(true);
+    const [first, second] = [column(thetas, 0), column(thetas, 1)];
+    const later = defined(fit.occasions[1]);
+    const errors = defined(later.standardErrors);
+    expect(Math.abs(later.mean - (mean(second) - mean(first)) / spread(first))).toBeLessThan(4 * errors.mean);
+    expect(Math.abs(later.sd - spread(second) / spread(first))).toBeLessThan(4 * errors.sd);
+    expect(Math.abs(defined(fit.correlations[1]?.[0]) - correlate(first, second))).toBeLessThan(
+      4 * defined(fit.correlationStandardErrors?.[1]?.[0]),
+    );
+  });
 });
 
 /**

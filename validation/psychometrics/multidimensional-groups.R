@@ -2,7 +2,8 @@
 # their own means and covariances, with and without fixed items, against mirt's multipleGroup, with items invariant across
 # groups (invariance = c("slopes", "intercepts")) and the means and covariances of every group but the first free
 # ("free_means", "free_var"). Fixed items are mirt's pars with est = FALSE, and the scale they set frees the means and
-# covariance of the first group too. The data are simulated with set.seed(20261029).
+# covariance of the first group too. The data are simulated with set.seed(20261029). Two dimensions are on 21 nodes, where
+# measurekit's calibrations agree with mirt's as closely as on 31 in less than half the time; three are on 15.
 
 source("validation/psychometrics/common.R")
 suppressPackageStartupMessages({
@@ -140,12 +141,12 @@ colnames(two$data) <- ids(12)
 two_model <- simple_model(6, 2, TRUE)
 
 cases$correlated <- local({
-  fit <- calibrate(two$data, two_model, two$group, "2PL", 31, TRUE)
+  fit <- calibrate(two$data, two_model, two$group, "2PL", 21, TRUE)
   stopifnot_converged(fit)
   c(
     list(
       source = "mirt::simdata (set.seed(20261029)): 900 persons of N(0, R) and 700 of N((0.4, 0.4), S), 12 dichotomous items, 6 on each of 2 dimensions, R and S correlated 0.4 and 0.52.",
-      model = "m2pl", points = 31, itemIds = colnames(two$data), responses = unname(two$data),
+      model = "m2pl", points = 21, itemIds = colnames(two$data), responses = unname(two$data),
       personGroups = two$group, loadings = loading_pattern(6, 2),
       items = mirt_items(fit, 2, graded = FALSE, errors = TRUE)
     ),
@@ -171,7 +172,7 @@ cases$anchors <- local({
   }
   first <- values$group == "A" & values$item == "GROUP"
   values$est[first & values$name %in% c("MEAN_1", "MEAN_2", "COV_11", "COV_22")] <- TRUE
-  fit <- multipleGroup(two$data, two_model, group = two$group, invariance = invariance, pars = values, quadpts = 31,
+  fit <- multipleGroup(two$data, two_model, group = two$group, invariance = invariance, pars = values, quadpts = 21,
                        TOL = TOL, SE = TRUE, SE.type = "Oakes", verbose = FALSE, technical = list(NCYCLES = 5000))
   stopifnot_converged(fit)
   fixed <- setNames(lapply(anchors, function(i) {
@@ -180,7 +181,7 @@ cases$anchors <- local({
   c(
     list(
       source = "The data of the correlated case, with items q01, q02, q07 and q08 fixed at their generating parameters.",
-      model = "m2pl", points = 31, itemIds = colnames(two$data), responses = unname(two$data),
+      model = "m2pl", points = 21, itemIds = colnames(two$data), responses = unname(two$data),
       personGroups = two$group, loadings = loading_pattern(6, 2), fixed = fixed,
       items = mirt_items(fit, 2, graded = FALSE, errors = TRUE, fixed = colnames(two$data)[anchors])
     ),
@@ -200,12 +201,12 @@ cases$uncorrelated <- local({
   colnames(three$data) <- ids(10)
   # The second group does not answer q01 and q06, the third q02 and q07: the groups share the other items.
   three$data <- leave_out(three$data, three$group, list(B = c(1, 6), C = c(2, 7)))
-  fit <- calibrate(three$data, simple_model(5, 2, FALSE), three$group, "2PL", 31, TRUE)
+  fit <- calibrate(three$data, simple_model(5, 2, FALSE), three$group, "2PL", 21, TRUE)
   stopifnot_converged(fit)
   c(
     list(
       source = "mirt::simdata (set.seed(20261029)): 500, 450 and 400 persons of three groups with uncorrelated dimensions, 10 dichotomous items, 5 on each of 2 dimensions, 2 items left unanswered in each of the last two groups.",
-      model = "m2pl", points = 31, itemIds = colnames(three$data), responses = unname(three$data),
+      model = "m2pl", points = 21, itemIds = colnames(three$data), responses = unname(three$data),
       personGroups = three$group, loadings = loading_pattern(5, 2), correlated = FALSE,
       items = mirt_items(fit, 2, graded = FALSE, errors = TRUE)
     ),
@@ -222,12 +223,12 @@ cases$graded <- local({
   graded <- simulate_groups(slopes, intercepts, c(700, 600), list(c(0, 0), c(0.5, 0.2)),
                             list(matrix(c(1, 0.3, 0.3, 1), 2), matrix(c(0.7, 0.2, 0.2, 1.4), 2)), itemtype = "graded")
   colnames(graded$data) <- ids(8)
-  fit <- calibrate(graded$data, simple_model(4, 2, TRUE), graded$group, "graded", 31, FALSE)
+  fit <- calibrate(graded$data, simple_model(4, 2, TRUE), graded$group, "graded", 21, FALSE)
   stopifnot_converged(fit)
   c(
     list(
       source = "mirt::simdata (set.seed(20261029)): 700 and 600 persons of two groups, 8 items of 4 categories, 4 on each of 2 correlated dimensions.",
-      model = "mgrm", points = 31, itemIds = colnames(graded$data), responses = unname(graded$data),
+      model = "mgrm", points = 21, itemIds = colnames(graded$data), responses = unname(graded$data),
       personGroups = graded$group, loadings = loading_pattern(4, 2),
       items = mirt_items(fit, 2, graded = TRUE, errors = FALSE)
     ),

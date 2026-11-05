@@ -434,9 +434,9 @@ two seeds; the distance is the largest difference of a mean, standard deviation 
 | 1    | 0.109               | 0.021               | 2.8 s, 4.1 s, 21 s          |
 | 2    | 0.104               | 0.008               | 1.7 s, 6.6 s, 22 s          |
 
-So the default is 21 nodes at 3 occasions, and `mirt`'s 31 at 2. The tests recover the moments of 5,000 simulated
-persons at 10 and at 40 items per occasion within 1.5 times the worst error of `mirt` on the same design, rounded up to
-a multiple of 0.005 ([validation](validation.md#simulation)).
+So the default is 21 nodes at 3 occasions, and `mirt`'s 31 at 2. `validation/psychometrics/longitudinal-recovery.ts`
+recovers the moments of 5,000 simulated persons at 10 and at 40 items per occasion within 1.5 times the worst error of
+`mirt` on the same design, rounded up to a multiple of 0.005 ([validation](validation.md#simulation)).
 
 ### Standard errors
 

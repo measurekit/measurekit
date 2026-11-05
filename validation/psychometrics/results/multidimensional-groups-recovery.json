@@ -1,0 +1,85 @@
+{
+  "source": "calibrateMultidimensional, createRandom(seed): three groups of 700, 600 and 600 persons, 40 M2PL items on each of 3 dimensions with slopes from 0.8 to 1.8, at 21 and 15 nodes per dimension. The error is the largest distance of a group's mean or covariance from the value that generated it.",
+  "seeds": [20261031, 20261032, 20261033],
+  "sizes": {
+    "persons": [700, 600, 600],
+    "dimensions": 3,
+    "itemsPerDimension": 40
+  },
+  "limits": {
+    "mean": 0.18,
+    "covariance": 0.25
+  },
+  "worst": {
+    "21 nodes": {
+      "mean": 0.1336013817261441,
+      "covariance": 0.1846945528988706
+    },
+    "15 nodes": {
+      "mean": 0.24036037255287152,
+      "covariance": 0.6594584872464258
+    }
+  },
+  "fits": [
+    {
+      "seed": 20261031,
+      "points": 21,
+      "mean": 0.1336013817261441,
+      "covariance": 0.18290415584054331,
+      "within": true,
+      "iterations": 47,
+      "converged": true,
+      "seconds": 101.8
+    },
+    {
+      "seed": 20261031,
+      "points": 15,
+      "mean": 0.24036037255287152,
+      "covariance": 0.6091521955830468,
+      "within": false,
+      "iterations": 96,
+      "converged": true,
+      "seconds": 81.7
+    },
+    {
+      "seed": 20261032,
+      "points": 21,
+      "mean": 0.11169374940518145,
+      "covariance": 0.13948923984877837,
+      "within": true,
+      "iterations": 40,
+      "converged": true,
+      "seconds": 101.9
+    },
+    {
+      "seed": 20261032,
+      "points": 15,
+      "mean": 0.1735126026800176,
+      "covariance": 0.4189392948852855,
+      "within": false,
+      "iterations": 44,
+      "converged": true,
+      "seconds": 39.7
+    },
+    {
+      "seed": 20261033,
+      "points": 21,
+      "mean": 0.08028425614961382,
+      "covariance": 0.1846945528988706,
+      "within": true,
+      "iterations": 44,
+      "converged": true,
+      "seconds": 104.4
+    },
+    {
+      "seed": 20261033,
+      "points": 15,
+      "mean": 0.16125921783769603,
+      "covariance": 0.6594584872464258,
+      "within": false,
+      "iterations": 47,
+      "converged": true,
+      "seconds": 38.1
+    }
+  ]
+}

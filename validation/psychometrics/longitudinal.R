@@ -32,17 +32,18 @@ cases$two <- local({
 
 # --- Three occasions ---------------------------------------------------------------------------------------------------------
 
-# 1,200 persons, 8 items on three occasions; 15% do not take part in the third.
+# 300 persons, 8 items on three occasions; 15% do not take part in the third. Three occasions are on 15 nodes, whose grid
+# of 15 ** 3 nodes keeps measurekit's calibration to a second or two; the tests hold the default of 21 apart.
 cases$three <- local({
   set.seed(20261101)
   items <- simulate_items(8)
-  thetas <- simulate_abilities(1200, c(0, 0.3, 0.7), c(1, 1.15, 1.3), autoregressive(3, 0.75))
-  occasions <- simulate_responses(thetas, items, list(1:8, 1:8, 1:8), list(integer(), integer(), sort(sample(1200, 180))))
-  run <- fit_mirt(occasions, "2PL", 21)
+  thetas <- simulate_abilities(300, c(0, 0.3, 0.7), c(1, 1.15, 1.3), autoregressive(3, 0.75))
+  occasions <- simulate_responses(thetas, items, list(1:8, 1:8, 1:8), list(integer(), integer(), sort(sample(300, 45))))
+  run <- fit_mirt(occasions, "2PL", 15)
   c(
     list(
-      source = "Simulated with set.seed(20261101): 1,200 persons, 8 dichotomous items on 3 occasions, abilities N((0, 0.3, 0.7), sds (1, 1.15, 1.3), autoregressive correlation 0.75); 180 persons absent from the third occasion.",
-      model = "2pl", points = 21, occasions = occasion_records(occasions), items = mirt_items(run, occasions, FALSE)
+      source = "Simulated with set.seed(20261101): 300 persons, 8 dichotomous items on 3 occasions, abilities N((0, 0.3, 0.7), sds (1, 1.15, 1.3), autoregressive correlation 0.75); 45 persons absent from the third occasion.",
+      model = "2pl", points = 15, occasions = occasion_records(occasions), items = mirt_items(run, occasions, FALSE)
     ),
     mirt_moments(run), mirt_statistics(run)
   )
@@ -116,18 +117,20 @@ tam_rasch <- function(occasions, points) {
   )
 }
 
+# Two occasions, as the model's slope and scale do not depend on their number and the three case holds three: on 15 nodes
+# per occasion mirt's estimates of three occasions are 4e-3 from measurekit's, and on 21 the calibration takes many seconds.
 cases$rasch <- local({
   set.seed(20261101)
   items <- simulate_items(8)
   items$a <- rep(1, 8)
-  thetas <- simulate_abilities(1200, c(0, 0.4, 0.8), c(1.1, 1.2, 1.3), autoregressive(3, 0.8))
-  occasions <- simulate_responses(thetas, items, list(1:8, 1:8, 1:8), list(integer(), sort(sample(1200, 120)), integer()))
-  run <- fit_mirt(occasions, "2PL", 21, common_slope = TRUE)
+  thetas <- simulate_abilities(800, c(0, 0.4), c(1.1, 1.2), autoregressive(2, 0.8))
+  occasions <- simulate_responses(thetas, items, list(1:8, 1:8), list(integer(), sort(sample(800, 80))))
+  run <- fit_mirt(occasions, "2PL", 31, common_slope = TRUE)
   c(
     list(
-      source = "Simulated with set.seed(20261101): 1,200 persons, 8 Rasch items on 3 occasions, abilities N((0, 0.4, 0.8), sds (1.1, 1.2, 1.3), autoregressive correlation 0.8); 120 persons absent from the second occasion. mirt: slopes constrained equal; TAM: tam.mml with slopes 1, converted to the scale of the first occasion.",
-      model = "1pl", points = 21, occasions = occasion_records(occasions), items = mirt_items(run, occasions, FALSE),
-      tam = tam_rasch(occasions, 21)
+      source = "Simulated with set.seed(20261101): 800 persons, 8 Rasch items on 2 occasions, abilities N((0, 0.4), sds (1.1, 1.2), correlation 0.8); 80 persons absent from the second occasion. mirt: slopes constrained equal; TAM: tam.mml with slopes 1, converted to the scale of the first occasion.",
+      model = "1pl", points = 31, occasions = occasion_records(occasions), items = mirt_items(run, occasions, FALSE),
+      tam = tam_rasch(occasions, 31)
     ),
     mirt_moments(run), mirt_statistics(run)
   )

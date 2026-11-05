@@ -1,0 +1,243 @@
+{
+  "source": "calibrateLongitudinal, createRandom(seed): persons answer the same 2PL items on 2 or 3 occasions, abilities with means 0, 0.3 and 0.6, standard deviations 1, 1.15 and 1.3 and an autoregressive correlation of 0.85. The error is the largest distance of an estimate from the mean, standard deviation or correlation of the simulated abilities; a threshold is 1.5 times the worst error of mirt on 10 items and the same design, rounded up to a multiple of 0.005.",
+  "recovery": [
+    {
+      "persons": 5000,
+      "itemsPerOccasion": 10,
+      "occasions": 2,
+      "points": 31,
+      "seeds": [1, 2, 3],
+      "thresholds": {
+        "mean": 0.03,
+        "sd": 0.025,
+        "correlation": 0.02
+      },
+      "worst": {
+        "mean": 0.02071907811214757,
+        "sd": 0.004397437754020572,
+        "correlation": 0.015369735649326088
+      },
+      "fits": [
+        {
+          "seed": 1,
+          "mean": 0.0014238899710535269,
+          "sd": 0.0017127389433699847,
+          "correlation": 0.015369735649326088,
+          "iterations": 24,
+          "converged": true,
+          "within": true,
+          "seconds": 1.3
+        },
+        {
+          "seed": 2,
+          "mean": 0.02071907811214757,
+          "sd": 0.0021109567898243142,
+          "correlation": 0.006475770093246069,
+          "iterations": 19,
+          "converged": true,
+          "within": true,
+          "seconds": 1.1
+        },
+        {
+          "seed": 3,
+          "mean": 0.0198845387206405,
+          "sd": 0.004397437754020572,
+          "correlation": 0.0014327244253889981,
+          "iterations": 21,
+          "converged": true,
+          "within": true,
+          "seconds": 1.3
+        }
+      ]
+    },
+    {
+      "persons": 5000,
+      "itemsPerOccasion": 40,
+      "occasions": 2,
+      "points": 31,
+      "seeds": [1, 2, 3],
+      "thresholds": {
+        "mean": 0.03,
+        "sd": 0.025,
+        "correlation": 0.02
+      },
+      "worst": {
+        "mean": 0.01151723693864376,
+        "sd": 0.010177436298027809,
+        "correlation": 0.004761218407313916
+      },
+      "fits": [
+        {
+          "seed": 1,
+          "mean": 0.01151723693864376,
+          "sd": 0.0036151000318416227,
+          "correlation": 0.00029199605635221726,
+          "iterations": 31,
+          "converged": true,
+          "within": true,
+          "seconds": 4.6
+        },
+        {
+          "seed": 2,
+          "mean": 0.005505835017577676,
+          "sd": 0.0031483032806940425,
+          "correlation": 0.004761218407313916,
+          "iterations": 24,
+          "converged": true,
+          "within": true,
+          "seconds": 3.7
+        },
+        {
+          "seed": 3,
+          "mean": 0.004245364043522992,
+          "sd": 0.010177436298027809,
+          "correlation": 0.0013393455920590602,
+          "iterations": 27,
+          "converged": true,
+          "within": true,
+          "seconds": 4.1
+        }
+      ]
+    },
+    {
+      "persons": 5000,
+      "itemsPerOccasion": 10,
+      "occasions": 3,
+      "points": 21,
+      "seeds": [1, 2, 3],
+      "thresholds": {
+        "mean": 0.03,
+        "sd": 0.035,
+        "correlation": 0.02
+      },
+      "worst": {
+        "mean": 0.01657110182374011,
+        "sd": 0.019561240343160646,
+        "correlation": 0.015028573855748406
+      },
+      "fits": [
+        {
+          "seed": 1,
+          "mean": 0.01657110182374011,
+          "sd": 0.017964106075491815,
+          "correlation": 0.00980280106113085,
+          "iterations": 26,
+          "converged": true,
+          "within": true,
+          "seconds": 8.8
+        },
+        {
+          "seed": 2,
+          "mean": 0.005674275383422189,
+          "sd": 0.010530892115778068,
+          "correlation": 0.013055459477090636,
+          "iterations": 21,
+          "converged": true,
+          "within": true,
+          "seconds": 9
+        },
+        {
+          "seed": 3,
+          "mean": 0.011635070295562322,
+          "sd": 0.019561240343160646,
+          "correlation": 0.015028573855748406,
+          "iterations": 21,
+          "converged": true,
+          "within": true,
+          "seconds": 8.5
+        }
+      ]
+    },
+    {
+      "persons": 5000,
+      "itemsPerOccasion": 40,
+      "occasions": 3,
+      "points": 21,
+      "seeds": [1, 2, 3],
+      "thresholds": {
+        "mean": 0.03,
+        "sd": 0.035,
+        "correlation": 0.02
+      },
+      "worst": {
+        "mean": 0.00971829241972555,
+        "sd": 0.01886466834983125,
+        "correlation": 0.006485012751081376
+      },
+      "fits": [
+        {
+          "seed": 1,
+          "mean": 0.00791135565145723,
+          "sd": 0.004344733448523819,
+          "correlation": 0.006485012751081376,
+          "iterations": 33,
+          "converged": true,
+          "within": true,
+          "seconds": 17.1
+        },
+        {
+          "seed": 2,
+          "mean": 0.006316264937577587,
+          "sd": 0.007260565408754305,
+          "correlation": 0.005975867114749067,
+          "iterations": 37,
+          "converged": true,
+          "within": true,
+          "seconds": 16.7
+        },
+        {
+          "seed": 3,
+          "mean": 0.00971829241972555,
+          "sd": 0.01886466834983125,
+          "correlation": 0.0033897995694905925,
+          "iterations": 53,
+          "converged": true,
+          "within": true,
+          "seconds": 23
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "persons": 5000,
+      "itemsPerOccasion": 40,
+      "occasions": 3,
+      "points": 15,
+      "seed": 1,
+      "mean": 0.08487309757146977,
+      "sd": 0.10337091666455045,
+      "correlation": 0.04161276803941705,
+      "thresholds": {
+        "mean": 0.03,
+        "sd": 0.035,
+        "correlation": 0.02
+      },
+      "seconds": 9
+    }
+  ],
+  "grid": [
+    {
+      "persons": 2000,
+      "itemsPerOccasion": 40,
+      "occasions": 3,
+      "points": [15, 21, 31],
+      "seed": 101,
+      "fifteenAgainstThirtyOne": 0.10931428450829905,
+      "twentyOneAgainstThirtyOne": 0.020756733253988302,
+      "converged": [true, true, true],
+      "seconds": [4.7, 6.1, 28.2]
+    },
+    {
+      "persons": 2000,
+      "itemsPerOccasion": 40,
+      "occasions": 3,
+      "points": [15, 21, 31],
+      "seed": 102,
+      "fifteenAgainstThirtyOne": 0.10427836743398333,
+      "twentyOneAgainstThirtyOne": 0.008360144941741199,
+      "converged": [true, true, true],
+      "seconds": [2.8, 8.7, 30.6]
+    }
+  ]
+}
