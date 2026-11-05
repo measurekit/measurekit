@@ -221,7 +221,8 @@ function pairData(items: readonly string[], learners: readonly Answers[]): PairD
   for (const answers of learners) addAnswers(answers, counts, m);
   const { pairLearners, failSolve, itemLearners, solved } = counts;
   const p = items.map((item, i) => {
-    if (solved[i] === 0) throw new DataError(`Item "${item}" is solved by no learner, so IITA cannot weigh it.`);
+    if (solved[i] === 0)
+      throw new DataError(`Item "${item}" is solved by no learner, so the difference test cannot weigh it.`);
     return (solved[i] ?? 0) / (itemLearners[i] ?? 1);
   });
   const complete = itemLearners.every((count) => count === n);

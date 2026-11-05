@@ -2034,7 +2034,7 @@ describe("the test of a quasi order", () => {
       "The alternative prerequisites have no key for item",
     );
     expect(() => diffTest(patternLog(names, { "110": 3, "100": 1 }), chain3)).toThrow(
-      'Item "c" is solved by no learner',
+      'Item "c" is solved by no learner, so the difference test cannot weigh it.',
     );
     expect(() => diffTest(patternLog(["a"], { "1": 3 }), { a: [] })).toThrow("needs at least 2 items");
     const apart = patternLog(names, { "11.": 4, "10.": 3, "0.1": 2, "1.0": 2, "01.": 1, ".11": 1 });
