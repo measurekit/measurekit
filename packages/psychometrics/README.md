@@ -166,7 +166,7 @@ calibration recovers the items it simulates.
 
 [Choosing](https://measurekit.wakan.dev/_measurekit/psychometrics/choosing/) says when the package fits, when another library fits better, and what each has
 that the package lacks. [Coming from R](https://measurekit.wakan.dev/_measurekit/psychometrics/coming-from-r/) puts the calls of mirt, TAM, catR,
-GDINA, equate, difR, psych and mokken beside the package's, with the tolerance and the time of each.
+GDINA, equate, difR, psych and mokken beside the package's, with the tolerance of each.
 
 Each guide lists what its module leaves out under Not included, with the reason for each method, and shows as recipes what
 a few lines over its functions compute, such as plausible values and bootstrap standard errors.

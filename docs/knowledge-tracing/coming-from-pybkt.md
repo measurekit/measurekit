@@ -1,9 +1,8 @@
 # Coming to knowledge tracing from pyBKT
 
 How a pyBKT 1.4.3 model maps to `bkt` of `@measurekit/knowledge-tracing`: the data, the options, the calls, the
-tolerance of each comparison from [validation](validation.md#tolerances), and the time of measurekit over pyBKT's from
-[performance](performance.md#results), which gives the machine, the versions and the date: below 1, measurekit takes less
-time.
+tolerance of each comparison from [validation](validation.md#tolerances); [performance](performance.md#results) gives the
+time of measurekit over pyBKT's, with the machine, the versions and the date.
 
 ```mermaid
 flowchart LR
@@ -88,14 +87,14 @@ optimum as the given starts on the practice log of the [validation](validation.m
 
 ## Calls
 
-| pyBKT                                         | measurekit                                    | Tolerance                                                           | Time over pyBKT |
-| --------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------- | --------------: |
-| `Model.fit`, 5 skills                         | `bkt(options).fit(log)`                       | 1e-8 absolute, the parameters and log-likelihood from a given start |         0.0042× |
-| `Model.fit`, each learner at 20 of 400 skills | `bkt(options).fit(log)`                       | the same                                                            |          0.019× |
-| `Model.fit` with `correct = -1` rows          | `fit` of a log with events without an outcome | 1e-8 absolute                                                       |         0.0057× |
-| `Model.fit(multipair = True)`                 | `fit` with `pairLearning: true`               | 1e-8 absolute                                                       |         0.0056× |
-| `Model.predict`                               | `fit.predictions`, or `predict` and `update`  | 1e-13 absolute, P(correct) and P(L) at fixed parameters             |          0.024× |
-| `Model.evaluate(metric = "auc")`              | `metrics` and `crossValidate` of `evaluate`   | 1e-12 absolute, against base R and pROC                             |       not timed |
+| pyBKT                                         | measurekit                                    | Tolerance                                                           |
+| --------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------- |
+| `Model.fit`, 5 skills                         | `bkt(options).fit(log)`                       | 1e-8 absolute, the parameters and log-likelihood from a given start |
+| `Model.fit`, each learner at 20 of 400 skills | `bkt(options).fit(log)`                       | the same                                                            |
+| `Model.fit` with `correct = -1` rows          | `fit` of a log with events without an outcome | 1e-8 absolute                                                       |
+| `Model.fit(multipair = True)`                 | `fit` with `pairLearning: true`               | 1e-8 absolute                                                       |
+| `Model.predict`                               | `fit.predictions`, or `predict` and `update`  | 1e-13 absolute, P(correct) and P(L) at fixed parameters             |
+| `Model.evaluate(metric = "auc")`              | `metrics` and `crossValidate` of `evaluate`   | 1e-12 absolute, against base R and pROC                             |
 
 ## Where measurekit differs
 

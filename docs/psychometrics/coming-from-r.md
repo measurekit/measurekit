@@ -2,9 +2,8 @@
 
 How the calls of mirt, TAM, catR and mirtCAT, GDINA, equate, equateIRT and kequate, difR, psych, the variance components
 of gtheory and mokken map to `@measurekit/psychometrics`. Each R call stands beside the function that the tests compare
-with it, the tolerance of that comparison from [validation](validation.md#tolerances), and the time of measurekit over the
-time of the R call from [performance](performance.md#results), which gives the machine, the versions and the date: below 1,
-measurekit takes less time.
+with it and the tolerance of that comparison from [validation](validation.md#tolerances); [performance](performance.md#results)
+gives the time of each function over the time of its R call, with the machine, the versions and the date.
 
 ```mermaid
 flowchart LR
@@ -58,107 +57,106 @@ posteriorMeanEstimate(fit.items, data.responses[0] ?? []); // => { theta: 0.32, 
 
 ## Calls
 
-The tolerance is against the R call of the row unless the row names another reference; "none" in the time is a task that
-[performance](performance.md#results) times against no R call.
+The tolerance is against the R call of the row unless the row names another reference.
 
 ### mirt
 
-| R call                                            | measurekit                                                      | Tolerance                                                | Time over R |
-| ------------------------------------------------- | --------------------------------------------------------------- | -------------------------------------------------------- | ----------: |
-| `mirt(data, 1, itemtype = "2PL")`                 | `calibrate(matrix, twoParameterLogistic)`                       | 1e-5 absolute, the item parameters                       |       0.51× |
-| `mirt(data, 1, itemtype = "graded")`              | `calibrate` with `gradedResponse`                               | 2e-4 absolute                                            |       0.26× |
-| `mirt(data, 1, itemtype = "gpcm")`                | `calibrate` with `generalizedPartialCredit`                     | 2e-4 absolute                                            |       0.19× |
-| `mirt(data, model, quadpts = 31)`, two dimensions | `calibrateMultidimensional`                                     | 1e-5 absolute, the M2PL's parameters                     |        0.3× |
-| `bfactor(data, specific, quadpts = 31)`           | `calibrateBifactor`                                             | 5e-4 absolute                                            |      0.052× |
-| `fscores(method = "EAP")`                         | `posteriorMeanEstimate`, or `abilityEstimates` for every person | 1e-10 absolute                                           |       0.62× |
-| `fscores(method = "MAP")`                         | `posteriorModeEstimate`                                         | 1e-5 absolute                                            |      0.064× |
-| `fscores(method = "ML")`                          | `maximumLikelihoodEstimate`                                     | 1e-5 absolute                                            |       0.11× |
-| `fscores(method = "WLE")`                         | `weightedLikelihoodEstimate`                                    | 1e-10 absolute, against base R's root of Warm's equation |      0.015× |
-| `testinfo`                                        | `testInformation`                                               | 1e-12 absolute                                           |       0.41× |
-| `itemfit(fit_stats = "S_X2")`                     | `summedScoreFit`                                                | 1e-12 absolute                                           |       0.13× |
-| `residuals(type = "Q3")`                          | `yenQ3`                                                         | 1e-12 absolute                                           |      0.044× |
-| `M2`                                              | `limitedInformationFit`                                         | 1e-3 absolute                                            |       0.16× |
-| `multipleGroup`, `DIF(scheme = "drop")`           | `irtLikelihoodRatioDif`                                         | 1e-5 absolute                                            |       0.24× |
+| R call                                            | measurekit                                                      | Tolerance                                                |
+| ------------------------------------------------- | --------------------------------------------------------------- | -------------------------------------------------------- |
+| `mirt(data, 1, itemtype = "2PL")`                 | `calibrate(matrix, twoParameterLogistic)`                       | 1e-5 absolute, the item parameters                       |
+| `mirt(data, 1, itemtype = "graded")`              | `calibrate` with `gradedResponse`                               | 2e-4 absolute                                            |
+| `mirt(data, 1, itemtype = "gpcm")`                | `calibrate` with `generalizedPartialCredit`                     | 2e-4 absolute                                            |
+| `mirt(data, model, quadpts = 31)`, two dimensions | `calibrateMultidimensional`                                     | 1e-5 absolute, the M2PL's parameters                     |
+| `bfactor(data, specific, quadpts = 31)`           | `calibrateBifactor`                                             | 5e-4 absolute                                            |
+| `fscores(method = "EAP")`                         | `posteriorMeanEstimate`, or `abilityEstimates` for every person | 1e-10 absolute                                           |
+| `fscores(method = "MAP")`                         | `posteriorModeEstimate`                                         | 1e-5 absolute                                            |
+| `fscores(method = "ML")`                          | `maximumLikelihoodEstimate`                                     | 1e-5 absolute                                            |
+| `fscores(method = "WLE")`                         | `weightedLikelihoodEstimate`                                    | 1e-10 absolute, against base R's root of Warm's equation |
+| `testinfo`                                        | `testInformation`                                               | 1e-12 absolute                                           |
+| `itemfit(fit_stats = "S_X2")`                     | `summedScoreFit`                                                | 1e-12 absolute                                           |
+| `residuals(type = "Q3")`                          | `yenQ3`                                                         | 1e-12 absolute                                           |
+| `M2`                                              | `limitedInformationFit`                                         | 1e-3 absolute                                            |
+| `multipleGroup`, `DIF(scheme = "drop")`           | `irtLikelihoodRatioDif`                                         | 1e-5 absolute                                            |
 
 ### TAM
 
-| R call                                          | measurekit                | Tolerance                                                       | Time over R |
-| ----------------------------------------------- | ------------------------- | --------------------------------------------------------------- | ----------: |
-| `tam.jml`                                       | `jointMaximumLikelihood`  | 1e-10 absolute, from TAM's estimates iterated by base R         |       0.33× |
-| `IRT.RMSD`                                      | `rootMeanSquareDeviation` | 1e-8 absolute                                                   |        5.5× |
-| `tam.mml.mfr(formulaA = ~ item + rater + step)` | `manyFacetRasch`          | 1e-8 absolute, against base R's maximum, which TAM's approaches |        1.2× |
+| R call                                          | measurekit                | Tolerance                                                       |
+| ----------------------------------------------- | ------------------------- | --------------------------------------------------------------- |
+| `tam.jml`                                       | `jointMaximumLikelihood`  | 1e-10 absolute, from TAM's estimates iterated by base R         |
+| `IRT.RMSD`                                      | `rootMeanSquareDeviation` | 1e-8 absolute                                                   |
+| `tam.mml.mfr(formulaA = ~ item + rater + step)` | `manyFacetRasch`          | 1e-8 absolute, against base R's maximum, which TAM's approaches |
 
 ### catR and mirtCAT
 
-| R call                                  | measurekit                                                       | Tolerance                                                        | Time over R |
-| --------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- | ----------: |
-| catR's `nextItem(criterion = "MLWI")`   | `createAdaptiveTest` with `likelihoodWeightedInformation`        | 1e-12 relative, the scores of the items                          |    0.00017× |
-| catR's `nextItem(criterion = "KL")`     | `createAdaptiveTest` with `kullbackLeibler`                      | 1e-12 relative                                                   |      0.008× |
-| catR's `thetaEst` and `semTheta`, EAP   | The estimates of an adaptive test after each response            | 1e-6 absolute                                                    |   not timed |
-| catR's `randomCAT`                      | `simulateAdaptiveTest`                                           | catR's item at every step of a run, through `createAdaptiveTest` |      0.017× |
-| mirtCAT's `mirtCAT(criteria = "Drule")` | `simulateMultidimensionalAdaptiveTest` with `maximumDeterminant` | 1e-12 relative, against a base R replay                          |      0.012× |
+| R call                                  | measurekit                                                       | Tolerance                                                        |
+| --------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- |
+| catR's `nextItem(criterion = "MLWI")`   | `createAdaptiveTest` with `likelihoodWeightedInformation`        | 1e-12 relative, the scores of the items                          |
+| catR's `nextItem(criterion = "KL")`     | `createAdaptiveTest` with `kullbackLeibler`                      | 1e-12 relative                                                   |
+| catR's `thetaEst` and `semTheta`, EAP   | The estimates of an adaptive test after each response            | 1e-6 absolute                                                    |
+| catR's `randomCAT`                      | `simulateAdaptiveTest`                                           | catR's item at every step of a run, through `createAdaptiveTest` |
+| mirtCAT's `mirtCAT(criteria = "Drule")` | `simulateMultidimensionalAdaptiveTest` with `maximumDeterminant` | 1e-12 relative, against a base R replay                          |
 
 ### GDINA
 
-| R call                       | measurekit                   | Tolerance                                                | Time over R |
-| ---------------------------- | ---------------------------- | -------------------------------------------------------- | ----------: |
-| `GDINA(model = "GDINA")`     | `calibrateCdm`               | 1e-5 absolute, the success probabilities and proportions |        0.8× |
-| `GDINA(model = "DINA")`      | `calibrateCdm` with the DINA | 1e-5 absolute                                            |       0.48× |
-| `modelcomp(method = "Wald")` | `compareItemModels`          | 1e-4 relative to max(1, statistic), the Wald statistics  |     0.0065× |
-| `modelfit`                   | `cdmModelFit`                | 1e-3 absolute                                            |       0.58× |
-| `personparm(what = "EAP")`   | `attributeProfiles`          | 1e-5 absolute                                            |        2.7× |
-| `CA`                         | `cdmClassificationAccuracy`  | 1e-5 absolute                                            |       0.45× |
+| R call                       | measurekit                   | Tolerance                                                |
+| ---------------------------- | ---------------------------- | -------------------------------------------------------- |
+| `GDINA(model = "GDINA")`     | `calibrateCdm`               | 1e-5 absolute, the success probabilities and proportions |
+| `GDINA(model = "DINA")`      | `calibrateCdm` with the DINA | 1e-5 absolute                                            |
+| `modelcomp(method = "Wald")` | `compareItemModels`          | 1e-4 relative to max(1, statistic), the Wald statistics  |
+| `modelfit`                   | `cdmModelFit`                | 1e-3 absolute                                            |
+| `personparm(what = "EAP")`   | `attributeProfiles`          | 1e-5 absolute                                            |
+| `CA`                         | `cdmClassificationAccuracy`  | 1e-5 absolute                                            |
 
 ### equate, equateIRT and kequate
 
-| R call                                             | measurekit                    | Tolerance                                                   | Time over R |
-| -------------------------------------------------- | ----------------------------- | ----------------------------------------------------------- | ----------: |
-| equate's `equate(type = "equipercentile")`         | `equipercentileEquating`      | 1e-6 absolute                                               |      0.008× |
-| equate's `equate(method = "tucker")`               | `tuckerEquating`              | 1e-12 absolute                                              |     0.0044× |
-| equate's `equate(method = "frequency estimation")` | `frequencyEstimationEquating` | 1e-6 absolute                                               |     0.0039× |
-| equateIRT's `direc(method = "Stocking-Lord")`      | `stockingLordLinking`         | 1e-7 absolute                                               |       0.04× |
-| equateIRT's `score(method = "TSE")`                | `trueScoreEquating`           | 1e-12 absolute, against base R, with which equateIRT agrees |      0.018× |
-| kequate's `kequate("EG")`                          | `kernelEquating`              | 1e-5 absolute                                               |     0.0098× |
+| R call                                             | measurekit                    | Tolerance                                                   |
+| -------------------------------------------------- | ----------------------------- | ----------------------------------------------------------- |
+| equate's `equate(type = "equipercentile")`         | `equipercentileEquating`      | 1e-6 absolute                                               |
+| equate's `equate(method = "tucker")`               | `tuckerEquating`              | 1e-12 absolute                                              |
+| equate's `equate(method = "frequency estimation")` | `frequencyEstimationEquating` | 1e-6 absolute                                               |
+| equateIRT's `direc(method = "Stocking-Lord")`      | `stockingLordLinking`         | 1e-7 absolute                                               |
+| equateIRT's `score(method = "TSE")`                | `trueScoreEquating`           | 1e-12 absolute, against base R, with which equateIRT agrees |
+| kequate's `kequate("EG")`                          | `kernelEquating`              | 1e-5 absolute                                               |
 
 ### difR
 
-| R call        | measurekit              | Tolerance                                                          | Time over R |
-| ------------- | ----------------------- | ------------------------------------------------------------------ | ----------: |
-| `difMH`       | `mantelHaenszel`        | 1e-12 absolute                                                     |       0.06× |
-| `difLogistic` | `logisticRegressionDif` | 1e-9 absolute                                                      |       0.53× |
-| `difLord`     | `lordChiSquare`         | 1e-5 relative                                                      |       0.73× |
-| `difRaju`     | `rajuAreaDif`           | 1e-8 absolute                                                      |       0.67× |
-| `difSIBTEST`  | `sibtest`               | 1e-10 absolute, against mirt's `SIBTEST`, which difR's agrees with |       0.15× |
+| R call        | measurekit              | Tolerance                                                          |
+| ------------- | ----------------------- | ------------------------------------------------------------------ |
+| `difMH`       | `mantelHaenszel`        | 1e-12 absolute                                                     |
+| `difLogistic` | `logisticRegressionDif` | 1e-9 absolute                                                      |
+| `difLord`     | `lordChiSquare`         | 1e-5 relative                                                      |
+| `difRaju`     | `rajuAreaDif`           | 1e-8 absolute                                                      |
+| `difSIBTEST`  | `sibtest`               | 1e-10 absolute, against mirt's `SIBTEST`, which difR's agrees with |
 
 ### psych
 
-| R call                              | measurekit                        | Tolerance                                                      | Time over R |
-| ----------------------------------- | --------------------------------- | -------------------------------------------------------------- | ----------: |
-| `alpha`                             | `cronbachAlpha`, `itemStatistics` | 1e-10 absolute                                                 |      0.037× |
-| `omega(nfactors = 1)`               | `mcdonaldOmega`                   | 1e-10 absolute against base R; psych's `omega.tot` within 1e-4 |       0.62× |
-| `polychoric`                        | `polychoricCorrelations`          | 1e-4 absolute                                                  |     0.0064× |
-| `fa.parallel(cor = "poly")`         | `parallelAnalysis`                | 4 Monte Carlo standard errors, the mean eigenvalues            |     0.0032× |
-| `fa(fm = "ml", rotate = "oblimin")` | `exploratoryFactorAnalysis`       | 1e-4 absolute, the loadings                                    |       0.26× |
-| `ICC`                               | `intraclassCorrelation`           | 1e-12 absolute                                                 |     0.0029× |
+| R call                              | measurekit                        | Tolerance                                                      |
+| ----------------------------------- | --------------------------------- | -------------------------------------------------------------- |
+| `alpha`                             | `cronbachAlpha`, `itemStatistics` | 1e-10 absolute                                                 |
+| `omega(nfactors = 1)`               | `mcdonaldOmega`                   | 1e-10 absolute against base R; psych's `omega.tot` within 1e-4 |
+| `polychoric`                        | `polychoricCorrelations`          | 1e-4 absolute                                                  |
+| `fa.parallel(cor = "poly")`         | `parallelAnalysis`                | 4 Monte Carlo standard errors, the mean eigenvalues            |
+| `fa(fm = "ml", rotate = "oblimin")` | `exploratoryFactorAnalysis`       | 1e-4 absolute, the loadings                                    |
+| `ICC`                               | `intraclassCorrelation`           | 1e-12 absolute                                                 |
 
 ### gtheory
 
 gtheory is archived on CRAN. Its G and D studies are compared with their definitions written out in base R and with
 lme4's REML estimates.
 
-| R call   | measurekit              | Tolerance                                                        |                    Time over R |
-| -------- | ----------------------- | ---------------------------------------------------------------- | -----------------------------: |
-| `gstudy` | `generalizabilityStudy` | 1e-10 relative against base R; 1e-5 absolute against lme4's REML | 0.0026×, against lme4's `lmer` |
-| `dstudy` | `decisionStudy`         | 1e-10 relative                                                   |                      not timed |
+| R call   | measurekit              | Tolerance                                                        |
+| -------- | ----------------------- | ---------------------------------------------------------------- |
+| `gstudy` | `generalizabilityStudy` | 1e-10 relative against base R; 1e-5 absolute against lme4's REML |
+| `dstudy` | `decisionStudy`         | 1e-10 relative                                                   |
 
 ### mokken
 
-| R call                       | measurekit               | Tolerance                                   | Time over R |
-| ---------------------------- | ------------------------ | ------------------------------------------- | ----------: |
-| `coefH(se = TRUE)`           | `scalability`            | 1e-10, relative to max(1, value)            |      0.011× |
-| `aisp`                       | `automatedItemSelection` | exact                                       |       0.03× |
-| `check.monotonicity`         | `monotonicity`           | exact counts; 1e-8 absolute, the violations |       0.17× |
-| `check.iio(method = "MIIO")` | `invariantItemOrdering`  | exact items removed; 1e-10 absolute, H^T    |       0.19× |
+| R call                       | measurekit               | Tolerance                                   |
+| ---------------------------- | ------------------------ | ------------------------------------------- |
+| `coefH(se = TRUE)`           | `scalability`            | 1e-10, relative to max(1, value)            |
+| `aisp`                       | `automatedItemSelection` | exact                                       |
+| `check.monotonicity`         | `monotonicity`           | exact counts; 1e-8 absolute, the violations |
+| `check.iio(method = "MIIO")` | `invariantItemOrdering`  | exact items removed; 1e-10 absolute, H^T    |
 
 ## Where measurekit differs
 
