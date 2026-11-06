@@ -37,7 +37,8 @@ The engines may differ in the last bit of `Math.exp` and `Math.log`, so the resu
 within its tolerance of 1e-8 keeps such a difference far below that. The bundle uses the browser's platform, so a module of Node.js in
 a package fails the bundling, and Deno runs it with no permission, so a call to the file system, the network or the environment fails.
 esbuild reads no tsconfig, because the `paths` of the one in this folder, which point the type checker at the sources, would bundle
-the sources and not the build.
+the sources and not the build; its metafile lists every input, and a path of `packages/` outside a `dist/` fails the check before a
+runtime runs.
 
 ## Running it
 

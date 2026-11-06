@@ -4,15 +4,38 @@ import { createRequire } from "node:module";
 import { connect, createServer } from "node:net";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
-import { build } from "esbuild";
+import { build, type Metafile } from "esbuild";
 import type { Results } from "./scenarios.js";
 
+/** The root of the repository: the metafile of a bundle names its inputs by their path from it. */
+const ROOT = join(import.meta.dirname, "..");
 const DIST = join(import.meta.dirname, ".dist");
 /** The workerd program: the package of that name exports the path of the binary for the platform. */
 const WORKERD = (createRequire(import.meta.url)("workerd") as { readonly default: string }).default;
 /** How long workerd has to listen, and the time between two tries. */
 const LISTEN_LIMIT_MS = 15_000;
 const LISTEN_TRY_MS = 50;
+
+/** A file of a package that is not in its `dist`, such as a source, and a file that is. */
+const NOT_SHIPPED = /^packages\/[^/]+\/(?!dist\/)/;
+const SHIPPED = /^packages\/[^/]+\/dist\//;
+
+/**
+ * Throws when the bundles hold a file of a package that the package does not ship, or hold none that it ships, so that the
+ * pattern above could not tell the one from the other.
+ */
+function assertShipped({ inputs }: Metafile): void {
+  const files = Object.keys(inputs);
+  const unshipped = files.filter((file) => NOT_SHIPPED.test(file));
+  if (unshipped.length > 0) {
+    throw new Error(
+      `The bundles hold ${unshipped.length} files that the packages do not ship, such as ${unshipped[0]}.`,
+    );
+  }
+  if (!files.some((file) => SHIPPED.test(file))) {
+    throw new Error("The bundles hold no file of the dist of a package, so this check cannot tell what they hold.");
+  }
+}
 
 /**
  * Bundles the scenarios into one file for each way a runtime runs them: `run.js` for Node.js, Deno and Bun, which print the
@@ -21,16 +44,19 @@ const LISTEN_TRY_MS = 50;
  * sources applies. The platform is the browser's, so that a module of Node.js in a package fails the bundle: a Worker has none.
  */
 async function bundle(): Promise<void> {
-  await build({
+  const { metafile } = await build({
     entryPoints: { run: join(import.meta.dirname, "run.ts"), worker: join(import.meta.dirname, "worker.ts") },
+    absWorkingDir: ROOT,
     outdir: DIST,
     bundle: true,
     format: "esm",
     target: "es2022",
     platform: "browser",
     tsconfigRaw: {},
+    metafile: true,
     logLevel: "warning",
   });
+  assertShipped(metafile);
 }
 
 /** Runs a command and returns what it printed. */
