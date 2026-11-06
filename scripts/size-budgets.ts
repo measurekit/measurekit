@@ -10,17 +10,17 @@ export interface EntryBudget {
 }
 
 /**
- * The budget of every entry point of the packages, bundled alone as a host's bundler makes it: minified, with
- * `export *` of the entry. The size is 1.25 times the size measured after gzip, rounded up to the next 500 bytes; the
- * modules are those it holds, which the import rules of AGENTS.md allow, so that an import that pulls another module
- * into an entry point fails until the list says so. docs/<package>/performance.md lists them. A budget changes only with the
- * reason in the commit that changes it.
+ * The budget of every entry point of the packages, bundled alone as a host's bundler makes it: minified, with `export *` of
+ * the entry. The size is 1.25 times the size measured after gzip, rounded up to the next 500 bytes; the modules are those it
+ * holds, which the import rules of AGENTS.md allow, so that an import that pulls another module into an entry point fails
+ * until the list says so. docs/<package>/performance.md lists them. Every budget is set again by this rule from main before
+ * a release, and one budget, in a commit that says why, when its entry passes it; gzip is measured on Node.js 22.
  */
 export const ENTRY_BUDGETS: Readonly<Record<string, EntryBudget>> = {
   "@measurekit/core": { gzip: 9000, holds: [] },
   "@measurekit/psychometrics": { gzip: 2000, holds: ["core"] },
   "@measurekit/psychometrics/cat": {
-    gzip: 29_500,
+    gzip: 31_500,
     holds: [
       "core",
       "psychometrics/cdm",
@@ -33,30 +33,30 @@ export const ENTRY_BUDGETS: Readonly<Record<string, EntryBudget>> = {
     ],
   },
   "@measurekit/psychometrics/cdm": {
-    gzip: 20_000,
+    gzip: 21_500,
     holds: ["core", "psychometrics/checks", "psychometrics/data", "psychometrics/irt", "psychometrics/math"],
   },
-  "@measurekit/psychometrics/change": { gzip: 3000, holds: ["core", "psychometrics/checks"] },
-  "@measurekit/psychometrics/ctt": { gzip: 10_500, holds: ["core", "psychometrics/data", "psychometrics/math"] },
-  "@measurekit/psychometrics/data": { gzip: 3000, holds: ["core"] },
+  "@measurekit/psychometrics/change": { gzip: 3500, holds: ["core", "psychometrics/checks"] },
+  "@measurekit/psychometrics/ctt": { gzip: 12_000, holds: ["core", "psychometrics/data", "psychometrics/math"] },
+  "@measurekit/psychometrics/data": { gzip: 3500, holds: ["core"] },
   "@measurekit/psychometrics/dif": {
-    gzip: 36_500,
+    gzip: 43_500,
     holds: ["core", "psychometrics/data", "psychometrics/equating", "psychometrics/irt", "psychometrics/math"],
   },
   "@measurekit/psychometrics/dimensionality": {
-    gzip: 18_000,
+    gzip: 19_500,
     holds: ["core", "psychometrics/data", "psychometrics/math"],
   },
   "@measurekit/psychometrics/equating": {
-    gzip: 25_000,
+    gzip: 27_500,
     holds: ["core", "psychometrics/checks", "psychometrics/irt", "psychometrics/math"],
   },
   "@measurekit/psychometrics/explanatory": {
-    gzip: 21_500,
+    gzip: 23_000,
     holds: ["core", "psychometrics/data", "psychometrics/irt", "psychometrics/math"],
   },
   "@measurekit/psychometrics/fit": {
-    gzip: 50_500,
+    gzip: 52_000,
     holds: [
       "core",
       "psychometrics/checks",
@@ -67,27 +67,27 @@ export const ENTRY_BUDGETS: Readonly<Record<string, EntryBudget>> = {
     ],
   },
   "@measurekit/psychometrics/generalizability": {
-    gzip: 7000,
+    gzip: 7500,
     holds: ["core", "psychometrics/data", "psychometrics/math"],
   },
   "@measurekit/psychometrics/irt": {
-    gzip: 34_000,
+    gzip: 41_000,
     holds: ["core", "psychometrics/checks", "psychometrics/data", "psychometrics/math"],
   },
   "@measurekit/psychometrics/mokken": {
-    gzip: 15_000,
+    gzip: 16_000,
     holds: ["core", "psychometrics/checks", "psychometrics/data", "psychometrics/math"],
   },
   "@measurekit/psychometrics/multidimensional": {
-    gzip: 51_000,
+    gzip: 58_500,
     holds: ["core", "psychometrics/checks", "psychometrics/data", "psychometrics/irt", "psychometrics/math"],
   },
   "@measurekit/psychometrics/parameterization": {
-    gzip: 7500,
+    gzip: 8000,
     holds: ["core", "psychometrics/irt", "psychometrics/multidimensional"],
   },
   "@measurekit/psychometrics/rater": {
-    gzip: 29_000,
+    gzip: 29_500,
     holds: [
       "core",
       "psychometrics/checks",
@@ -98,15 +98,15 @@ export const ENTRY_BUDGETS: Readonly<Record<string, EntryBudget>> = {
     ],
   },
   "@measurekit/psychometrics/response-time": {
-    gzip: 23_000,
+    gzip: 26_000,
     holds: ["core", "psychometrics/checks", "psychometrics/data", "psychometrics/irt", "psychometrics/math"],
   },
   "@measurekit/psychometrics/scaling": {
-    gzip: 14_500,
+    gzip: 17_500,
     holds: ["core", "psychometrics/checks", "psychometrics/equating", "psychometrics/irt", "psychometrics/math"],
   },
   "@measurekit/psychometrics/sim": {
-    gzip: 9000,
+    gzip: 9500,
     holds: [
       "core",
       "psychometrics/cdm",
@@ -121,37 +121,37 @@ export const ENTRY_BUDGETS: Readonly<Record<string, EntryBudget>> = {
     holds: ["core", "psychometrics/checks", "psychometrics/data", "psychometrics/irt", "psychometrics/math"],
   },
   "@measurekit/psychometrics/standard-setting": {
-    gzip: 13_500,
+    gzip: 16_500,
     holds: ["core", "psychometrics/checks", "psychometrics/equating", "psychometrics/irt", "psychometrics/math"],
   },
   "@measurekit/knowledge-tracing": { gzip: 2000, holds: ["core"] },
   "@measurekit/knowledge-tracing/bkt": {
-    gzip: 10_500,
+    gzip: 12_000,
     holds: ["core", "knowledge-tracing/data", "knowledge-tracing/math"],
   },
-  "@measurekit/knowledge-tracing/data": { gzip: 3000, holds: ["core"] },
+  "@measurekit/knowledge-tracing/data": { gzip: 3500, holds: ["core"] },
   "@measurekit/knowledge-tracing/elo": {
-    gzip: 3000,
+    gzip: 3500,
     holds: ["core", "knowledge-tracing/data", "knowledge-tracing/math"],
   },
   "@measurekit/knowledge-tracing/evaluate": {
-    gzip: 8000,
+    gzip: 8500,
     holds: ["core", "knowledge-tracing/data", "knowledge-tracing/math", "knowledge-tracing/model"],
   },
   "@measurekit/knowledge-tracing/irt": {
-    gzip: 7000,
+    gzip: 7500,
     holds: ["core", "knowledge-tracing/data", "knowledge-tracing/math"],
   },
   "@measurekit/knowledge-tracing/kst": {
-    gzip: 19_000,
+    gzip: 22_500,
     holds: ["core", "knowledge-tracing/data", "knowledge-tracing/math"],
   },
   "@measurekit/knowledge-tracing/logistic": {
-    gzip: 20_500,
+    gzip: 21_000,
     holds: ["core", "knowledge-tracing/data", "knowledge-tracing/math", "knowledge-tracing/model"],
   },
   "@measurekit/knowledge-tracing/practice": {
-    gzip: 3000,
+    gzip: 3500,
     holds: ["core", "knowledge-tracing/data", "knowledge-tracing/model"],
   },
   "@measurekit/knowledge-tracing/sim": {

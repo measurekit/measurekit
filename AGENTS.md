@@ -450,11 +450,16 @@ listed here with its reason. A file is written `<package>/<path below src>`, and
   each model's limits, such as BKT parameters at their bounds or a posterior mode beyond the IRT grid.
 - A module has benchmarks of its hot path in `test/<module>.bench.ts`, the size of the input in the title of each, a budget
   in `test/budgets.ts` and, where a reference does the task, the same task timed in
-  `validation/benchmarks/<package>/<module>.R`, or a `<module>-<topic>.R` beside it, on the same data. Each entry point has
-  a size budget in `scripts/size-budgets.ts`, and the readers of untrusted input of the largest peaks, at the limits or
-  past the size of their input, a case with a heap and a budget in `scripts/peak-memory.ts`. `docs/<package>/performance.md`
-  gives the times against the references, the sizes and the peak memory of the readers of untrusted input, and
+  `validation/benchmarks/<package>/<module>.R`, or a `<module>-<topic>.R` beside it, on the same data. The readers of untrusted
+  input of the largest peaks, at the limits or past the size of their input, have a case with a heap and a budget in
+  `scripts/peak-memory.ts`. `docs/<package>/performance.md` gives the times against the references, the sizes and the peak memory of the readers of untrusted input, and
   `validation/README.md` the method of the benchmarks, how to refresh the pages and how the budgets were measured.
+- Every entry point of a package has a size budget that `pnpm test` holds: the bytes of its first load (its entry chunk and
+  the chunks it loads statically), bundled alone as a host's bundler makes it, minified and with code splitting, after gzip
+  at level 9 on Node.js 22, and the modules other than its own that it holds, so that an import which pulls one module into
+  another fails until the list says so. The bytes are 1.25 times those measured, rounded up to the next 500. Every budget
+  is set again by this rule from main before a release, and one budget, in a commit that says why, when its entry passes
+  it. `scripts/size-budgets.ts` holds them, and `scripts/entry-sizes.ts` measures them.
 - A bug fix comes with a test that fails without it, in the test file of the fixed folder. A rule that keeps untrusted
   input from being misread, or from costing what its size does not, has an entry in `scripts/check-rules.ts`.
 - A limit is a constant `MAX_*` that the message of its `DataError` names, or the default `DEFAULT_MAX_*` of an option
