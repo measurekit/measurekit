@@ -955,6 +955,8 @@
     "Zwick",
     "\u00dcnl\u00fc",
     "\u00dcnl\u00fc's",
-    "\u0158ih\u00e1k"
-  ]
+    "\u0158ih\u00e1k",
+    "katex"
+  ],
+  "ignoreRegExpList": ["GHSA(?:-[0-9a-z]{4}){3}"]
 }

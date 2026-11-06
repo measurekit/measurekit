@@ -9,7 +9,6 @@
   "favicon": "docs/favicon.svg",
   "treatWarningsAsErrors": true,
   "plugin": ["typedoc-plugin-mermaid", "./docs/typedoc-seo.ts"],
-  "mermaidVersion": "11.17.2",
   "customCss": "docs/diagrams.css",
   "ignoredHighlightLanguages": ["python", "r"]
 }
