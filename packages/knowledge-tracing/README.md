@@ -108,8 +108,8 @@ Invalid input throws `DataError`. A statistic that is undefined for the data, su
 correct, is `null` in a table of metrics and a `DataError` from a function that returns only that statistic. Results
 never contain `NaN`.
 
-A state or parameters stored by a 1.x release stay readable by every later 1.x release. A new field is optional, and its
-absence means the old behavior.
+A state or parameters stored by a 1.x release stay readable by every later 1.x release
+([storage](https://measurekit.wakan.dev/_measurekit/knowledge-tracing/storage/#stored-states-across-versions)).
 
 ## Supported
 

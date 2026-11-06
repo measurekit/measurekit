@@ -25,6 +25,5 @@ flowchart LR
 | [practice](practice.md) | The next item by predicted success, streak, threshold, moving-average, window and predicted mastery criteria                                                | base R replays                                   | [Not included](practice.md#not-included) |
 | [sim](sim.md)           | Outcomes drawn from any learner model, seeded, with lessons that draw none                                                                                  | Seeded recovery of each family                   | [Not included](sim.md#not-included)      |
 
-Every model runs on Node.js, browsers, Deno, Bun and workerd, with no platform API; `compat/` runs a BKT fit on each and
-compares its results with Node.js's. A state or parameters stored by a 1.x release stay readable by every later 1.x
-release ([storage](storage.md)).
+Every model uses no platform API, so it runs in browsers as well as on Node.js, Deno, Bun and workerd; `compat/` runs a BKT
+fit on the last four and compares its results with Node.js's.

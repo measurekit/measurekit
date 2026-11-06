@@ -38,6 +38,6 @@ flowchart LR
 | [sim](sim.md)                           | Thetas, item parameters of every model, responses with missingness, CDM and multidimensional responses                                                                                                                                                                                                      | Seeded properties and recovery; R's generator differs | [Not included](sim.md#not-included)              |
 | [parameterization](parameterization.md) | mirt's IRT and slope-intercept coefficients of every model, multidimensional ones included                                                                                                                                                                                                                  | mirt                                                  | [Not included](parameterization.md#not-included) |
 
-Every function runs on Node.js, browsers, Deno, Bun and workerd, with no platform API; `compat/` runs a calibration on each
-and compares its results with Node.js's. The limits on the size of each input are in
+Every function uses no platform API, so it runs in browsers as well as on Node.js, Deno, Bun and workerd; `compat/` runs a
+calibration on the last four and compares its results with Node.js's. The limits on the size of each input are in
 [SECURITY.md](https://github.com/measurekit/measurekit/blob/main/SECURITY.md).
