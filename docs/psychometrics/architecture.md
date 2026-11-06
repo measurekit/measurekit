@@ -68,19 +68,11 @@ flowchart LR
 
 Each module is a folder of `packages/psychometrics/src/` with an `index.ts` that lists its public API.
 [AGENTS.md](../../AGENTS.md#layout) shows the layout of the repository and
-the [README](../../packages/psychometrics/README.md#api) the contents of each module. The package exports `.` and
-one subpath per module: `@measurekit/psychometrics/cat`,
-`@measurekit/psychometrics/cdm`, `@measurekit/psychometrics/change`, `@measurekit/psychometrics/ctt`,
-`@measurekit/psychometrics/data`, `@measurekit/psychometrics/dif`, `@measurekit/psychometrics/dimensionality`,
-`@measurekit/psychometrics/equating`, `@measurekit/psychometrics/explanatory`, `@measurekit/psychometrics/fit`,
-`@measurekit/psychometrics/generalizability`, `@measurekit/psychometrics/irt`, `@measurekit/psychometrics/mokken`,
-`@measurekit/psychometrics/multidimensional`, `@measurekit/psychometrics/parameterization`,
-`@measurekit/psychometrics/rater`, `@measurekit/psychometrics/response-time`, `@measurekit/psychometrics/scaling`,
-`@measurekit/psychometrics/sim`, `@measurekit/psychometrics/similarity` and `@measurekit/psychometrics/standard-setting`.
-Each public name has one entry, its module's subpath. `.` holds only what the modules share and core owns, so that a user
-does not import core ([AGENTS.md](../../AGENTS.md#deviations-from-the-standards)): `createRandom`, `DataError`,
-`MeasurekitError` and the types of core that the modules take or return, `Random`, `QMatrix`, `ThresholdItem`,
-`NominalParameters`, `ThetaDistribution` and `KappaWeights`, which no module re-exports. `math/` is not exported.
+the [README](../../packages/psychometrics/README.md#api) the contents of each module. The package exports `.` and one
+subpath per module, `@measurekit/psychometrics/<module>`; each public name has one entry, its module's subpath. `.` holds
+only what the modules share and core owns, which no module re-exports, so that a user does not import core
+([AGENTS.md](../../AGENTS.md#deviations-from-the-standards)); the README's API table lists its names. `math/` is not
+exported.
 
 ## Dependencies between modules
 
@@ -96,16 +88,30 @@ Modules form layers; a module imports only from lower layers, never from its own
 | 6     | `fit/`, `cat/`                                                                            |
 | 7     | `rater/`                                                                                  |
 
-Analysis modules (`ctt/`, `change/`, `irt/`, `dimensionality/`, `generalizability/` and `mokken/`) build on `data/` and
-`math/` or on nothing, not on each other. `sim/` builds on `irt/`, `cdm/` and `multidimensional/` to simulate their models, `parameterization/`
-on `irt/` and `multidimensional/` to convert their items, `cat/` on `sim/` for the same response simulation, on `cdm/` for
-the profile estimates of diagnostic tests and on `multidimensional/` for the items, estimates and information of
-multidimensional tests, `dif/` and `standard-setting/` on `equating/` for linking and score distributions, `scaling/` on
-`equating/` for the linear transformation of a theta scale, `fit/` on `sim/` for the replications of the critical value of
-Q3, and `rater/` on `irt/` for the Rasch model of its many
-facets and on `fit/` for the fit of their elements. `explanatory/` builds on `irt/` for the calibrated items it
-regresses, `multidimensional/` on `irt/` for its priors, compressed responses and parameter bounds, and `similarity/` on
-`irt/` for the probability of each category at a person's theta.
+```mermaid
+flowchart BT
+  irt["irt/"]
+  multidimensional["multidimensional/"] -->|"priors, compressed responses, parameter bounds"| irt
+  explanatory["explanatory/"] -->|"the calibrated items it regresses"| irt
+  similarity["similarity/"] -->|"the probability of each category at a theta"| irt
+  equating["equating/"]
+  cdm["cdm/"]
+  sim["sim/"] -->|"simulates their models"| cdm
+  sim --> multidimensional
+  parameterization["parameterization/"] -->|"converts their items"| multidimensional
+  dif["dif/"] -->|"linking, score distributions"| equating
+  standardSetting["standard-setting/"] -->|"linking, score distributions"| equating
+  scaling["scaling/"] -->|"the linear transformation of a theta scale"| equating
+  fit["fit/"] -->|"the replications of the critical value of Q3"| sim
+  cat["cat/"] -->|"the same response simulation"| sim
+  cat -->|"profile estimates of diagnostic tests"| cdm
+  cat -->|"items, estimates and information of multidimensional tests"| multidimensional
+  rater["rater/"] -->|"the fit of the elements of a facet"| fit
+  rater -->|"the Rasch model of its facets"| irt
+```
+
+Every module of layers 4 to 7 also builds on `irt/`; the analysis modules of layer 3 (`ctt/`, `change/`, `irt/`,
+`dimensionality/`, `generalizability/` and `mokken/`) build on `data/` and `math/` or on nothing, not on each other.
 [AGENTS.md](../../AGENTS.md#dependencies) lists the imports each module may use; Biome enforces them, the absence of
 Node modules and platform globals in `src/`, and that code outside `packages/` imports `@measurekit/psychometrics` by
 name.
