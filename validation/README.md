@@ -35,8 +35,8 @@ Rscript validation/psychometrics/factor-hierarchy.R  # Schmid-Leiman and omega h
 Rscript validation/psychometrics/cat.R               # adaptive testing: catR; diagnostic: cdcatR; multidimensional: mirtCAT; testlets: base R and mirtCAT
 Rscript validation/psychometrics/cat-stopping.R      # classification stopping: catR's checkStopRule per cut; mirtCAT's SPRT in base R, checked against mirtCAT on one cut; reads cat-3pl.json
 Rscript validation/psychometrics/cat-bounds.R        # content bounds: base R replays; the shadow test of mirtCAT with lpSolve, in two processes
-Rscript validation/psychometrics/cat-selection.R     # the other selection rules and starting items: catR and base R on the banks of cat.R
-Rscript validation/psychometrics/form-assembly.R     # assembly of forms: base R replays; highs on 85 blueprints
+Rscript validation/psychometrics/cat-selection.R     # the other selection rules and starting items: catR and base R on the banks of cat.R, about 4 minutes
+Rscript validation/psychometrics/form-assembly.R     # assembly of forms: base R replays; highs on 85 blueprints, about 4 minutes
 Rscript validation/psychometrics/multistage-cuts.R   # routing cuts of multistage panels: base R over mirt's iteminfo and expected.item
 Rscript validation/psychometrics/fit.R               # item and person fit: eRm's infit and outfit, mirt's S-X², Zh and Q3
 Rscript validation/psychometrics/fit-global.R        # limited-information fit: mirt's M2, base R where mirt's Δ differs or its 3PL is off; the noncentral chi-square
@@ -51,7 +51,7 @@ Rscript validation/psychometrics/dif-irt.R          # IRT DIF: mirt's multipleGr
 Rscript validation/psychometrics/dif-fixed-parameters.R # DIF of 3PL items with c held: difR's difLord and difRaju with c on mirt calibrations, mirt's multipleGroup with g held
 Rscript validation/psychometrics/dif-polytomous-tests.R # Liu-Agresti odds ratio and logistic discriminant function: difR's liu_agresti_ccor, base R's equation 3 and glm; run dif.R first
 Rscript validation/psychometrics/rasch-cml.R         # conditional maximum likelihood: eRm's RM, PCM, RSM; base R's conditional likelihood by every pattern
-Rscript validation/psychometrics/rasch-tests.R       # Andersen, Martin-Löf and Wald tests: eRm's LRtest, MLoef, Waldtest; base R where eRm's value is not the statistic
+Rscript validation/psychometrics/rasch-tests.R       # Andersen, Martin-Löf and Wald tests: eRm's LRtest, MLoef, Waldtest; base R where eRm's value is not the statistic, about 2 minutes
 Rscript validation/psychometrics/equating.R          # linking and equating: equateIRT, equate
 Rscript validation/psychometrics/kernel-equating.R   # kernel equating in five designs: kequate; base R's delta method where kequate's counterbalanced errors differ
 Rscript validation/psychometrics/linking-errors.R   # errors of links between separate calibrations and of equating through them: equateIRT's direc, chainec and score, numDeriv where equateIRT is not the reference
@@ -118,12 +118,12 @@ uv pip install --python validation/psychometrics/.venv-scoring -r validation/psy
 ```
 
 `multidimensional.R` takes the cases `m2pl`, `missing`, `m3pl`, `fixed-parameters`, `graded`, `graded3`, `mhrm`, `exploratory`, `rotation`,
-`information` and `likelihood` as arguments, and runs all of them without; the exploratory cases are slow, as mirt's EM and
-the base R maximum are, and `mhrm`, which runs mirt's MH-RM four times on five dimensions, is as slow. `rotation` reads the fixture that `exploratory` writes, so run `exploratory` first.
+`information` and `likelihood` as arguments, and runs all of them without; the exploratory cases take a few minutes, as mirt's EM and
+the base R maximum are slow, and `mhrm`, which runs mirt's MH-RM four times on five dimensions, takes about as long. `rotation` reads the fixture that `exploratory` writes, so run `exploratory` first.
 `multidimensional-items.R` holds the helper of `multidimensional.R` and `parameterization.R` that sets items in mirt.
 GGUM imports xlsx, which needs Java: install rJava against a JDK, with the variables that `R CMD javareconf -e` sets,
-and run `irt-unfolding.R` with `JAVA_HOME` set to the JDK. It runs
-two seeds at a time: `"seed 1"` to `"seed 10"`, `mixed`, `starts` and `"default tolerance"`, which reads seed 1's, as arguments
+and run `irt-unfolding.R` with `JAVA_HOME` set to the JDK. It takes about 3 minutes a seed,
+two at a time: `"seed 1"` to `"seed 10"`, `mixed`, `starts` and `"default tolerance"`, which reads seed 1's, as arguments
 run only those cases and keep the others of the fixture.
 CopyDetect 1.4 is on GitHub only, CRAN having archived 1.3, and exports nothing: `similarity.R` and the benchmark of
 similarity call its internal functions. Install it at its commit into a library of its own and name the library:
@@ -137,13 +137,13 @@ with their minres solutions in base R and psych. `factor-solutions.R` holds the 
 minres and maximum likelihood and their rotations, which it, `efa-fit.R` and `factor-hierarchy.R` share.
 
 `bifactor.R` takes the cases `m2pl`, `long`, `two-tier`, `m3pl`, `graded`, `incomplete` and `recovery` as arguments, and runs
-all of them without; mirt's EM at `TOL = 1e-10` runs 80 to 2,700 cycles, and each fixture records
+all of them without; it takes about 5 minutes, mirt's EM at `TOL = 1e-10` running 80 to 2,700 cycles, and each fixture records
 whether mirt stopped before its limit of 5,000. `recovery` writes the data and the truth only: `bifactor-recovery.ts` reads them.
 
 `longitudinal.R` writes one fixture of five cases, two occasions with persons missing from the second, three occasions, items
-that only one occasion has, the graded model and the Rasch model; `longitudinal-mirt.R` holds the
+that only one occasion has, the graded model and the Rasch model, and takes about three minutes; `longitudinal-mirt.R` holds the
 simulation and the mirt model that it, `longitudinal-recovery.R` and the benchmark share. `longitudinal-recovery.R` fits mirt
-to 5,000 persons on 4 cores, writes each row as it finishes and stops after 60 minutes.
+to 5,000 persons on 4 cores, writes each row as it finishes, takes about ten minutes and stops after 60 minutes.
 
 cdcatR imports cdmTools for its nonparametric rules only, and cdmTools needs a Rust compiler through CVXR and clarabel.
 `cat.R` runs without them: download the cdcatR source with `download.packages`, remove cdmTools from `Imports` in
@@ -158,19 +158,19 @@ same rule at a size that runs in seconds. `validation/` is a package of the work
 packages by name and `pnpm typecheck` checks them; no Vitest project and no job of CI runs them. A study exits with 1 when
 a fit misses the threshold it states.
 
-| Study                                               | Its results record                                                                                                                                                                                                                                                                                              |
-| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `psychometrics/bifactor-recovery.ts`                | A two-tier model of 80 items and 3,000 persons on 21 nodes, from the data of `bifactor.R`'s `recovery`: the root mean square errors of the primary and the specific slopes against 0.10 and 0.14, and the correlation's error against 0.04                                                                      |
-| `psychometrics/irt-error-recovery.ts`               | The guide's bootstrap of 400 resamples on 20 seeds: each error against the Hessian's and their root mean square; the coverage of the pretest items' intervals under fixed items calibrated on 150 other persons and on the same 1,000, with their error carried and taken as known                              |
-| `psychometrics/ctt-interval-coverage.ts`            | The coverage of the percentile intervals of alpha and omega, 500 samples of 200 persons and 1,000 resamples, against 0.92 to 0.98                                                                                                                                                                               |
-| `psychometrics/parallel-analysis-quantiles.ts`      | The means and the 0.95 quantiles of parallel analysis' random eigenvalues against base R's 2,000 permutations of `bfi`, 1,000 replications on 20 seeds, in Monte Carlo errors against 4 and 6                                                                                                                   |
-| `psychometrics/longitudinal-recovery.ts`            | The moments of 5,000 persons on 2 and 3 occasions at 10 and 40 items, seeds 1 to 3: each fit's errors against 1.5 times mirt's worst, and the worst over the seeds; 40 items on 3 occasions at 15 nodes; the distances between 15, 21 and 31 nodes                                                              |
-| `psychometrics/multidimensional-groups-recovery.ts` | Three groups of 700, 600 and 600 persons, 40 items on each of 3 dimensions, three seeds at 21 and 15 nodes: each fit's errors of the means and covariances against 0.18 and 0.25, and the worst at each number of nodes                                                                                         |
-| `psychometrics/multidimensional-mhrm-recovery.ts`   | 30 items on 5 dimensions by MH-RM, 2,000 persons, three seeds: each fit's largest errors in standard errors against 4 and its slopes' root mean square error against 0.2, and the worst over the seeds                                                                                                          |
-| `psychometrics/multidimensional-mhrm-mirt.ts`       | MH-RM on the 25 graded items of `bfi`, 800 persons, 5 dimensions, seeds 1 to 10 of both programs: each fit's largest differences from the mean of mirt's runs against 0.3 and 0.08 and its dimensions turned; each standard error averaged over the seeds of each program, with their ratio; each seed's ratios |
-| `psychometrics/multidimensional-mhrm-errors.ts`     | 50 data sets of 800 persons simulated from mirt's mean estimates on `bfi`, each calibrated by MH-RM: each fit's estimates and standard errors, and each parameter's averaged standard errors of both programs over the deviation of its estimates, against 1 ± 0.1 at the median and 0.6 to 1.6                 |
-| `psychometrics/multidimensional-groups-mirt.ts`     | Two groups on three dimensions, the case `three` of `multidimensional-groups.json`: the largest differences from mirt's estimates, moments and log-likelihood against 2e-4, 5e-4 and 5e-6                                                                                                                       |
-| `psychometrics/cdm-additive-ecpe.ts`                | GDINA's additive models on ECPE, 2,922 persons and 28 items: each model's largest differences from GDINA's probabilities, coefficients and proportions against 1e-5, its log-likelihood above GDINA's, iterations and seconds                                                                                   |
+| Study                                               | Time             | Its results record                                                                                                                                                                                                                                                                                              |
+| --------------------------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `psychometrics/bifactor-recovery.ts`                |                  | A two-tier model of 80 items and 3,000 persons on 21 nodes, from the data of `bifactor.R`'s `recovery`: the root mean square errors of the primary and the specific slopes against 0.10 and 0.14, and the correlation's error against 0.04                                                                      |
+| `psychometrics/irt-error-recovery.ts`               | About 20 minutes | The guide's bootstrap of 400 resamples on 20 seeds: each error against the Hessian's and their root mean square; the coverage of the pretest items' intervals under fixed items calibrated on 150 other persons and on the same 1,000, with their error carried and taken as known                              |
+| `psychometrics/ctt-interval-coverage.ts`            | About 2 minutes  | The coverage of the percentile intervals of alpha and omega, 500 samples of 200 persons and 1,000 resamples, against 0.92 to 0.98                                                                                                                                                                               |
+| `psychometrics/parallel-analysis-quantiles.ts`      | About 2 minutes  | The means and the 0.95 quantiles of parallel analysis' random eigenvalues against base R's 2,000 permutations of `bfi`, 1,000 replications on 20 seeds, in Monte Carlo errors against 4 and 6                                                                                                                   |
+| `psychometrics/longitudinal-recovery.ts`            | About 5 minutes  | The moments of 5,000 persons on 2 and 3 occasions at 10 and 40 items, seeds 1 to 3: each fit's errors against 1.5 times mirt's worst, and the worst over the seeds; 40 items on 3 occasions at 15 nodes; the distances between 15, 21 and 31 nodes                                                              |
+| `psychometrics/multidimensional-groups-recovery.ts` | About 10 minutes | Three groups of 700, 600 and 600 persons, 40 items on each of 3 dimensions, three seeds at 21 and 15 nodes: each fit's errors of the means and covariances against 0.18 and 0.25, and the worst at each number of nodes                                                                                         |
+| `psychometrics/multidimensional-mhrm-recovery.ts`   | About 2 minutes  | 30 items on 5 dimensions by MH-RM, 2,000 persons, three seeds: each fit's largest errors in standard errors against 4 and its slopes' root mean square error against 0.2, and the worst over the seeds                                                                                                          |
+| `psychometrics/multidimensional-mhrm-mirt.ts`       | About 4 minutes  | MH-RM on the 25 graded items of `bfi`, 800 persons, 5 dimensions, seeds 1 to 10 of both programs: each fit's largest differences from the mean of mirt's runs against 0.3 and 0.08 and its dimensions turned; each standard error averaged over the seeds of each program, with their ratio; each seed's ratios |
+| `psychometrics/multidimensional-mhrm-errors.ts`     | About 25 minutes | 50 data sets of 800 persons simulated from mirt's mean estimates on `bfi`, each calibrated by MH-RM: each fit's estimates and standard errors, and each parameter's averaged standard errors of both programs over the deviation of its estimates, against 1 ± 0.1 at the median and 0.6 to 1.6                 |
+| `psychometrics/multidimensional-groups-mirt.ts`     |                  | Two groups on three dimensions, the case `three` of `multidimensional-groups.json`: the largest differences from mirt's estimates, moments and log-likelihood against 2e-4, 5e-4 and 5e-6                                                                                                                       |
+| `psychometrics/cdm-additive-ecpe.ts`                |                  | GDINA's additive models on ECPE, 2,922 persons and 28 items: each model's largest differences from GDINA's probabilities, coefficients and proportions against 1e-5, its log-likelihood above GDINA's, iterations and seconds                                                                                   |
 
 ## Knowledge tracing
 
@@ -192,14 +192,14 @@ Rscript validation/knowledge-tracing/practice.R  # mastery criteria over a seede
 Rscript validation/knowledge-tracing/irt.R       # the grid posterior and exact mode of θ, against mirt's fscores; with drift, passes in logs and a particle filter
 Rscript validation/knowledge-tracing/kst.R       # structures, fringes, BLIM, IITA and assessment by kst, pks and DAKS
 Rscript validation/knowledge-tracing/kst-structure.R  # base, atoms, neighbourhoods, paths, traces and closures by kst; clauses in base R
-Rscript validation/knowledge-tracing/kst-diagnostics.R  # BLIM with fixed and equal rates, comparison, identifiability, gradedness by pks; validity by kst; the test of a quasi order by the delta method
+Rscript validation/knowledge-tracing/kst-diagnostics.R  # BLIM with fixed and equal rates, comparison, identifiability, gradedness by pks; validity by kst; the test of a quasi order by the delta method (takes about 6 minutes)
 Rscript validation/knowledge-tracing/kst-incomplete.R  # the test of a quasi order on incomplete patterns: base R and numDeriv over the learners' weights, DAKS on complete ones
 validation/knowledge-tracing/.venv/bin/python validation/knowledge-tracing/bkt.py  # BKT by pyBKT: inference, EM from given and random starts, recovery; lessons as correct = -1, fixed rates, multipair
 validation/knowledge-tracing/.venv/bin/python validation/knowledge-tracing/data-rows.py  # the sequences of outcomes that pyBKT's convert_data makes of the rows of ASSISTments and DataShop exports
 ```
 
 The R scripts need R with the packages pROC, irr, lme4, LiblineaR, LKT, mirt, kst, pks, DAKS, sets and jsonlite; `common.R`
-holds their shared helpers, and stops a script that runs without `OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1`. `irt.R` spends most of its time on the grid of 1,921 points; `irt.R abilities`,
+holds their shared helpers, and stops a script that runs without `OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1`. `irt.R` takes about two minutes, most of them on the grid of 1,921 points; `irt.R abilities`,
 `irt.R nominal` or `irt.R drift` runs one part. `bkt.py` needs the Python environment below.
 
 ### Python
@@ -225,7 +225,7 @@ the inputs, writes them to
 They need the packages of the scripts above, and for the tasks of
 `validation/benchmarks/` psych, TAM, nlme, metafor, pROC, irr, equate, equateIRT, difR, rms, GDINA, NPCD, catR, cdcatR,
 mirtCAT, pks, DAKS, kst, sets, eRm and CopyDetect, installed as above, in its library on `R_LIBS`, as for
-`similarity.R`. The results go to `validation/benchmarks/results/`, which git ignores.
+`similarity.R`; similarity's references take about 10 minutes. The results go to `validation/benchmarks/results/`, which git ignores.
 
 ### Method
 

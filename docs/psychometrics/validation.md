@@ -1064,7 +1064,7 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
 - **Multidimensional recovery by MH-RM.** 30 simulated M2PL items, 6 on each of 5 dimensions correlated 0.4 to the power
   of their distance, from 2,000 simulated persons, three seeds: every slope, intercept and correlation within four
   standard errors of the true value, and a root mean square error of the slopes below 0.2 (3.3 standard errors at most,
-  0.11 found). `validation/psychometrics/multidimensional-mhrm-recovery.ts` runs it and records it in
+  0.11 found). `validation/psychometrics/multidimensional-mhrm-recovery.ts` runs it in about 2 minutes and records it in
   `results/`; no test does, as MH-RM on five dimensions is slow even for a few hundred persons.
 - **Bifactor recovery.** Simulated bifactor 2PLs of 1,000 persons, 12 items in 3 specific dimensions and 40 in 4: the root
   mean square errors of the general and the specific slopes are at most those of `mirt::bfactor` plus 0.005 (0.275 and 0.438,
@@ -1080,7 +1080,7 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
   simulated persons in three groups with their own means and covariances, three seeds: at 21 nodes per dimension every
   mean within 0.18 and every covariance within 0.25 of the true value (0.13 and 0.18 found); at the default 15 nodes the
   errors are up to 0.24 and 0.66, which is why the guide advises 21 above 20 items per dimension.
-  `validation/psychometrics/multidimensional-groups-recovery.ts` runs it and records it in
+  `validation/psychometrics/multidimensional-groups-recovery.ts` runs it in about ten minutes and records it in
   `results/`. The test recovers three groups on two dimensions from 500 persons each and 10 items per dimension: every
   mean within 0.25 and every covariance within 0.5 of the moments of the simulated abilities, on the scale of the first
   group's sample (0.146 and 0.305 at most over seeds 1 to 20).
@@ -1113,8 +1113,8 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
   correlations within 1.5 times the worst error of `mirt` on 10 items and the same design, rounded up to a multiple of
   0.005 (0.03, 0.025 and 0.02 at 2 occasions, 0.03, 0.035 and 0.02 at 3). The errors are distances from the moments of the
   simulated abilities, not of their distribution. At 40 items and 3 occasions, 15 nodes miss these thresholds, and 21
-  nodes are within 0.03 of 31 where 15 are 0.10 away. `validation/psychometrics/longitudinal-recovery.ts` runs these and
-  records them in `results/`. The test recovers the moments of 2 occasions from 300 persons and 10
+  nodes are within 0.03 of 31 where 15 are 0.10 away. `validation/psychometrics/longitudinal-recovery.ts` runs these in
+  about five minutes and records them in `results/`. The test recovers the moments of 2 occasions from 300 persons and 10
   items within four standard errors of the estimates (2.4 at most over seeds 1 to 20).
 - **Kernel equating.** The population of 40 Rasch items with difficulties from -1.5 to 1.5 and theta N(0, 1), form X
   easier and form Y harder by 0.2; the truth is the kernel equating of the population presmoothed at degree 12. On 200
@@ -1632,9 +1632,10 @@ variance free; the comparison converts it to the scale of that standard deviatio
 The MH-RM calibrations of the tests run with the default `tolerance` of 1e-3 and the seed 1, on the first 200 persons of
 a fixture, 120 for the graded model, against EM on the same persons; each bound is 1.5 times the worst over the seeds 1 to
 20, rounded up. `validation/psychometrics/multidimensional-mhrm-mirt.ts` compares the five-dimensional case with mirt's
-runs on the seeds 1 to 10: each seed's estimates are within 0.20 of mirt's mean and its
+runs on the seeds 1 to 10, in about four minutes: each seed's estimates are within 0.20 of mirt's mean and its
 correlations within 0.034. Each standard error averaged over the ten seeds of each program is a median 1.12 of mirt's,
-from 0.95 to 1.43, so `validation/psychometrics/multidimensional-mhrm-errors.ts` settles which are right: 50 data sets of 800 persons simulated from the mean of mirt's estimates, each calibrated by MH-RM, give each
+from 0.95 to 1.43, so `validation/psychometrics/multidimensional-mhrm-errors.ts` settles which are right, in about 25
+minutes: 50 data sets of 800 persons simulated from the mean of mirt's estimates, each calibrated by MH-RM, give each
 estimate's standard deviation, less MH-RM's own variance over ten seeds of one data set. Against it the averaged errors
 here are a median 1.01, from 0.80 to 1.25, and those of the simulated calibrations 1.01, from 0.80 to 1.26, within the
 bounds of a median within 0.1 of 1 and every ratio from 0.6 to 1.6; mirt's are 0.92, from 0.61 to 1.20, so mirt's MH-RM
