@@ -193,7 +193,7 @@ the chance that two measurements agree, and `attributeConsistency` γ_k. They us
 `validateQMatrix(matrix, calibration, { eps })` checks each item's attributes by the PVAF method of de la Torre and
 Chiu (2016), as GDINA's `Qval(method = "PVAF")`. For a q-vector q, ς²(q) is the variance of the item's success
 probabilities over the latent groups of q, weighted by the groups' proportions, each profile's probability its persons'
-expected share correct; PVAF(q) is ς²(q) over ς² of all attributes. The suggestion is the q-vector with the fewest
+expected share correct; PVAF(q) is ς²(q) over ς² of all attributes. The suggestion, `suggested`, is the q-vector with the fewest
 attributes whose PVAF exceeds `eps`, default 0.95, of those the one of largest PVAF. An item whose success
 probabilities do not vary over the profiles, such as an item without responses, has `pvaf` `null` and keeps its
 attributes; a profile of proportion 0 adds nothing. ς² of every q-vector takes time that grows as 3^K, each summed from

@@ -75,8 +75,22 @@ steepest point along the direction of its slopes: one value for a dichotomous it
 as mirt's `MDISC` and `MDIFF` (Reckase, 2009). MDISC takes an item of any model, MDIFF one of the built-in models.
 
 A model implemented outside the package works as the built-in ones do if it has the members of
-`MultidimensionalModel`. The first `dimensions` entries of its parameter vector are the slopes, `parameterDerivatives`
-differentiates with respect to the vector, and `information` writes the Fisher information matrix.
+`MultidimensionalModel`; calibration, scoring and information use only these. The first `dimensions` entries of its
+parameter vector are the slopes. Methods that write into `out` must not allocate: they run in the inner loops.
+
+| Member                                                   | Purpose                                                                                                                               |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`                                                   | A short name for messages.                                                                                                            |
+| `maxCategories`                                          | The most response categories an item can have: 2 for a dichotomous model, `Infinity` without a limit.                                 |
+| `categoryCount(parameters)`                              | The number of categories of an item.                                                                                                  |
+| `dimensionCount(parameters)`                             | The number of dimensions the item's slopes span.                                                                                      |
+| `parameters(categoryCount, dimensions)`                  | The estimated parameters as `ModelParameter`s, in vector order: the slopes `a1` to `aD` first; a slope the loadings fix at 0 stays.   |
+| `startingValues(proportions, slopes)`                    | Parameters to start calibration from, given the share of persons in each category and the starting slopes; bounded ones start inside. |
+| `toVector(parameters)`, `fromVector(vector, dimensions)` | Conversion to and from the vector the optimizer works on. `toVector` throws `DataError` for invalid parameters.                       |
+| `probabilities(parameters, theta, out)`                  | Writes P(k \| θ) for each category k.                                                                                                 |
+| `thetaGradients(parameters, theta, out)`                 | Writes dP(k)/dθ_d for each category k and dimension d at `out[k * dimensions + d]`.                                                   |
+| `parameterDerivatives(parameters, theta, out)`           | Writes dP(k)/dξⱼ for each category k and vector entry j at `out[k * length + j]`.                                                     |
+| `information(parameters, theta, out)`                    | Writes the Fisher information matrix of the item at theta, by rows: Σ_k ∇P ∇Pᵀ / P.                                                   |
 
 ## Calibration
 

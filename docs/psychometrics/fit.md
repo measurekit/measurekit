@@ -469,6 +469,8 @@ harder for the second group.
 | Items, `"mean"`     | The same at the mean                                                                                                                         |
 | Items, sets         | Two or more sets of ids that hold every item once, each with at least two items                                                              |
 
+Each test returns `converged`: `false` when a conditional fit stopped at `maxIterations` before it reached `tolerance`.
+
 Labels of each person's total score give eRm's `"all.r"` split, with the persons of the lowest and the highest score put
 in a neighboring group, as they add nothing to a conditional likelihood.
 
