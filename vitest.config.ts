@@ -70,6 +70,13 @@ function packageFloors(name: string, { branches, ...perModule }: Floor): Record<
   };
 }
 
+/**
+ * The limit of a test and of a hook, in milliseconds, which catches a hang. A test ends within half of it on a runner under
+ * coverage, which runs two to three times as long as a developer's machine, so it holds the tests of about 10 s that STANDARDS
+ * section 7 allows; a test that needs more is cut, never given a longer timeout of its own.
+ */
+const HANG_LIMIT = 60_000;
+
 /** The timeout of a benchmark that takes minutes: 30 minutes. */
 const SLOW_BENCHMARK_TIMEOUT = 1_800_000;
 
@@ -96,19 +103,18 @@ export default defineConfig({
           name: "core",
           include: ["packages/core/test/**/*.test.ts"],
           setupFiles: ["packages/core/test/setup.ts"],
+          testTimeout: HANG_LIMIT,
+          hookTimeout: HANG_LIMIT,
         },
       },
       {
         resolve: { alias: CORE_SOURCE },
-        // A test ends within half its timeout on a runner under coverage, which runs two to three times as long as a
-        // developer's machine: 60 s holds the tests of about 10 s there that STANDARDS section 7 allows, and a hook the
-        // same. A test that needs more is cut, never given a longer timeout of its own.
         test: {
           name: "psychometrics",
           include: ["packages/psychometrics/test/**/*.test.ts"],
           setupFiles: ["packages/psychometrics/test/setup.ts"],
-          testTimeout: 60_000,
-          hookTimeout: 60_000,
+          testTimeout: HANG_LIMIT,
+          hookTimeout: HANG_LIMIT,
         },
       },
       {
@@ -117,15 +123,27 @@ export default defineConfig({
           name: "knowledge-tracing",
           include: ["packages/knowledge-tracing/test/**/*.test.ts"],
           setupFiles: ["packages/knowledge-tracing/test/setup.ts"],
-          // Fits of BLIM and the drift of IRT take a second or two, several times as long under coverage and load.
-          testTimeout: 60_000,
+          testTimeout: HANG_LIMIT,
+          hookTimeout: HANG_LIMIT,
         },
       },
-      { test: { name: "scripts", include: ["scripts/test/**/*.test.ts"] } },
+      {
+        test: {
+          name: "scripts",
+          include: ["scripts/test/**/*.test.ts"],
+          testTimeout: HANG_LIMIT,
+          hookTimeout: HANG_LIMIT,
+        },
+      },
       {
         resolve: { alias: PACKAGE_SOURCES },
         // The examples run on the sources, as the libraries' own tests do.
-        test: { name: "examples", include: ["examples/test/**/*.test.ts"], testTimeout: 120_000 },
+        test: {
+          name: "examples",
+          include: ["examples/test/**/*.test.ts"],
+          testTimeout: HANG_LIMIT,
+          hookTimeout: HANG_LIMIT,
+        },
       },
       // `pnpm bench` runs the benchmarks of each package with `vitest bench`, which gives a project the suffix "(bench)".
       benchmarkProject("core", {}),
