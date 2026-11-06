@@ -52,7 +52,7 @@ interface Floor {
 }
 
 /**
- * Returns the thresholds of a package, as STANDARDS section 7 sets them: its branches over the package, as V8 counts the
+ * Returns the thresholds of a package: its branches over the package, as V8 counts the
  * fallback of `a[i] ?? 0`, which no test can take, as a branch, and its statements, functions and lines over each module
  * on its own, so that a module whose tests fall short fails, whatever the others reach. A module is a folder of `src/`,
  * or a file beside them: the modules of core's flat `src/`, a root's entry and the files the modules share.
@@ -72,8 +72,8 @@ function packageFloors(name: string, { branches, ...perModule }: Floor): Record<
 
 /**
  * The limit of a test and of a hook, in milliseconds, which catches a hang. A test ends within half of it on a runner under
- * coverage, which runs two to three times as long as a developer's machine, so it holds the tests of about 10 s that STANDARDS
- * section 7 allows; a test that needs more is cut, never given a longer timeout of its own.
+ * coverage, which runs two to three times as long as a developer's machine, so it holds the tests of about 10 s that the family
+ * allows; a test that needs more is cut, never given a longer timeout of its own.
  */
 const HANG_LIMIT = 60_000;
 

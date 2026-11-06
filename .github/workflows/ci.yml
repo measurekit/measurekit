@@ -16,7 +16,7 @@ concurrency:
 
 # Every job has a `timeout-minutes` of about three times its last green run, and at least 10 for a job that downloads, so that a
 # hung job stops and does not run to the 360 minutes of GitHub, which the Actions minutes of the month cannot bear. A benchmark
-# ends within half its timeout (STANDARDS.md section 7).
+# ends within half its timeout.
 jobs:
   # What a push or a pull request changed since the last commit of main whose run passed, or since the base of a pull request,
   # and so which jobs have something to check. A job that is skipped passes a required check. When nothing can be compared, for

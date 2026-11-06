@@ -3,7 +3,7 @@ import { benchmarksOf } from "../../../scripts/bench-harness.js";
 /**
  * The most that the fastest sample of each benchmark may take, in milliseconds: five times the fastest sample of the CI
  * runner over five runs of `bench` of 2026-11-05 on the code of commit 59d3e2cc, rounded up to one significant digit, the
- * one rule of STANDARDS.md section 11 that validation/README.md explains.
+ * one rule of the family that validation/README.md explains.
  */
 const BUDGETS = {
   "bkt.fit": 500,
