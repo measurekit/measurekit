@@ -3,18 +3,18 @@
 What shows that `@measurekit/knowledge-tracing` does what it says: every statistic against pyBKT or an R package within a
 stated tolerance, recovery studies of each model family at thresholds fixed before their first run, properties of the
 learner model interface, the samples of the guides and its runs on four runtimes. The counts below are those of the
-repository at `20e1462`, on 2026-11-04.
+repository at `1506fa8e`, on 2026-11-06.
 
 ```mermaid
 flowchart LR
-  scripts["20 reference scripts<br/>validation/knowledge-tracing"] --> fixtures["54 fixtures<br/>packages/knowledge-tracing/test/fixtures"]
+  scripts["20 reference scripts<br/>validation/knowledge-tracing"] --> fixtures["55 fixtures<br/>packages/knowledge-tracing/test/fixtures"]
   fixtures --> tests["Tests within the tolerances<br/>of validation.md, pnpm test"]
   sim["Seeded simulations"] --> recovery["Recovery at fixed thresholds<br/>pnpm test"]
 ```
 
 | Layer      | Question                                                                                                                  | Where                                                                                                                                                           | Runs                                                           |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| References | Does each statistic equal pyBKT's or the R package's?                                                                     | 20 R and Python scripts of `validation/knowledge-tracing/` write 54 fixtures; [validation](validation.md) gives the references, the versions and the tolerances | `pnpm test`; the scripts when a reference or a formula changes |
+| References | Does each statistic equal pyBKT's or the R package's?                                                                     | 20 R and Python scripts of `validation/knowledge-tracing/` write 55 fixtures; [validation](validation.md) gives the references, the versions and the tolerances | `pnpm test`; the scripts when a reference or a formula changes |
 | Recovery   | Does each family recover the values a simulation set, at thresholds fixed before the first run?                           | [validation](validation.md#simulation-recovery): Elo, BKT, AFM, IRT, BLIM and the assessment                                                                    | `pnpm test`                                                    |
 | Interface  | Does every model leave a state unchanged by `update`, continue the same after a JSON round trip, and read a stored state? | fast-check in the tests of each model; `test/model.test.ts` reads `test/fixtures/stored-state.json`                                                             | `pnpm test`                                                    |
 | Samples    | Does every sample of the guides and every `@example` give the values it shows?                                            | `examples/test/guides.test.ts`, `examples/test/tsdoc.test.ts`                                                                                                   | `pnpm test --project examples`                                 |

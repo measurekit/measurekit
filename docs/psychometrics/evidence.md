@@ -3,11 +3,11 @@
 What shows that `@measurekit/psychometrics` does what it says: every statistic against a reference in R or Python within a
 stated tolerance, recovery studies where no package is the reference, properties of every function, the samples of the
 guides, the peak memory of its readers, its mutation rules and its runs on four runtimes. The counts below are those of
-the repository at `20e1462`, on 2026-11-04.
+the repository at `1506fa8e`, on 2026-11-06.
 
 ```mermaid
 flowchart LR
-  scripts["83 reference scripts<br/>validation/psychometrics"] --> fixtures["175 fixtures<br/>packages/psychometrics/test/fixtures"]
+  scripts["83 reference scripts<br/>validation/psychometrics"] --> fixtures["177 fixtures<br/>packages/psychometrics/test/fixtures"]
   fixtures --> tests["Tests within the tolerances<br/>of validation.md, pnpm test"]
   sim["Seeded simulations"] --> recovery["Recovery studies<br/>pnpm test"]
   tests --> rules["Mutation rules<br/>pnpm check:rules"]
@@ -15,7 +15,7 @@ flowchart LR
 
 | Layer           | Question                                                                                                | Where                                                                                                                                                        | Runs                                                           |
 | --------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
-| References      | Does each statistic equal its reference's, on public datasets and seeded simulations?                   | 83 R and Python scripts of `validation/psychometrics/` write 175 fixtures; [validation](validation.md) gives the references, the versions and the tolerances | `pnpm test`; the scripts when a reference or a formula changes |
+| References      | Does each statistic equal its reference's, on public datasets and seeded simulations?                   | 83 R and Python scripts of `validation/psychometrics/` write 177 fixtures; [validation](validation.md) gives the references, the versions and the tolerances | `pnpm test`; the scripts when a reference or a formula changes |
 | Recovery        | Where no package is the reference, do the estimates recover the values a simulation set?                | [validation](validation.md#simulation): 2PL, multidimensional, MH-RM, bifactor, two-tier, several groups, factors                                            | `pnpm test`; at scale, the studies of `validation/`            |
 | Properties      | Do the invariants hold for any input: alpha at most 1, probabilities from 0 to 1, the order of persons? | fast-check in `packages/psychometrics/test/*.test.ts`, from the seed of `test/setup.ts`                                                                      | `pnpm test`                                                    |
 | Samples         | Does every sample of the guides and every `@example` give the values it shows?                          | `examples/test/guides.test.ts`, `examples/test/tsdoc.test.ts`                                                                                                | `pnpm test --project examples`                                 |
