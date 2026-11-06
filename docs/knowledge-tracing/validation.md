@@ -302,7 +302,7 @@ order, including chains with a step of several elements, which `learningPaths` l
 name as a pattern, so for ids that another id contains it returns wrong atoms; the fixtures use ids that no other contains.
 
 A learning space is a well-graded knowledge space, equivalently one in which every non-empty state has an element
-whose removal leaves a state (Cosyn and Uzun, 2009); kst's well-gradedness test takes minutes on the chess structure,
+whose removal leaves a state (Cosyn and Uzun, 2009); kst's well-gradedness test is slow on the chess structure,
 so pks's `is.downgradable` is the reference there.
 
 **pks.** pks keeps guess and slip at least 1e-6 from 0: on `DoignonFalmagne7` its estimates of η for items a and b are

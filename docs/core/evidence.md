@@ -7,7 +7,7 @@ through every statistic built on them, and its own tests of the edge cases, the 
 flowchart LR
   fixtures["Fixtures of psychometrics<br/>and knowledge-tracing"] --> numerics["The numerics of core,<br/>through every statistic"]
   own["Tests of core: edge cases,<br/>errors, the generator"] --> numerics
-  bench["pnpm bench"] --> speed["Speed against base R and stats"]
+  bench["pnpm bench"] --> speed["Budgets, timed against base R and stats"]
 ```
 
 | Layer      | Question                                                                                                     | Where                                                                                                                                                                                                   | Runs         |
@@ -16,4 +16,4 @@ flowchart LR
 | Edge cases | Do the routines stay finite at extreme arguments, and refuse what they cannot compute with `DataError`?      | `test/numerics.test.ts`, `test/distributions.test.ts`, `test/optimize.test.ts`                                                                                                                          | `pnpm test`  |
 | Checks     | Does each check refuse a value of another type, a hole and an unknown option, with a sentence that names it? | `test/checks.test.ts`                                                                                                                                                                                   | `pnpm test`  |
 | Generator  | Do equal seeds give equal draws, and do the draws have their distributions' moments?                         | `test/random.test.ts`                                                                                                                                                                                   | `pnpm test`  |
-| Speed      | How long do the numerics and the generator take against base R and stats?                                    | [performance](performance.md)                                                                                                                                                                           | `pnpm bench` |
+| Speed      | Do the numerics and the generator stay within the budgets of their benchmarks against base R and stats?      | [performance](performance.md)                                                                                                                                                                           | `pnpm bench` |

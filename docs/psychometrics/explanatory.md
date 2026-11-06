@@ -248,8 +248,7 @@ change.effects;
   it, throws `DataError` naming the set, the occasion and the group. Responses are 0 or 1.
 - **Cost.** Each person and item adds its pattern to a stratum of its set, group and number correct, so the time grows with
   the persons and items, and with the 2ᵀ patterns of each sum: 12 occasions is the limit. The effects, item sets ×
-  occasions after the first × groups, are at most 1,000, as Newton's method inverts a matrix of every pair of them:
-  1,000 effects of 4,000 persons take 0.8 s.
+  occasions after the first × groups, are at most 1,000, as Newton's method inverts a matrix of every pair of them.
 
 ### Change on one trait
 

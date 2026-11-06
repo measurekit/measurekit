@@ -1276,7 +1276,7 @@ flowchart LR
 
 An assembly holds a count for each pair of forms, of the items they share, and for each form and pool item, of what keeps
 the form from taking it, so it takes at most 2^26 counts, 256 MB: 8,191 forms of a pool of one item, or 1,000 forms of a
-pool of 66,000, which take about 5 s.
+pool of 66,000.
 
 `assembleForms` returns one result for each form: the `items` in the order of selection, the `contentCounts` of the
 constrained areas and the test `information` at each target theta, to check the forms against their specification. One

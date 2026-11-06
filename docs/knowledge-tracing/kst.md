@@ -162,7 +162,7 @@ rates cannot be estimated (Stefanutti et al., 2012): when every state with an it
 without prerequisites, its guess trades off with π, and when every state with it removed is, as for an item nothing
 requires, its slip does. Their estimates depend on the start; the fit's predictions do not. Learners
 with the same answers are computed once. An EM iteration takes time proportional to the learners with different
-answers, the items and the states: on 2,000 learners and 40 items, about 0.07 s with 385 states and 1 s with 5,896.
+answers, the items and the states.
 The fit's predictions are those of online inference with the fitted parameters. Its `mostLikelyStates` give each
 learner's most likely state after the log with its probability, as pks's `predict` does unless asked for the
 probabilities; with `posteriors: true`, `states` give each learner's posterior too, the state from which online
@@ -258,7 +258,7 @@ held.identifiability(); // => { parameters: 11, rank: 11, identifiable: true }
 ```
 
 The Jacobian has 2^items rows and one column for each parameter, so `identifiability` stops at `MAX_JACOBIAN_CELLS`, 10
-million cells (80 MB): a chain of 12 items takes about 17 ms, and 20 items with 10,000 states would need 84 GB.
+million cells (80 MB): a chain of 12 items is far below it, and 20 items with 10,000 states would need 84 GB.
 
 ## Events without an outcome
 
@@ -334,16 +334,8 @@ space.
 
 IITA's time grows faster than the items and the learners that its [limits](#limits) bound: each count of
 counterexamples checks the pairs it adds against every item, pass after pass, until none breaks transitivity. DAKS's
-`iita` finds the same quasi-orders and takes longer, on the answers of 1,000 learners to a chain of items, each run in
-turn on one machine:
-
-| Items | `iita`       | DAKS 2.1.3 `iita(v = 1)`     |
-| ----: | ------------ | ---------------------------- |
-|    12 | 10 ms        | 133 to 144 s                 |
-|   400 | 11 s to 21 s | Not finished after 9 minutes |
-
-A host that runs IITA on logs from users runs it in a worker with a deadline, and ends the worker when the deadline
-passes.
+`iita` finds the same quasi-orders. A host that runs IITA on logs from users runs it in a worker with a deadline, and
+ends the worker when the deadline passes.
 
 ## Validity of a structure
 

@@ -133,7 +133,7 @@ anchor's and not its [held parameters](irt.md#held-parameters), and every parame
 
 For each item the recursion sums the scores of the other items at every node, which costs the items times the square of
 the highest total score, so `summedScoreFit` takes items of a highest total score of at most 300: 300 dichotomous items,
-or 75 of five categories, take 2 to 3 s, where 600 dichotomous items took 17 s.
+or 75 of five categories.
 
 ## RMSD
 
@@ -247,8 +247,8 @@ Both statistics give every pair of items, so each takes at most 1,000 items, the
 in [dimensionality](dimensionality.md#correlations): at that limit `localDependenceChiSquare` returns 499,500 pairs, about
 200 MB, and `yenQ3` a matrix of a million entries ([peak memory](performance.md#memory)). Their time grows with
 the pairs times the persons. The tables of `localDependenceChiSquare` hold a cell for each pair of categories of each
-pair of items, at most 2^24 cells in all: two items of 4,096 categories, or 579 items of 10, which take about a second
-and, for the two items, 260 MB.
+pair of items, at most 2^24 cells in all: two items of 4,096 categories, or 579 items of 10; the two items take
+260 MB.
 
 ### Critical value of Q3
 
@@ -325,8 +325,7 @@ standard normal, and Q3 tests the local independence that testlets model.
   the chance of any false flag among the pairs near 1 - `quantile`. For one pair named before the data, they compare its
   Q3 with a percentile of that pair's own null distribution, which this function does not give: `yenQ3`,
   `simulateResponses` and `calibrate` make the replications.
-- **Replications.** Each costs a calibration, an estimate of each person's theta and Q3: 100 replications of the
-  example take about 2 seconds. The quantile of 40 replications has a Monte Carlo error of its own; a decision near the
+- **Replications.** Each costs a calibration, an estimate of each person's theta and Q3. The quantile of 40 replications has a Monte Carlo error of its own; a decision near the
   critical excess takes more, as the example's 100.
 - **Redraws.** A draw in which an item that the calibration estimates lacks a response in one of its categories cannot
   be calibrated as the data were, so it is drawn again; an item in `fixed` needs none.
@@ -421,10 +420,9 @@ then uses the whole complement of Δ's span, a column that adds nothing to it is
 are the moments less the rank. No model of the fixtures has such a Δ; the diagnosis models of [cdm](cdm.md#model-and-item-fit)
 can.
 
-Ξ grows with the fourth power of the items, so the function takes 60 at most: 1,830 rows and 27 MB, and a call took 0.6
-s here for M2* and 0.9 s for C2. C2 adds a row for each category above an item's second, so it takes at most the 1,830
-moments of 60 dichotomous items: 60 items of 21 categories, 2,970 rows, took 23 s, and items of a thousand would take
-gigabytes. At 12 items and 2,000 persons a call takes about 5 ms, against 38 ms for mirt's `M2`.
+Ξ grows with the fourth power of the items, so the function takes 60 at most: 1,830 rows and 27 MB. C2 adds a row for each
+category above an item's second, so it takes at most the 1,830 moments of 60 dichotomous items: 60 items of 21 categories
+have 2,970 rows, and items of a thousand would take gigabytes.
 
 ## Rasch tests
 

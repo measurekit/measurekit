@@ -2,8 +2,8 @@
 
 How the calls of mirt, TAM, catR and mirtCAT, GDINA, equate, equateIRT and kequate, difR, psych, the variance components
 of gtheory and mokken map to `@measurekit/psychometrics`. Each R call stands beside the function that the tests compare
-with it and the tolerance of that comparison from [validation](validation.md#tolerances); [performance](performance.md#results)
-gives the time of each function over the time of its R call, with the machine, the versions and the date.
+with it and the tolerance of that comparison from [validation](validation.md#tolerances); [performance](performance.md#speed)
+names the benchmarks that time each function against its R call.
 
 ```mermaid
 flowchart LR

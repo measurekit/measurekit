@@ -260,7 +260,7 @@ holds different persons, and a group of a few persons gives an unstable cut (McK
   `rSquared`.
 - **Persons.** Every person needs a mark and a rating at every station; leave out those who missed one.
 - **Limit.** Borderline regression sums over the persons for each pair of stations: persons × stations² is at most
-  2^28. At the limit, 26,843 persons at 100 stations take 0.3 s and 671,088 persons at 20 stations 1.4 s.
+  2^28. At the limit are 26,843 persons at 100 stations and 671,088 persons at 20.
 - **A margin of error.** Programs that guard against false passes raise the cut by a multiple of the standard error of
   measurement of the total, `standardErrorOfMeasurement` of [classical test theory](ctt.md) (Homer et al., 2016).
 
@@ -362,7 +362,7 @@ result.trueScore; // => { alpha: 2.226, beta: 1.964, lower: 0, upper: 1, effecti
 
 A shape below 1 makes the beta's density infinite at that end, as for two separate groups of persons; the integral there
 is taken in t^α or (1 - t)^β, an exact change of variables, so that it converges. The time grows with the rounded
-effective length, which may be at most 10,000: 2 ms for 3,000 scores of 40 items, 0.2 s at 4,639 trials.
+effective length, which may be at most 10,000.
 
 | Error                                                                               | Meaning and remedy                                                                                                 |
 | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |

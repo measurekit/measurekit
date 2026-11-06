@@ -1,8 +1,8 @@
 # Coming to knowledge tracing from pyBKT
 
 How a pyBKT 1.4.3 model maps to `bkt` of `@measurekit/knowledge-tracing`: the data, the options, the calls, the
-tolerance of each comparison from [validation](validation.md#tolerances); [performance](performance.md#results) gives the
-time of measurekit over pyBKT's, with the machine, the versions and the date.
+tolerance of each comparison from [validation](validation.md#tolerances); [performance](performance.md#speed) names the
+benchmarks that time each function against pyBKT's.
 
 ```mermaid
 flowchart LR

@@ -4,7 +4,7 @@ of bench-bkt-skills.json.
 
     validation/knowledge-tracing/.venv/bin/python validation/benchmarks.py
 
-The results go to validation/benchmarks/results/python.json, which `Rscript validation/benchmarks.R table` reads. pyBKT
+The results go to validation/benchmarks/results/python.json. pyBKT
 fits every skill, five starts each by default, with the processes of its parallel option off, one thread.
 """
 

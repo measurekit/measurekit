@@ -113,18 +113,11 @@ eigendecomposition, beside the singular value decomposition. The numerics both l
 `@measurekit/core`, whose [README](../../packages/core/README.md#why-the-numerics-are-written-here) says why `ml-matrix`
 and `@stdlib` are not used for them.
 
-| Eigendecomposition of a sample correlation matrix, fastest sample, 2026-11-05 | 25 items |   50 | 100 | 200 |  1,000 |
-| ----------------------------------------------------------------------------- | -------: | ---: | --: | --: | -----: |
-| `math/`, Householder and implicit QL (ms)                                     |    0.059 | 0.34 | 2.4 |  21 |  3,200 |
-| `ml-matrix`, Householder and QL of JAMA (ms)                                  |    0.072 | 0.45 | 3.3 |  28 |  4,500 |
-| Cyclic Jacobi, in the same style (ms)                                         |     0.24 |  1.9 |  17 | 145 | 26,000 |
-
 The method makes the difference, not the library: the cyclic Jacobi method gives small eigenvalues to their relative
-accuracy, which no analysis here needs, and takes 4 to 8 times as long as the QL method, whose eigenvalues are exact to
-rounding relative to the largest, as LAPACK's are. Written in `math/`, with no dependency, the QL method takes 0.7 to
-0.8 times as long as `ml-matrix`'s on the same matrices, alternated in one process, and adds 16 MB to the peak at 1,000
-items, the most that the analyses of a matrix of items take. Base R's `eigen`, LAPACK's dsyevr through OpenBLAS, is
-faster above about 100 items, 0.24 s at 1,000 as the reference of smoothing in [performance](performance.md), which
+accuracy, which no analysis here needs, and takes several times as long as the QL method, whose eigenvalues are exact to
+rounding relative to the largest, as LAPACK's are. Written in `math/`, with no dependency, the QL method takes about three
+quarters of the time of `ml-matrix`'s on the same matrices, and adds 16 MB to the peak at 1,000 items, the most that the
+analyses of a matrix of items take. Base R's `eigen`, LAPACK's dsyevr through OpenBLAS, is faster above about 100 items and
 takes the eigenvectors too: it reduces the matrix in blocks by native kernels, and finds the eigenvectors of the
 tridiagonal matrix by MRRR, in a time that grows with the square of its order, where the rotations of the QL method take
 half of its time. A caller that reads the eigenvalues alone, as parallel analysis and the check of smoothing do, skips

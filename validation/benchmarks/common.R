@@ -1,5 +1,5 @@
 # Helpers of the benchmark scripts: the fixtures with the inputs of the tasks, the timing of the references, and the
-# record of each task that docs/<package>/performance.md is made from. Run the scripts from the repository root, with
+# record of each task, which is saved to validation/benchmarks/results/r.json. Run the scripts from the repository root, with
 # `Rscript validation/benchmarks.R`.
 
 suppressPackageStartupMessages(library(jsonlite))
@@ -34,7 +34,7 @@ time_calls <- function(fn) {
   list(median = median(samples), min = min(samples), samples = runs)
 }
 
-# The name, version and function of a reference, as the tables of docs/<package>/performance.md show it.
+# The name, version and function of a reference.
 reference <- function(package, call) {
   sprintf("%s %s `%s`", package, as.character(packageVersion(package)), call)
 }
@@ -62,7 +62,7 @@ save_records <- function(file = file.path(RESULTS_DIR, "r.json")) {
   message("Wrote ", file)
 }
 
-# A count with thousands separators, as the sizes of the table show it.
+# A count with thousands separators, as the sizes of the tasks are written.
 count <- function(x) format(x, big.mark = ",", scientific = FALSE, trim = TRUE)
 
 # The ids of `n` columns: item1, item2, ...

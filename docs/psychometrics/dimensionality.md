@@ -85,13 +85,12 @@ from all responses.
 | An item with more than 8 observed categories    | A `DataError`, as psych's `polychoric` stops        |
 | More than 1,000 items                           | A `DataError`, in every analysis of this module     |
 
-Cost grows with the pairs of items, the persons and the product of the items' categories: the 25 items of `bfi`, with
-six categories and 2,800 persons, take about 20 ms, and a parallel analysis of 100 replications under a second. An item
+Cost grows with the pairs of items, the persons and the product of the items' categories. An item
 has at most 8 observed categories, psych's `max.cat`, as a pair's search takes the bivariate normal distribution at
 every pair of thresholds; items with more, such as scores, suit Pearson correlations, which every function here takes
 with `correlation: "pearson"`. Every analysis here holds matrices of every pair of items, and decomposes them in time
 that grows with the cube of the items, so a matrix has at most 1,000 items: at that size an exploratory factor analysis
-adds about 150 MB to the peak memory and takes about 15 s.
+adds about 150 MB to the peak memory.
 
 ## Parallel analysis
 
@@ -201,7 +200,7 @@ fit.converged; // => true
 
 Each iteration takes a Newton step on the communalities, with the Hessian that the objective has at a perfect fit, a
 backtracking line search that keeps the bounds, and an eigendecomposition of the matrix. The search starts from the
-squared multiple correlations. Convergence takes 5 to 20 iterations and a few milliseconds for 25 items. Fabrigar et
+squared multiple correlations. Convergence takes 5 to 20 iterations. Fabrigar et
 al. (1999) call maximum likelihood the best choice for data near the normal distribution, as it gives a test of the
 fit, and principal axis factoring, whose limit is minres, the choice for data far from it.
 
@@ -243,9 +242,9 @@ ml.fit;
 exploratoryFactorAnalysis(matrix, 1, { extraction: "maximum-likelihood" }).fit?.rmsea; // => 0.133: one factor misfits
 ```
 
-**Which function.** `exploratoryFactorAnalysis` works on the correlations of the items, takes milliseconds and returns
+**Which function.** `exploratoryFactorAnalysis` works on the correlations of the items, is quick and returns
 the factors. `calibrateMultidimensional` with `dimensions` estimates a compensatory item response model from the
-responses, by full information, and returns item parameters, a likelihood and standard errors, in seconds to minutes.
+responses, by full information, and returns item parameters, a likelihood and standard errors, at a far higher cost.
 The two agree on what they share: on the 12 simulated tetrachoric items of the validation, the loadings of the first
 factor average 0.710 here and 0.724 by full information after `rotateLoadings`, those of the second 0.606 and 0.618, and
 the correlation of the factors 0.316 and 0.306, for the truth of 0.7, 0.6 and 0.3. Use the factors to explore and to

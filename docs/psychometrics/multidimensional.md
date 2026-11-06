@@ -153,9 +153,9 @@ the ability.
   on the first j dimensions): the solution is then determined up to the signs of the dimensions. The dimensions are
   named `F1` to `FD`. EM starts from the first D eigenvectors of the items' correlations as loadings, each signed so
   that its entries sum to at least 0, converted to slopes by a = 1.702 λ / √(1 - h²). Use `rotateLoadings` for a simpler structure. To explore the number of factors and
-  their loadings from the correlations of the items, in milliseconds, use
+  their loadings from the correlations of the items, use
   [`exploratoryFactorAnalysis`](dimensionality.md#exploratory-factor-analysis); this route estimates the item
-  parameters by full information, in seconds.
+  parameters by full information, at a far higher cost.
 - **One dimension.** The model equals the one-dimensional model in the slope-intercept form: slope a, intercept
   -a b.
 - **EM.** The grid is the product of `points` equally spaced nodes per dimension, weighted by the normal density of the
@@ -429,14 +429,7 @@ item's by the names of its parameters, a parameter that the items share, the 1PL
 occasion's `mean` and `sd`, the first occasion's being `null`, as it fixes them; and the correlations' by rows. They are
 `null` without the option and where the information cannot be inverted or gives a variance that is not positive.
 
-**Time.** CPU time of one calibration at the default `tolerance`, on an Apple M5 with Node.js 26, simulated data:
-
-| Data                                                                     | `"none"` | `"cross-product"` | `"hessian"` |
-| ------------------------------------------------------------------------ | -------- | ----------------- | ----------- |
-| 2 occasions, 2PL, 10 items, 1,500 persons, 31 points                     | 0.4 s    | 0.4 s             | 1.0 s       |
-| 3 occasions, 2PL, 10 items, 1,000 persons, 21 points                     | 2.7 s    | 2.8 s             | 4.1 s       |
-| 3 occasions, graded with 5 categories, 6 items, 1,000 persons, 21 points | 2.0 s    | 2.3 s             | 3.8 s       |
-
+**Time.** `"cross-product"` adds one pass over the persons to a calibration and `"hessian"` two E-steps for each parameter.
 The E-step costs the responses times the points of an axis plus a few operations per node of the grid, which has
 `points ** occasions` nodes; the BFGS of the moments costs more than the items' M-step, which pools the occasions'
 counts. A calibration is synchronous: in a browser, run it in a Web Worker ([IRT](irt.md#in-a-browser)).
@@ -463,12 +456,13 @@ wide margin, so `calibrateLongitudinal` takes 2 or 3 occasions and throws a `Dat
 three dimensions, miss by many times what 21 do. 2,000 persons, 40 items per occasion, 3 occasions, correlation 0.85,
 two seeds; the distance is the largest difference of a mean, standard deviation or correlation between two grids:
 
-| Seed | 15 against 31 nodes | 21 against 31 nodes | Time at 15, 21 and 31 nodes |
-| ---- | ------------------- | ------------------- | --------------------------- |
-| 1    | 0.109               | 0.021               | 2.8 s, 4.1 s, 21 s          |
-| 2    | 0.104               | 0.008               | 1.7 s, 6.6 s, 22 s          |
+| Seed | 15 against 31 nodes | 21 against 31 nodes |
+| ---- | ------------------- | ------------------- |
+| 1    | 0.109               | 0.021               |
+| 2    | 0.104               | 0.008               |
 
-So the default is 21 nodes at 3 occasions, and `mirt`'s 31 at 2. `validation/psychometrics/longitudinal-recovery.ts`
+So the default is 21 nodes at 3 occasions, within 0.021 of 31 nodes at about a quarter of their time, and
+`mirt`'s 31 at 2. `validation/psychometrics/longitudinal-recovery.ts`
 recovers the moments of 5,000 simulated persons at 10 and at 40 items per occasion within 1.5 times the worst error of
 `mirt` on the same design, rounded up to a multiple of 0.005 ([validation](validation.md#simulation)).
 
@@ -496,39 +490,20 @@ if the information matrix cannot be inverted or gives a variance that is not pos
 
 ### Time
 
-CPU time of one calibration on an Apple M5 with Node.js 26, simulated data, each item loading on one dimension, the
-default `tolerance`. EM:
-
-| Data                                                                       | `"none"` | `"cross-product"` | `"hessian"` |
-| -------------------------------------------------------------------------- | -------- | ----------------- | ----------- |
-| 2 dimensions, M2PL, 20 items, 2,000 persons, 31 points                     | 1.1 s    | 1.4 s             | 3.3 s       |
-| 3 dimensions, M2PL, 30 items, 2,000 persons, 15 points                     | 7.3 s    | 7.6 s             | 11.6 s      |
-| 3 dimensions, graded with 5 categories, 15 items, 1,000 persons, 15 points | 3.6 s    | 3.3 s             | 5.7 s       |
-
-MH-RM, seeded, with the cycles of its last stage:
-
-| Data                                                            | Cycles | `"none"` | `"hessian"` |
-| --------------------------------------------------------------- | ------ | -------- | ----------- |
-| 2 dimensions, M2PL, 20 items, 2,000 persons                     | 44     | 16.1 s   | 23.8 s      |
-| 3 dimensions, M2PL, 30 items, 2,000 persons                     | 45     | 27.3 s   | 38.1 s      |
-| 3 dimensions, graded with 5 categories, 15 items, 1,000 persons | 53     | 21.5 s   | 30.0 s      |
-| 5 dimensions, M2PL, 30 items, 2,000 persons                     | 54     | 31.9 s   | 43.8 s      |
-| 5 dimensions, graded with 5 categories, 25 items, 1,000 persons | 57     | 38.6 s   | 53.6 s      |
-
-Differences under 10% are noise. The E-step of EM dominates and grows with the responses times the nodes: a grid of
+With EM, `"cross-product"` adds one pass over the persons to the calibration and `"hessian"` two E-steps for each parameter;
+with MH-RM, seeded, `"hessian"` adds about 40 percent. The E-step of EM dominates and grows with the responses times the nodes: a grid of
 `points` nodes in each of D dimensions has `points ** D` nodes. Fewer `points` is faster and, for a calibration, less
 exact. MH-RM has no grid, so its time grows slowly with the dimensions; it runs 250 cycles before the last stage, and
-the importance-sampled log-likelihood is part of every time. Correlated dimensions add their correlations, D (D - 1) / 2
-parameters whose information grows as the square of their number: two persons on 40 correlated dimensions take 170 MB
-and 8 s, on 60 dimensions 300 MB and 45 s. Use EM up to three dimensions, where it is exact and
+the importance-sampled log-likelihood is part of its time. Correlated dimensions add their correlations, D (D - 1) / 2
+parameters whose information grows as the square of their number: two persons on 40 correlated dimensions take 170 MB,
+on 60 dimensions 300 MB. Use EM up to three dimensions, where it is exact and
 faster. The exploratory model of a weak second dimension converges slowly with EM; `maxIterations` bounds it.
 Calibration runs synchronously: in a browser, run it in a Web Worker ([IRT](irt.md#in-a-browser)).
 
 An exploratory model starts from the leading eigenvectors of the items' correlations, which Householder's reduction and
-the implicit QL algorithm find with all the others, in time that grows as the cube of the items: about 30 s at 2,000
-items, where base R's `eigen` takes 1.6 s. The correlations take the responses to each pair of items: 20 s for 1,000 persons who answered
-all 2,000, and 0.2 s for 20,000 persons who answered 2 of them each. mirt's start, which smooths the correlations by
-eigendecompositions until none of their eigenvalues is negative, took more than 20 minutes on the first of these.
+the implicit QL algorithm find with all the others, in time that grows as the cube of the items. The correlations take
+the responses to each pair of items, so their time grows with the pairs times the persons who answered both: 1,000 persons who
+answered all 2,000 items cost far more than 20,000 persons who answered 2 of them each.
 
 ## Bifactor and two-tier models
 
@@ -638,15 +613,6 @@ a fraction of the time of the same model in full:
 A group of items whose persons all have different sub-patterns is the worst case: the cost is then the persons times the
 nodes squared times the items of the group, as with any bfactor program.
 
-CPU time of one calibration at the default `tolerance`, on an Apple M5 with Node.js 26, against `mirt::bfactor` with
-31 nodes on the same simulated data of 2,000 persons, each item loading on the general dimension and on one specific
-dimension:
-
-| Data                            | measurekit | mirt  | Ratio |
-| ------------------------------- | ---------- | ----- | ----- |
-| 12 items, 3 specific dimensions | 0.08 s     | 1.4 s | 17    |
-| 40 items, 4 specific dimensions | 0.51 s     | 4.2 s | 8.3   |
-
 ## Rotation
 
 `rotateLoadings(calibration, options)` rotates the standardized loadings of a calibration of uncorrelated dimensions,
@@ -709,8 +675,7 @@ are the identity and it has at least two dimensions.
 `items` are `{ model, parameters }` of one number of dimensions, at most 100; `responses` has one response per item,
 `null` when missing. An estimate has `theta`, `standardErrors` and `covariance`. The limit of dimensions is one for
 calibration, scoring, `multidimensionalInformation` and adaptive tests, so that every calibration can be scored: the
-matrices of scoring grow as the square of the dimensions and its time as the cube, so that the posterior mode of one item
-of 1,000 dimensions took 11 s.
+matrices of scoring grow as the square of the dimensions and its time as the cube.
 
 | Option   | Of       | Default                                                     | Meaning                                                                                              |
 | -------- | -------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
@@ -743,7 +708,7 @@ one-dimensional ones.
   the M2PL and the graded model, and of no function for the M3PL, whose likelihood can have several maxima and its
   weighted score several roots: the estimate is the one that the search reaches from the start.
 - **Time.** Warm's correction takes the gradients of each item at 2D points, and a Newton step the correction at 2D
-  more: on 100 dimensions and 500 items the WLE takes 2 s, and MAP and the MLE 0.06 s.
+  more: on 100 dimensions and 500 items the WLE takes about 30 times as long as MAP and the MLE.
 
 `multidimensionalEstimates` matches the data's item ids to `items`, estimates each person from the person's answered
 items only, and takes `multidimensionalPosteriorModeEstimate` unless given an estimator, a function of items and
@@ -826,7 +791,7 @@ multidimensionalPosteriorModeEstimate(fit.items, person, { prior }).theta; // =>
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | Model      | The 2PL for the responses, and for the indicators the same model, whose slope on the propensity is the indicator's discrimination              |
 | Dimensions | `loadings` puts each response on `"ability"` and each indicator on `"propensity"`; the correlation between them is estimated                   |
-| Time       | Two dimensions on a grid of 31 points, as any two-dimensional calibration: 800 persons and 16 items take under a second                        |
+| Time       | Two dimensions on a grid of 31 points, as any two-dimensional calibration                                                                      |
 | Check      | A correlation near 0 means the omissions say little about the ability, and the items differ little from those of a calibration that skips them |
 | Limits     | The model is the one of Holman and Glas: omissions depend on the ability only through the correlation of the two dimensions                    |
 

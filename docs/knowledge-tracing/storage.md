@@ -41,8 +41,8 @@ every build, and no build regenerates it.
 ## At answer time
 
 An answer reads the learner's state and the parameters of the item at hand, builds the model from them, and writes the
-state and the event back. It never reads the log. A model built from a few rows costs as little as the rows: building
-an Elo model of one item and updating it takes about a microsecond, against milliseconds for a model of thousands.
+state and the event back. It never reads the log. A model built from a few rows costs as little as the rows: an Elo
+model of one item is built and updated at the cost of its one row, and a model of thousands of items at the cost of thousands.
 
 ```ts
 import { bkt } from "@measurekit/knowledge-tracing/bkt";
@@ -74,11 +74,11 @@ const next = tracer.update(stateRow, {
 A logistic model takes the rows of the item's skills and, with fixed proficiency, the learner's θ; an IRT model the
 item's row, as `irt({ items: { q7: itemRow } })`.
 
-Updating a learner takes about 0.3 µs with Elo, 0.6 µs with BKT and 6 µs with IRT, whose model takes 10 µs to build. A
+Updating a learner costs about ten times as much with IRT as with BKT, and the IRT model costs more still to build. A
 call checks what it reads of a state, the entries of the attempt's skills, and `predict` and `mastery` take the same time
-at any number of skills; `update` returns a new state, a copy of its records, which takes about 0.05 ms at 128 skills and
-2 ms at 5,000. Pass the rows of the event's skills, as above, and an update costs the same at any number of skills. A
-KST update takes time proportional to the knowledge states: about 0.01 ms for 400 states, 0.1 ms for 6,000. A KST model
+at any number of skills; `update` returns a new state, a copy of its records, which takes time that grows with the skills.
+Pass the rows of the event's skills, as above, and an update costs the same at any number of skills. A
+KST update takes time proportional to the knowledge states. A KST model
 needs its whole structure and π; cache it between answers. With BKT, or Elo without online item updates, parameters
 change only at refits, so an app can cache them.
 
@@ -135,21 +135,20 @@ skills, and skills can be fitted in parallel processes.
 Orders of magnitude on Node.js, for logs of 5,000 items and 200 skills: 1M events of 50,000 learners, and 5M events of
 100,000 learners. Memory is the peak resident memory of the process, the input included.
 
-| Operation                  | 1M events                                  | 5M events                                       |
-| -------------------------- | ------------------------------------------ | ----------------------------------------------- |
-| `buildEventLog`            | About 0.2 s, 0.4 GB of heap with the input | About 1 s                                       |
-| Elo `fit`                  | About 0.4 s                                | About 3 s, 1.8 GB; 5-fold cross-validation 33 s |
-| `learningCurve`            |                                            | About 4 s                                       |
-| BKT `fit`                  | About 0.6 s per EM iteration and start     | About 5 s per EM iteration and start, 2.4 GB    |
-| AFM `fit`, fixed or random | About 5 s, 0.9 GB                          | About 55 s, 2.5 GB                              |
-| IRT `fit`, a replay        | About 10 s: 10 µs per event                | About 70 s, 2 GB                                |
+| Operation                  | 1M events                     | 5M events |
+| -------------------------- | ----------------------------- | --------- |
+| `buildEventLog`            | 0.4 GB of heap with the input |           |
+| Elo `fit`                  |                               | 1.8 GB    |
+| BKT `fit`                  |                               | 2.4 GB    |
+| AFM `fit`, fixed or random | 0.9 GB                        | 2.5 GB    |
+| IRT `fit`, a replay        |                               | 2 GB      |
 
 Without a ridge, a logistic fit grows linearly with events and with learners, with the square of the skills each learner
 practices, which the Schur complement of the learners couples, and with the cube of the coefficients, up to 5,000 of them:
 the 5M log has 50 attempts per learner against 20. With a ridge, the fit solves by conjugate gradients on passes over the
 events, so its memory is that of the design: 50,000 items with a proficiency for each of 3,000 learners and 150,000
-events fit in under a second. A BKT fit of 1M events with 5 starts of 100 iterations thus takes minutes; fitting skill by
-skill bounds its memory by the largest skill. Above a few million events, fit on a window or a sample, or skill by skill
+events fit with it. A BKT fit of 1M events runs an EM iteration over them for each of 5 starts of up to 100 iterations;
+fitting skill by skill bounds its memory by the largest skill. Above a few million events, fit on a window or a sample, or skill by skill
 for BKT.
 
 A logistic state is tens of bytes per skill, and grows only with the features that read more: terms over items add the same
@@ -159,15 +158,7 @@ attempts that the largest window reaches, and all of them with a window of `Infi
 proportional to the attempts at the skill, and a fit of a log, to the square of the attempts of a learner at a skill.
 
 A KST fit takes time proportional to the learners with different answers, the items and the knowledge states, and keeps
-one learner's posterior at a time, unless `posteriors` asks the fit for each of them. Near the default limit, with about 9,000 states over 40 items:
-
-| Operation                                                    | Time                     |
-| ------------------------------------------------------------ | ------------------------ |
-| `surmiseStructure`                                           | Under 0.1 s              |
-| `isLearningSpace`, comparing every pair of states            | About 9 s                |
-| `update`, `predict`                                          | About 0.2 ms             |
-| `nextQuestion` over the 40 items                             | About 1 ms               |
-| `fringes` of a structure the library built                   | Under 0.01 ms            |
-| `fringes` of a structure from storage, which it checks       | About 2 ms               |
-| A learner's state                                            | About 200 KB of JSON     |
-| `fit` of 2,000 learners and 40 items: 5 EM iterations, or MD | About 25 s, 13 s, 0.6 GB |
+one learner's posterior at a time, unless `posteriors` asks the fit for each of them. Near the default limit, with about 9,000
+states over 40 items, a learner's state is about 200 KB of JSON and a `fit` of 2,000 learners and 40 items, by 5 EM iterations
+or by MD, takes about 0.6 GB. `isLearningSpace` compares every pair of states, so its time grows with the square of their
+number, and `fringes` of a structure from storage checks it, which costs more than `fringes` of a structure the library built.

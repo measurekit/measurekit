@@ -421,7 +421,7 @@ same draws for the same posteriors.
 | `draws` not a positive integer; `random` not a generator                                                     | `DataError`                                    |
 
 The matrix is checked as symmetric and 1 on the diagonal to within 1e-8. A draw costs the square of the posteriors' number
-plus a binary search in each, and 2,000 draws from 6 posteriors of 241 nodes take under a millisecond.
+plus a binary search in each,.
 
 ## Recipe: plausible values
 

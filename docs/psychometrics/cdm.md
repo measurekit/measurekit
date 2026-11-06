@@ -208,7 +208,7 @@ expected share correct; PVAF(q) is ς²(q) over ς² of all attributes. The sugg
 attributes whose PVAF exceeds `eps`, default 0.95, of those the one of largest PVAF. An item whose success
 probabilities do not vary over the profiles, such as an item without responses, has `pvaf` `null` and keeps its
 attributes; a profile of proportion 0 adds nothing. ς² of every q-vector takes time that grows as 3^K, each summed from
-the groups of a q-vector of one attribute more: 160 ms an item at 15 attributes and 200 persons. A suggestion is evidence for experts to weigh, not a correction: calibrate the G-DINA before validating.
+the groups of a q-vector of one attribute more. A suggestion is evidence for experts to weigh, not a correction: calibrate the G-DINA before validating.
 
 ## Item-level model comparison
 
@@ -356,9 +356,8 @@ cdmItemFit(matrix, calibration)[0]; // => { id: "q1", proportion: { observed: 0.
 The first- and second-order margins do not always identify every parameter: on GDINA's `sim10GDINA`, Δ of the G-DINA
 has rank 44 of its 45 columns, and that of the A-CDM 31 of 35. M2 then uses the whole complement of Δ's span, with as
 many degrees of freedom as the moments less its rank. Above 10 attributes a model has more parameters than 60 items
-have moments, so M2 is `null`; the limit of 60 items is that of [fit](fit.md#limited-information-fit). On 2,000
-persons, a call took 5 ms for 10 items on 3 attributes, 40 ms for 30 on 5, and 5 s for 60 on 10, whose Δ has 1,143
-columns; `cdmItemFit` took at most 23 ms.
+have moments, so M2 is `null`; the limit of 60 items is that of [fit](fit.md#limited-information-fit). At 60
+items on 10 attributes, Δ has 1,143 columns.
 
 ## Small samples
 

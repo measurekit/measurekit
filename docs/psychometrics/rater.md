@@ -506,11 +506,11 @@ facets beyond two add terms.
 | `tolerance`      | `1e-4`                  | EM stops when no parameter changes by more than this                                                    |
 | `maxIterations`  | `500`                   | The most EM iterations                                                                                  |
 
-| Limit                                                           | Value | Why                                                                                                                                              |
-| --------------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Parameters: measures, biases, free thresholds, the mean and SD  | 1,000 | Newton's method inverts a matrix of every pair of them, in time that grows as their cube: 997 raters of 1,994 persons take 3.3 minutes and 80 MB |
-| Categories of a rating scale                                    | 255   | FACETS's limit                                                                                                                                   |
-| Expected counts: virtual items × quadrature points × categories | 2^24  | EM holds them in two tables of 128 MB, and the time of an iteration grows with them times the categories                                         |
+| Limit                                                           | Value | Why                                                                                                                              |
+| --------------------------------------------------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Parameters: measures, biases, free thresholds, the mean and SD  | 1,000 | Newton's method inverts a matrix of every pair of them, in time that grows as their cube: 997 raters of 1,994 persons take 80 MB |
+| Categories of a rating scale                                    | 255   | FACETS's limit                                                                                                                   |
+| Expected counts: virtual items × quadrature points × categories | 2^24  | EM holds them in two tables of 128 MB, and the time of an iteration grows with them times the categories                         |
 
 A few hundred kilobytes of scores reach these limits; the estimation's time grows faster than the scores, so run it on
 scores from users in a worker with a deadline.

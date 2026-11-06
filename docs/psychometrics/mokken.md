@@ -29,7 +29,7 @@ at most 1,000 items, the limit of the analyses of pairs of items in [dimensional
 at that limit the coefficients of `scalability` and the indices of `conditionalAssociation` hold a million entries, up
 to about 150 MB ([peak memory](performance.md#memory)). Their time grows with the pairs times the persons, and
 that of `conditionalAssociation`, whose W1 conditions every pair on a third item, with the cube of the items times the
-persons, 14 s for 1,000 items of 8 persons: on matrices from users, run them in a worker with a deadline.
+persons: on matrices from users, run them in a worker with a deadline.
 
 | Function                                    | Result                                                                |
 | ------------------------------------------- | --------------------------------------------------------------------- |
@@ -314,7 +314,7 @@ flagged.w3; // => [["item5", "reversed"]]: the pair that contradicts itself
 `check.ca` then removes the item with the most flags, the one with the lowest H_i among ties and a random one among
 those, and runs again until nothing is flagged or fewer than four items remain: to do the same, drop that item from the
 matrix and call the function again. W1 sums over every item, conditioning item and third item, so the time grows with
-the cube of the items times the persons: 0.26 s for 40 items and 433 persons.
+the cube of the items times the persons.
 
 ## Monotonicity
 

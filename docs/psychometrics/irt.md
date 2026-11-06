@@ -185,7 +185,7 @@ priors, the log-likelihood plus the log prior densities. Bock-Aitkin EM alternat
   of each item at each node, and of each group at each node.
 - **M-step:** one Fisher-scoring step with a line search on each item's expected log-likelihood, a generalized EM step
   that never lowers it. Items sharing a parameter step together, by the Schur complement of each item's own parameters,
-  in time that grows with the items: 0.8 s for 1,000 1PL items of 500 persons and 3.3 s for 5,000. Bounded parameters
+  in time that grows with the items. Bounded parameters
   (c and d, in (0, 1)) are estimated on the logit scale.
 
 Every second EM step is followed by a jump along the line of the two steps, the squared extrapolation SQUAREM (Varadhan
@@ -218,9 +218,8 @@ as mirt.
 | `"cross-product"` | Σ over persons of s sᵀ, s the person's score vector, plus minus the priors' second derivatives    | `SE.type = "crossprod"`  | one pass over the persons, and P³ / 2     |
 
 P is the number of estimated parameters. The gradient is exact by Fisher's identity: the posterior mean of the
-complete-data gradient. On 20,000 persons and 60 2PL items, EM takes 1.3 to 2.0 s, Hessian standard errors 24 to 40 s
-more and cross-product ones 0.5 to 1.2 s more; on 4,000 persons answering 40 of 1,000 items, cross-product standard
-errors take 2.0 to 3.9 s, on a quiet machine and on one under load. Both methods estimate the same covariance in large
+complete-data gradient. On 20,000 persons and 60 2PL items, Hessian standard errors
+cost about 20 times as much as the calibration and cross-product ones about half as much. Both methods estimate the same covariance in large
 samples; the Hessian is the reference for small ones.
 Standard errors are `null` for fixed items, a held parameter has none, and every item has `null` when the information
 cannot be inverted or gives a variance that is not positive. They take at most 2,000 estimated parameters, counting a parameter that items share once
@@ -712,7 +711,7 @@ items in `fixed` or a standard normal group.
 
 ### In a browser
 
-Calibration runs synchronously and can take seconds on large data. In a browser, run it in a Web Worker so that the
+Calibration runs synchronously and is slow on large data. In a browser, run it in a Web Worker so that the
 page stays responsive: `@measurekit/psychometrics` uses no platform API, so the worker imports it as any module
 does, and the data and the result pass as plain objects.
 
@@ -775,7 +774,7 @@ posteriorMeanEstimate(result.items, [3, 2, 1, 0, 0, 0, 0, 0, 0]); // => { theta:
 | Reflection | θ → -θ with every b → -b leaves the likelihood unchanged. The starts' signs fix the orientation, the loadings summing to at least 0. Compare two solutions after reflecting one whose locations correlate negatively with the other's.                                                                                               |
 | Bounds     | a in (0.1, 10) and b in (-10, 10), the GGUM package's; the thresholds are free.                                                                                                                                                                                                                                                      |
 | Result     | A `Calibration` of `generalizedGradedUnfolding` items with `persons`: the log-likelihood, AIC and BIC are those of the persons kept.                                                                                                                                                                                                 |
-| Time       | The starts take 3 s at 1,000 items; each EM iteration then takes about 0.1 ms per item on a few persons, and a stage that never converges runs `maxIterations` of them: 3 minutes for 1,000 items at the default. Run large calibrations in a worker with a deadline.                                                                |
+| Time       | The starts and each EM iteration take time that grows with the items, and a stage that never converges runs `maxIterations` of them. Run large calibrations in a worker with a deadline.                                                                                                                                             |
 
 `calibrate` takes `generalizedGradedUnfolding` as any model, from starts by each item's shares alone: a = 1, b from its
 agreement at 0 or above, which cannot place the sign of a location, so it may stop at a local maximum. Unfolding data go
@@ -889,14 +888,7 @@ P(x | r) = Π_i e^(-η_(i x_i)) / γ_r(A).
   changes by more than `tolerance`. The standard errors come from the inverse of the Hessian at the estimates.
 - **Cost.** Each group of persons who answered the same items takes its own functions, two items left out for every pair,
   so a Newton step takes time in proportion to the groups times about the fourth power of their items. The products of
-  those functions are at most 2^29 in a step, or the fit throws `DataError`. Near the limit, on a quiet machine and on
-  one under load:
-
-| Responses near the limit                            | Newton step  | Fit, 6 or 7 steps |
-| --------------------------------------------------- | ------------ | ----------------- |
-| 2,000 persons, 283 items, complete                  | 0.6 to 1.1 s | 4.6 to 8.6 s      |
-| 2,000 persons, 50 items, a fifth missing at random  | 1.4 to 3.4 s | 13 to 26 s        |
-| 40,000 persons, 25 items, a fifth missing at random | 4.6 to 8.5 s | 34 to 60 s        |
+  those functions are at most 2^29 in a step, or the fit throws `DataError`.
 
 | Option          | Default                                                          | Meaning                |
 | --------------- | ---------------------------------------------------------------- | ---------------------- |
@@ -1166,7 +1158,7 @@ fit.items.slice(0, 2).map((item, j) => ({
 | Choice                 | Value                                                                                                        |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------ |
 | Replicates             | 200 to 1,000; the standard deviation of a standard error is about 1 / √(2R) of its value, 5% at 200          |
-| Time                   | One `calibrate` per replicate: 400 replicates of 1,000 persons and 8 items take 4.6 to 10 s                  |
+| Time                   | One `calibrate` per replicate                                                                                |
 | A replicate that fails | Check `converged` and leave it out, reporting how many                                                       |
 | Intervals              | The values at the 2.5% and 97.5% ranks of a parameter's sorted replicates                                    |
 | Fixed settings         | The replicates use the options of the original fit, and the same `fixed` items                               |

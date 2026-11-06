@@ -710,7 +710,7 @@ Several results of the reference packages are not references:
   Monte Carlo error, 0.08 on the simulation and 0.06 on CredentialForm1.
 - **GDINA on the fraction subtraction data.** Under the DINA, profiles with equal ideal responses share any split of
   their proportion; GDINA's split depends on its starts, so the fixture sums proportions over such profiles, and
-  persons' posteriors among them are not compared. On the whole data, 20 items and 8 attributes, the DINA's EM over 256 profiles takes tens of seconds under coverage, so the fixture keeps
+  persons' posteriors among them are not compared. On the whole data, 20 items and 8 attributes, the DINA's EM over 256 profiles is too slow under coverage, so the fixture keeps
   13 items and 5 attributes. Under the G-DINA with 8 attributes, GDINA's estimates have a
   log-likelihood 110.8 below those of `calibrateCdm`: the likelihood has several maxima, and the case is left
   out. `coef` rounds to 4 digits unless given `digits`; GDINA breaks MAP ties at random. GDINA's
@@ -857,7 +857,7 @@ Several results of the reference packages are not references:
   EM stops short of the maximum of a model with an item free on few persons, 2e-4 in its log-likelihood on every 6th person
   of `bfi`, which a chi-square shows. `DIF(scheme = "drop")` on the constrained model refits from its estimates and agrees
   within 1e-2 at mirt's tolerance. The cases keep every few persons and some of the items, so that their dozens of fits
-  take seconds: the verbal items 4, 6, 9, 16, 19 and 20, every 8th person and 8 items of the sparse simulations, every
+  stay short: the verbal items 4, 6, 9, 16, 19 and 20, every 8th person and 8 items of the sparse simulations, every
   10th person of `bfi`. The focal group's mean and standard deviation stop within 1.4e-6 of the package's, where the
   log-likelihoods agree within 3.7e-11.
 - **Held lower asymptotes in DIF.** difR's `c` calibrates each group by ltm's `tpm` with the guessing parameters
@@ -898,7 +898,7 @@ Several results of the reference packages are not references:
   agree within their Monte Carlo error: about 1.6% of each standard error for 2000 replications and 3.2% for 500, as
   the standard deviation of B values has a relative standard error of 1 / √(2 (B - 1)). The test compares standard
   errors above 0.05 within 10%, about three standard deviations of the difference. Frequency estimation resamples are
-  smoothed, which takes seconds, so the test runs 500 replications of it.
+  smoothed, which is slow, so the test runs 500 replications of it.
 - **mirt's covariance of a concurrent calibration** is of the slopes and intercepts (a1, d); the script converts it to
   that of a and b = -d / a1 with the Jacobian of the transformation, and takes the means and variances of the groups
   from the same calibration as known populations. The standard errors of equating then come from numDeriv's
@@ -965,7 +965,7 @@ Several results of the reference packages are not references:
   error, not to the digits. On the 1,500 persons of the two-dimensional M2PL case, seeds 1 to 6 at the default settings
   differ from mirt's EM by 0.034 to 0.057 in a parameter, 0.28 to 0.41 of the largest standard error, by at most 0.025 in
   the correlation, 7% in the standard errors and -2.3 to 1.4 in the log-likelihood; 400 cycles of the last stage lower
-  the parameters' difference only to about 0.03. The tests take the first 200 persons, where MH-RM runs in seconds, and
+  the parameters' difference only to about 0.03. The tests take the first 200 persons, where MH-RM is fast enough for a test, and
   hold it to EM on the same persons within 1.5 times the worst of the seeds 1 to 20 (above). The five-dimensional case
   has no exact reference. mirt's MH-RM with ten seeds differs from its mean over the seeds by up to 0.19 in a parameter
   (median 0.014), and its standard errors by 44% at the median and 151% at most, with some missing where its information
@@ -1064,8 +1064,8 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
 - **Multidimensional recovery by MH-RM.** 30 simulated M2PL items, 6 on each of 5 dimensions correlated 0.4 to the power
   of their distance, from 2,000 simulated persons, three seeds: every slope, intercept and correlation within four
   standard errors of the true value, and a root mean square error of the slopes below 0.2 (3.3 standard errors at most,
-  0.11 found). `validation/psychometrics/multidimensional-mhrm-recovery.ts` runs it in minutes and records it in
-  `results/`; no test does, as MH-RM on five dimensions takes seconds even for a few hundred persons.
+  0.11 found). `validation/psychometrics/multidimensional-mhrm-recovery.ts` runs it and records it in
+  `results/`; no test does, as MH-RM on five dimensions is slow even for a few hundred persons.
 - **Bifactor recovery.** Simulated bifactor 2PLs of 1,000 persons, 12 items in 3 specific dimensions and 40 in 4: the root
   mean square errors of the general and the specific slopes are at most those of `mirt::bfactor` plus 0.005 (0.275 and 0.438,
   0.131 and 0.159 found; mirt's the same within 0.001).
@@ -1080,7 +1080,7 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
   simulated persons in three groups with their own means and covariances, three seeds: at 21 nodes per dimension every
   mean within 0.18 and every covariance within 0.25 of the true value (0.13 and 0.18 found); at the default 15 nodes the
   errors are up to 0.24 and 0.66, which is why the guide advises 21 above 20 items per dimension.
-  `validation/psychometrics/multidimensional-groups-recovery.ts` runs it in about ten minutes and records it in
+  `validation/psychometrics/multidimensional-groups-recovery.ts` runs it and records it in
   `results/`. The test recovers three groups on two dimensions from 500 persons each and 10 items per dimension: every
   mean within 0.25 and every covariance within 0.5 of the moments of the simulated abilities, on the scale of the first
   group's sample (0.146 and 0.305 at most over seeds 1 to 20).
@@ -1113,8 +1113,8 @@ seeds and bounds of four standard errors, which a correct simulation exceeds wit
   correlations within 1.5 times the worst error of `mirt` on 10 items and the same design, rounded up to a multiple of
   0.005 (0.03, 0.025 and 0.02 at 2 occasions, 0.03, 0.035 and 0.02 at 3). The errors are distances from the moments of the
   simulated abilities, not of their distribution. At 40 items and 3 occasions, 15 nodes miss these thresholds, and 21
-  nodes are within 0.03 of 31 where 15 are 0.10 away. `validation/psychometrics/longitudinal-recovery.ts` runs these in
-  about five minutes and records them in `results/`. The test recovers the moments of 2 occasions from 300 persons and 10
+  nodes are within 0.03 of 31 where 15 are 0.10 away. `validation/psychometrics/longitudinal-recovery.ts` runs these and
+  records them in `results/`. The test recovers the moments of 2 occasions from 300 persons and 10
   items within four standard errors of the estimates (2.4 at most over seeds 1 to 20).
 - **Kernel equating.** The population of 40 Rasch items with difficulties from -1.5 to 1.5 and theta N(0, 1), form X
   easier and form Y harder by 0.2; the truth is the kernel equating of the population presmoothed at degree 12. On 200
@@ -1603,17 +1603,15 @@ digits. JML runs with `tolerance: 1e-12` against a base R solution iterated to 1
 
 The multidimensional calibrations run with `tolerance: 1e-9` for the 2PL and with parameters held, 1e-7 for the 3PL and the graded model on two
 dimensions, and 1e-8 on three, and the exploratory ones with 1e-8: the likelihoods of the other models are flatter, and
-mirt's EM stops within the tolerances above. The `bfi` fixtures take a few seconds each, and the exploratory cases, whose
-EM needs hundreds to thousands of iterations on 600 persons, tens of seconds.
+mirt's EM stops within the tolerances above. The exploratory cases' EM needs hundreds to thousands of iterations on 600 persons.
 
 The bifactor calibrations run with `tolerance: 1e-8`: mirt's EM at `TOL = 1e-10` needs 80 to 2,700 cycles, and each fixture
 records them, with whether mirt stopped before its limit of 5,000, which every test of a comparison asserts. The 3PL has a
 prior on logit c because mirt does not converge without one. The fixtures are small, 400 to 1,500 persons on 11 to 15
-points for each dimension, so that each comparison takes seconds; mirt's EM on a two-tier model does not settle within
+points for each dimension, so that each comparison is quick; mirt's EM on a two-tier model does not settle within
 5,000 cycles on 500 persons with 4 specific dimensions, or on 9 or fewer points, which is why the case has 600 persons, 2
 specific dimensions and 15 points. The tests against the full grid run both EM calibrations for
-40 iterations with `tolerance: 0`: the two are one sequence of estimates, so they agree to rounding, in about a second
-where the full grid takes half a minute to converge.
+40 iterations with `tolerance: 0`: the two are one sequence of estimates, so they agree to rounding; the full grid takes far longer to converge.
 
 The calibrations of groups run with `tolerance: 1e-7`, and the one of three dimensions with 1e-6, which moves their
 distances from mirt's estimates by less than 1e-5 against 1e-9. The likelihood is flat in the groups' moments, so mirt's
@@ -1622,7 +1620,7 @@ by less than 1e-7 between the tolerances 1e-9 and 1e-11, and their log-likelihoo
 on 21 nodes, where the distances are those on 31. For a group whose standard deviations are near 2 on the scale of the
 first, mirt's EM stops 0.148 below the maximum of the likelihood, by mirt's own evaluation there, so that group is held to
 the maximum that BFGS in base R reaches from mirt's estimates. `validation/psychometrics/multidimensional-groups-mirt.ts`
-compares the two groups on three dimensions with mirt's, which takes seconds outside the tests (4.8e-5, 1.1e-4 and 3.2e-7
+compares the two groups on three dimensions with mirt's, which is quick outside the tests (4.8e-5, 1.1e-4 and 3.2e-7
 found).
 
 The longitudinal calibrations run with `tolerance: 1e-6`. On three occasions mirt's EM stops before its estimates settle,
@@ -1634,10 +1632,9 @@ variance free; the comparison converts it to the scale of that standard deviatio
 The MH-RM calibrations of the tests run with the default `tolerance` of 1e-3 and the seed 1, on the first 200 persons of
 a fixture, 120 for the graded model, against EM on the same persons; each bound is 1.5 times the worst over the seeds 1 to
 20, rounded up. `validation/psychometrics/multidimensional-mhrm-mirt.ts` compares the five-dimensional case with mirt's
-runs on the seeds 1 to 10, in about four minutes: each seed's estimates are within 0.20 of mirt's mean and its
+runs on the seeds 1 to 10: each seed's estimates are within 0.20 of mirt's mean and its
 correlations within 0.034. Each standard error averaged over the ten seeds of each program is a median 1.12 of mirt's,
-from 0.95 to 1.43, so `validation/psychometrics/multidimensional-mhrm-errors.ts` settles which are right, in about 25
-minutes: 50 data sets of 800 persons simulated from the mean of mirt's estimates, each calibrated by MH-RM, give each
+from 0.95 to 1.43, so `validation/psychometrics/multidimensional-mhrm-errors.ts` settles which are right: 50 data sets of 800 persons simulated from the mean of mirt's estimates, each calibrated by MH-RM, give each
 estimate's standard deviation, less MH-RM's own variance over ten seeds of one data set. Against it the averaged errors
 here are a median 1.01, from 0.80 to 1.25, and those of the simulated calibrations 1.01, from 0.80 to 1.26, within the
 bounds of a median within 0.1 of 1 and every ratio from 0.6 to 1.6; mirt's are 0.92, from 0.61 to 1.20, so mirt's MH-RM
