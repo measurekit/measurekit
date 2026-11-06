@@ -2,44 +2,19 @@
 
 ## Principles
 
-- **Correct first.** Every statistic matches a named R reference within a documented tolerance
-  ([validation](validation.md)), and the fixtures are committed.
-- **Portable.** No platform API (`node:*`, `fetch`, DOM, `process`) and one runtime dependency,
-  `@measurekit/core`, which has none and holds the errors, argument checks and random number generator that
-  both packages share. ESM, strict TypeScript.
-- **Deterministic.** The library never calls `Math.random`, which a Biome plugin enforces. Randomness comes from a
-  `Random` passed in, so a seed reproduces a result. Results are identical within one JavaScript engine version:
-  `Math.log`, `Math.exp` and the other `Math` functions may differ in their last bits between engines and between
-  versions of one engine, such as V8's, which can move results by a few units in the last place.
-- **Data in, data out.** Functions take plain arrays and objects and return plain, typed result objects. No I/O, no
-  logging, no localized text: labels are string unions with documented, configurable thresholds.
-- **Defined results.** Invalid input throws `DataError`, also input of another type than documented, as plain
-  JavaScript or JSON may pass it: `null` or a number for an array or for options, a string for a number, or a model,
-  rule, estimator or random number generator that is not an object or function of its interface. An option set to
-  `null` is invalid, not absent, and an option a function does not take is refused with its name, as are the fields a
-  record of settings does not have, such as a prior or a quadrature: a misspelled name would otherwise leave a default
-  in place. Records of data, such as items and a calibration's testlets, may carry fields of their own. A statistic that is undefined for the data is `null` in a table and a `DataError`
-  from a function that returns only that statistic; results never contain `NaN`. Iterative methods report
-  convergence instead of throwing.
+The [principles of core](../core/architecture.md#principles) hold for psychometrics: correct first, portable,
+deterministic, data in and data out, defined results, and complete at the first version. It adds:
+
+- **Labels.** Labels are string unions with documented, configurable thresholds, never localized text.
+- **Defined results.** A model, rule, estimator or random number generator that is not an object or function of its
+  interface is refused, as is a field that a record of settings does not have, such as a prior or a quadrature. Records of
+  data, such as items and a calibration's testlets, may carry fields of their own.
 - **Extensible.** Where methods have alternatives, such as models or estimators, they are interfaces, and built-ins
   implement the same interfaces as user code.
-- **Complete at the first version.** Each module has a fixed list of authoritative [sources](#sources), which the owner set,
-  and builds what they treat as standard practice. A new capability afterwards means changing the list.
 
 ## Sources
 
-A capability is built when it passes all three tests below. Every method that is not built is listed under "Not included" in the module's guide, one method per line, with the first test it fails.
-
-```mermaid
-flowchart LR
-  C["A capability of the module's domain"] --> Q1{"Do the sources treat it<br/>as standard practice?"}
-  Q1 -- no --> O["Not included: Outside the sources"]
-  Q1 -- yes --> Q2{"Is there a usable<br/>reference?"}
-  Q2 -- no --> R["Not included: No reference"]
-  Q2 -- yes --> Q3{"Does it fit<br/>a library?"}
-  Q3 -- no --> F["Not included: No fit"]
-  Q3 -- yes --> B["Built, and validated against the reference"]
-```
+A capability is built by the [rule of core](../core/architecture.md#sources). The sources of each module:
 
 | Module             | Sources                                                                                                                                                                                                                                                                                            | Covers                                                                                                          |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
@@ -118,8 +93,8 @@ name.
 
 ## Numerics
 
-- Numerics work on `Float64Array` and do not allocate in inner loops.
-- Functions in `math/` assume valid input; public functions validate before calling them.
+The [numerics of core](../core/architecture.md#numerics) hold, and:
+
 - Scores are integers, so sums are exact: covariances come from Σxy, Σx and Σy of the values less the first of each,
   so that scores far from 0, such as near 1e8, do not cancel; a variance is exactly 0 when the values are equal, and no
   statistic depends on the order of persons. Zero-variance checks compare with 0.

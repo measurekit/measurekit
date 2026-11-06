@@ -90,6 +90,9 @@ that the package lacks.
 [Performance](https://measurekit.wakan.dev/_measurekit/core/performance/) gives the speed of the numerics against base R
 and stats, and what the entry point adds to a bundle.
 
+[Architecture](https://measurekit.wakan.dev/_measurekit/core/architecture/) gives the principles that core and both
+libraries follow, and the rule by which a capability is built.
+
 ## License
 
 [Apache-2.0](https://github.com/measurekit/measurekit/blob/main/packages/core/LICENSE). Copyright Fariz Wakan. See

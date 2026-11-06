@@ -2,48 +2,23 @@
 
 ## Principles
 
-- **Correct first.** Every statistic matches a named reference, R or pyBKT, within a documented tolerance
-  ([validation](validation.md)), and the fixtures are committed.
-- **Portable.** No platform API (`node:*`, `fetch`, DOM, `process`) and one runtime dependency,
-  `@measurekit/core`, which has none and holds the errors, argument checks and random number generator that
-  both packages share. ESM, strict TypeScript.
-- **Deterministic.** The library never calls `Math.random`, which a Biome plugin enforces. Randomness comes from a
-  `Random` passed in, or for a fit from a seed in the model's options, so a seed reproduces a result. Results are
-  identical within one JavaScript engine version: `Math.log`, `Math.exp` and the other `Math` functions may differ in
-  their last bits between engines and between versions of one engine, such as V8's, which can move results by a few
-  units in the last place.
-- **Data in, data out.** Functions take plain arrays and objects and return plain, typed result objects. No I/O, no
-  logging, no localized text.
+The [principles of core](../core/architecture.md#principles) hold for knowledge tracing: correct first, portable,
+deterministic, data in and data out, defined results, and complete at the first version. It adds:
+
+- **Seeds.** Randomness comes from a `Random` passed in, or for a fit from a seed in the model's options.
 - **Online and batch.** Every model is fitted to a log in batch and updates a learner's state one event at a time
   online, with the same arithmetic.
 - **Serializable state.** Learner states and model parameters are plain data that JSON serializes, so they can be
   stored in a database or in browser storage and resumed exactly.
-- **Defined results.** Invalid input throws `DataError`, also input of another type than documented, as plain
-  JavaScript or JSON may pass it: `null` or a number for an array or for options, a string for a number, or a model,
-  state or random number generator that is not an object of its interface. An option set to `null` is invalid, not
-  absent, and an option a function does not take is refused with its name, as are the fields a record of settings does
-  not have, such as BKT's bounds or a prior: a misspelled name would otherwise leave a default in place. Records of
-  data, such as events, states and parameters, may carry fields of their own. A statistic that is undefined for the data is `null` in a table and a `DataError` from a function that
-  returns only that statistic; results never contain `NaN`. Iterative methods report convergence instead of throwing.
+- **Defined results.** A model, state or random number generator that is not an object of its interface is refused, as is a
+  field that a record of settings does not have, such as BKT's bounds or a prior. Records of data, such as events, states
+  and parameters, may carry fields of their own.
 - **Extensible.** Every model implements one interface, `LearnerModel`, and evaluation uses only that interface, so a
   model written outside the package is evaluated as a built-in one is.
-- **Complete at the first version.** Each module has a fixed list of authoritative [sources](#sources), which the owner set,
-  and builds what they treat as standard practice. A new capability afterwards means changing the list.
 
 ## Sources
 
-A capability is built when it passes all three tests below. Every method that is not built is listed under "Not included" in the module's guide, one method per line, with the first test it fails.
-
-```mermaid
-flowchart LR
-  C["A capability of the module's domain"] --> Q1{"Do the sources treat it<br/>as standard practice?"}
-  Q1 -- no --> O["Not included: Outside the sources"]
-  Q1 -- yes --> Q2{"Is there a usable<br/>reference?"}
-  Q2 -- no --> R["Not included: No reference"]
-  Q2 -- yes --> Q3{"Does it fit<br/>a library?"}
-  Q3 -- no --> F["Not included: No fit"]
-  Q3 -- yes --> B["Built, and validated against the reference"]
-```
+A capability is built by the [rule of core](../core/architecture.md#sources). The sources of each module:
 
 | Module     | Sources                                                                                                                                                                                   | Covers                                                                                      |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
@@ -72,18 +47,24 @@ exported.
 
 Modules form layers; a module imports only from lower layers, never from its own or a higher one.
 
-| Layer | Modules                                                                       |
-| ----- | ----------------------------------------------------------------------------- |
-| 1     | `@measurekit/core`                                                            |
-| 2     | `math/`, `data/`                                                              |
-| 3     | `model.ts`                                                                    |
-| 4     | `elo/`, `bkt/`, `logistic/`, `irt/`, `kst/`, `evaluate/`, `practice/`, `sim/` |
+```mermaid
+flowchart BT
+  core["@measurekit/core"]
+  data["data/"] --> core
+  math["math/"] --> core
+  model["model.ts<br/>LearnerModel, ModelFit"] -->|"the types of"| data
+  families["elo/, bkt/, logistic/, irt/, kst/"] --> model
+  families --> data
+  families --> math
+  consumers["evaluate/, practice/, sim/"] -->|"models only through the interface"| model
+  consumers --> data
+  consumers -.->|"evaluate/ only"| math
+```
 
-`math/` and `data/` import nothing but core, and `model.ts` the types of `data/`. The model families,
-`evaluate/`, `practice/` and `sim/` never import each other: evaluation, practice and simulation know models only
-through the interface. [AGENTS.md](../../AGENTS.md#dependencies) lists the imports each module may use; Biome enforces
-them, the absence of Node modules and platform globals in `src/`, and that code outside `packages/` imports
-`@measurekit/knowledge-tracing` by name.
+`math/` and `data/` import nothing but core. The model families, `evaluate/`, `practice/` and `sim/` never import each
+other. [AGENTS.md](../../AGENTS.md#dependencies) lists the imports each module may use; Biome enforces them, the absence of
+Node modules and platform globals in `src/`, and that code outside `packages/` imports `@measurekit/knowledge-tracing` by
+name.
 
 ## The learner model interface
 
@@ -205,8 +186,8 @@ Evaluation, practice and simulation check that a model passed in is an object wi
 
 ## Numerics
 
-- Numerics work on `Float64Array` and do not allocate in inner loops.
-- Functions in `math/` assume valid input; public functions validate before calling them.
+The [numerics of core](../core/architecture.md#numerics) hold, and:
+
 - A fit's predictions and states come from one pass over the log with the model's steps, `onePass` of `data/replay.ts`:
   the arithmetic of online updates without their checks, as the log was checked as a whole, so they equal the same events
   applied online, to the last bit. Elo's and IRT's fits pass with their own step, which also moves Elo's item ratings; an
@@ -232,8 +213,6 @@ Evaluation, practice and simulation check that a model passed in is an object wi
   α_t(i) A(i, j) / p_(t+1)(j) · γ_(t+1)(j), from probabilities and shares of them only: a sequence of thousands of
   attempts, where a state's filtered probability underflows to 0, gives no `NaN`.
 - AUC comes from midranks, exact for ties; calibration bins compare predictions with the bounds k / K as computed.
-- The numerics are written here rather than taken from `ml-matrix` or `@stdlib`, for the reasons that core's
-  [README](../../packages/core/README.md#why-the-numerics-are-written-here) gives.
 
 ## Not included
 
