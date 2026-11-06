@@ -136,6 +136,11 @@ not check is checked by the newer one. Every job has a `timeout-minutes` of abou
 Per-push CI stays short, as Actions minutes are limited: `rules.yml` runs the slow checks each Monday, on `workflow_dispatch`
 and from `release.yml` before it publishes: `rules`, and `coverage`, the floor of psychometrics, whose tests take about 10
 minutes on a runner under coverage, four times as long as without. A builder runs the rules of its package before a merge (`pnpm check:rules packages/<package>`).
+The rules are in `scripts/check-rules.ts` with the engine, which runs only the tests whose titles a rule names, in threads
+that a stopped run kills. assesskit's and interopkit's engine differs: it keeps the rules of a package in
+`scripts/rules/<package>.ts`, runs the whole test file of a rule, runs the unchanged code once for each test file, and runs
+browser rules. The two stay apart until after the release, as joining them costs a full run of the rules in each
+repository; `rules.yml` checks each engine as it stands.
 
 ## Releases
 
