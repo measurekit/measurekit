@@ -839,7 +839,7 @@ Several results of the reference packages are not references:
   items reach in 1 of 80 score groups; and the score groups below `guess_correction` times the number of columns are left
   out, the studied and the flagged items counted: `sibtest` does all three. Its `1 - pchisq` reaches 0 below about
   1e-16, which the tolerance covers. `difSIBTEST` calls `SIBTEST`.
-- **sirt's `eb.dif`.** `dif.variance` returns λ (d - d̄) + (1 - λ) d̄ with d̄ the mean of the MH D-DIF, where shrinkage towards
+- **sirt's `eb.dif`.** `dif.variance` returns λ (d - d̄) + (1 - λ) d̄ with d̄ the mean of the MH D-DIF, where shrinkage toward
   the mean is λ d + (1 - λ) d̄. They agree when d̄ is 0, so the fixture passes centered values and adds d̄ back. The
   standard deviation does not depend on the centering.
 - **difR's Raju areas.** `RajuZ` returns 2 (a_F - a_R) ln(1 + e^Y) / (a_F a_R) - Δb as the unsigned area, which is

@@ -1,6 +1,6 @@
 # Mokken scale analysis
 
-`@measurekit/psychometrics/mokken` analyses a set of items with nonparametric item response theory, without a model of
+`@measurekit/psychometrics/mokken` analyzes a set of items with nonparametric item response theory, without a model of
 the items' curves: it imputes missing responses, finds persons whose responses contradict the order of the items, measures how well items scale
 together, selects items into scales, checks the local independence of the items and the two assumptions that make the
 total score a good measure. It suits questionnaires and attitude scales, and screens achievement items for response
@@ -492,8 +492,8 @@ Invalid input throws `DataError` naming the value found.
 | Error                                                                                           | What to do                                                                                               |
 | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | Fewer than two items, or fewer than three for the item ordering and the conditional association | Give the items the method compares: two for the coefficients, three for the ordering and the association |
-| More than 1,000 items                                                                           | Analyse a part of the items; a Mokken scale has far fewer                                                |
-| More than 1,000 item steps for the reliability                                                  | Group the scores into fewer categories, or analyse fewer items                                           |
+| More than 1,000 items                                                                           | Analyze a part of the items; a Mokken scale has far fewer                                                |
+| More than 1,000 item steps for the reliability                                                  | Group the scores into fewer categories, or analyze fewer items                                           |
 | Fewer than two persons answered every item                                                      | Keep the persons who answered every item, or the items they all answered                                 |
 | The scores span more than 10 categories                                                         | Group the scores into at most 10 categories                                                              |
 | The minimum group size is more than half of the persons                                         | Lower `minimumGroupSize`, or give more persons                                                           |

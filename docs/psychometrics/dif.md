@@ -696,7 +696,7 @@ mantelTest(matrix, groups)
 ## Recipe: DIF variance
 
 The variance τ² of an item set's true DIF says how much the items differ (Camilli and Penfield, 1997), and shrinks each
-item's MH D-DIF towards the mean by what its standard error leaves unexplained (Longford, Holland and Thayer, 1993). With
+item's MH D-DIF toward the mean by what its standard error leaves unexplained (Longford, Holland and Thayer, 1993). With
 d the `delta` of `mantelHaenszel`, SE its `deltaStandardError`, d̄ their mean and w = 1 / SE²:
 
 τ² = max((Σ w² (d - d̄)² - Σ w) / Σ w², 0), λ = τ² / (τ² + SE²), shrunken d = λ d + (1 - λ) d̄.
