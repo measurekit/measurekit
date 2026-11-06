@@ -2,8 +2,8 @@
 
 How a pyBKT 1.4.3 model maps to `bkt` of `@measurekit/knowledge-tracing`: the data, the options, the calls, the
 tolerance of each comparison from [validation](validation.md#tolerances), and the time of measurekit over pyBKT's from
-[performance](performance.md#results), measured on Apple M5 with Node.js 26.8.1 and published there on 2026-11-04: below 1,
-measurekit takes less time.
+[performance](performance.md#results), which gives the machine, the versions and the date: below 1, measurekit takes less
+time.
 
 ```mermaid
 flowchart LR

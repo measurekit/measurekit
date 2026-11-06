@@ -3,8 +3,8 @@
 How the calls of mirt, TAM, catR and mirtCAT, GDINA, equate, equateIRT and kequate, difR, psych, the variance components
 of gtheory and mokken map to `@measurekit/psychometrics`. Each R call stands beside the function that the tests compare
 with it, the tolerance of that comparison from [validation](validation.md#tolerances), and the time of measurekit over the
-time of the R call from [performance](performance.md#results), measured on Apple M5 with Node.js 26.8.1 and R 4.6.1 and
-published there on 2026-11-04: below 1, measurekit takes less time.
+time of the R call from [performance](performance.md#results), which gives the machine, the versions and the date: below 1,
+measurekit takes less time.
 
 ```mermaid
 flowchart LR
