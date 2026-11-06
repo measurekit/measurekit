@@ -282,6 +282,7 @@ Invalid input throws `DataError` naming the value found.
 | No key for items or responses of more than two categories                       | Pass `key`, the keyed category of each item                                     |
 | A context without one string or `null` per person                               | Pass a list per context in the order of the ids, with strings                   |
 | More pairs than `maxPairs`                                                      | Use narrower contexts, a lower `maxGroup`, or a higher `maxPairs` with its cost |
+| More than 94,906,265 persons in `selectPairs`                                   | Pass the persons of one administration at a time                                |
 | A pair compares more than 1,000 items in `generalizedBinomialTest` or `m4Index` | Compare the items of one form                                                   |
 | The K index's counts above 2²⁴ cells                                            | Merge rare categories, or analyze fewer items                                   |
 
