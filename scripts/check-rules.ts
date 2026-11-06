@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 
 /**
  * A rule of the code that a test must guard. Replacing `find` with `replace` in `file` removes the rule and leaves valid
@@ -1383,7 +1383,9 @@ export const RULES: readonly Rule[] = [
 ];
 
 /** The folders that a scratch copy leaves out: generated output and installed packages, which it links instead. */
-const SKIPPED = new Set(["node_modules", ".git", "dist", "coverage", "api"]);
+const SKIPPED = new Set(["node_modules", ".git", "dist", "coverage", ".cache", ".vitest"]);
+/** The generated API reference, which no test reads. */
+const API_DOCS = "docs/api";
 /** The longest a test of a copy may take, in milliseconds: a removed bound can make a test wait for ever. */
 const TEST_TIMEOUT_MS = 120_000;
 /**
@@ -1461,7 +1463,10 @@ function foldersIn(root: string, folder: string): string[] {
 
 /** Copies the repository into a scratch directory without generated output, and links the installed packages. */
 function copyRepository(root: string, scratch: string): void {
-  cpSync(root, scratch, { recursive: true, filter: (path) => !SKIPPED.has(basename(path)) });
+  cpSync(root, scratch, {
+    recursive: true,
+    filter: (path) => !SKIPPED.has(basename(path)) && relative(root, path) !== API_DOCS,
+  });
   for (const directory of [root, ...foldersIn(root, "packages"), join(root, "examples")]) {
     const modules = join(directory, "node_modules");
     if (existsSync(modules)) symlinkSync(modules, join(scratch, directory.slice(root.length), "node_modules"));
