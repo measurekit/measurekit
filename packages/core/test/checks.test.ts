@@ -119,6 +119,12 @@ describe("checks of one value", () => {
     expect(() => checkSeed(1.5)).toThrow("A seed must be a safe integer, found 1.5.");
   });
 
+  it("name the one choice that there is, with no list, and join two or more with commas and or", () => {
+    expect(() => checkChoice("d", "The mode", ["a"])).toThrow('The mode must be "a", found "d".');
+    expect(() => checkChoice("d", "The mode", ["a", "b"])).toThrow('The mode must be "a" or "b", found "d".');
+    expect(() => checkChoice("d", "The mode", ["a", "b", "c"])).toThrow('The mode must be "a", "b" or "c", found "d".');
+  });
+
   it("refuse a name that is not an option or a field, and list the names there are", () => {
     const names = { tolerance: true, maxIterations: true, seed: true } as const;
     expect(() => checkOptions(JSON.parse('{"verbose":1e-6}'), names)).toThrow(
