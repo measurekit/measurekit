@@ -357,12 +357,16 @@ listed here with its reason. A file is written `<package>/<path below src>`, and
     complete, with its imports, runs alone and shows at least one result, as the samples of the guides do.
   - No other tags and no boilerplate.
 - `//` comments only explain why something non-obvious is done, or cite a source. No commented-out code.
-- The guide of a module, every page of `docs/<package>/` but `architecture`, `choosing`, `coming-from-pybkt`, `coming-from-r`,
-  `evidence`, `performance`, `storage`, `supported` and `validation`,
-  has `## Quick start` first, a minimal sample of the main call, and ends with `## Errors`, `## Not included` and
-  `## Differences from the references`, in that order, before `## References`; a section with nothing to say says "None"
-  and why. `pnpm check:standards` fails on a guide without the four sections (`guide-sections`) and on a Not included
-  section that is not the table above (`not-included`).
+- A guide of a module has its sections in this order, each fact in one of them: its diagram, before the first heading;
+  `## Quick start`, a minimal sample of the main call that runs; the topics of the module, in the order a reader uses them,
+  each option once with its default, in a table under the call that takes it, or in `## Options` where one options object
+  serves the module's calls; `## Errors`, every error a user can meet, with what to do about it, each limit once, with its
+  value, in the row of the `DataError` that names it; `## Not included`, the table `| Not included | Why |`; `## Differences
+  from the references`; and last, where the guide has them, `## Build or adopt`, `## Evidence`, `## Files` and
+  `## References`. A section with nothing to say says "None" and why. `pnpm check:standards` fails on a guide without Quick
+  start, Errors, Not included or Differences from the references (`guide-sections`). The pages of `docs/<package>/` that are
+  not the guide of a module are `architecture`, `choosing`, `coming-from-pybkt`, `coming-from-r`, `evidence`, `performance`, `storage`, `supported` and `validation`; every page writes
+  what it leaves out as the table above (`not-included`).
 - Docs lead with a picture, then tables, then prose. Diagrams are Mermaid in Markdown: GitHub renders them, and
   `typedoc-plugin-mermaid`, pinned in `typedoc.json` with the Mermaid version it loads, renders them on the docs site.
 - US English; short sentences, a table or list rather than prose; complete samples with their imports; a source's section
