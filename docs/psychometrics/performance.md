@@ -1,8 +1,7 @@
 # Performance of psychometrics
 
 What the hot paths of `@measurekit/psychometrics` cost against their references, how much each entry point adds to a
-bundle, and the memory that each reader of untrusted input needs on its worst input. A budget holds each number and
-fails a gate of CI: `pnpm bench` for the time, `pnpm test` for the size and the memory.
+bundle, and the memory that each reader of untrusted input needs on its worst input.
 
 ```mermaid
 flowchart LR
@@ -14,11 +13,8 @@ flowchart LR
 ## Speed
 
 Each benchmark times the hot path of each module against its reference in R, or RSMTool for the evaluation of automated
-scores, on the same data, with one thread. The ratio is the time of measurekit over the time of the reference: above 1,
-measurekit is slower, and above 1.5 the row is in bold. A benchmark fails `pnpm bench` when its fastest sample is above
-its budget in `packages/psychometrics/test/budgets.ts`: five times the fastest sample of the CI runner, rounded up to
-one significant digit, as STANDARDS.md section 11 sets every budget. How each side is timed, how the budgets were
-measured and how to refresh this page are in [validation](../../validation/README.md#benchmarks).
+scores, on the same data. How each side is timed, how the ratio is read, how the budgets are set and how to refresh this
+page are in the [method](../../validation/README.md#benchmarks).
 
 <!-- charts -->
 
@@ -385,10 +381,7 @@ Extrapolated, they stop closer to it than plain EM does, by up to about 1e-3 at 
 
 ## Size
 
-Each entry point bundled alone with esbuild, as a host's bundler makes it ([method](../../validation/README.md#sizes-and-peak-memory)). The bytes and the
-modules are those of the entry chunk and the chunks it imports statically, which load with it; a module that a dynamic
-`import()` loads later is a chunk of its own and is not counted.
-The modules each holds are those the import rules of [AGENTS.md](../../AGENTS.md#dependencies) allow it. Every package
+Each entry point bundled alone with esbuild ([method](../../validation/README.md#sizes-and-peak-memory)). Every package
 declares `sideEffects: false`, so a named import holds only what that name needs: `createAdaptiveTest` from
 `@measurekit/psychometrics/cat` bundles to 16.6 KB minified, 5.9 KB after gzip, with `cat`, `checks`, `irt`, `math` and
 core, and none of the `cdm`, `data`, `multidimensional` and `sim` that the subpath's other functions take.
@@ -417,8 +410,6 @@ core, and none of the `cdm`, `data`, `multidimensional` and `sim` that the subpa
 | `@measurekit/psychometrics/sim`              |           21,511 |        7,251 | core, cdm, checks, data, irt, multidimensional            |
 | `@measurekit/psychometrics/similarity`       |           23,305 |        8,945 | core, checks, data, irt, math                             |
 | `@measurekit/psychometrics/standard-setting` |           34,317 |       12,776 | core, checks, equating, irt, math                         |
-
-The table is of Node.js 22, the runner's version; the gzip of Node.js 26 is up to 1.2 percent less.
 
 ## Memory
 

@@ -1,7 +1,6 @@
 # Performance of core
 
-What the numerics of `@measurekit/core` cost against base R and stats, and how much its entry point adds to a bundle. A
-budget holds each number and fails a gate of CI: `pnpm bench` for the time, `pnpm test` for the size. core reads no
+What the numerics of `@measurekit/core` cost against base R and stats, and how much its entry point adds to a bundle. core reads no
 untrusted input of its own: the readers of the libraries do, and their pages give the memory they need.
 
 ```mermaid
@@ -12,12 +11,8 @@ flowchart LR
 
 ## Speed
 
-Each benchmark times the numerics against base R and stats, on the same data, with one thread. The ratio is the time of
-measurekit over the time of the reference: above 1, measurekit is slower, and above 1.5 the row is in bold. A benchmark
-fails `pnpm bench` when its fastest sample is above its budget in `packages/core/test/budgets.ts`: five times the
-fastest sample of the CI runner, rounded up to one significant digit, as STANDARDS.md section 11 sets every budget. How
-each side is timed, how the budgets were measured and how to refresh this page are in
-[validation](../../validation/README.md#benchmarks).
+Each benchmark times the numerics against base R and stats on the same data. How each side is timed, how the ratio is
+read, how the budgets are set and how to refresh this page are in the [method](../../validation/README.md#benchmarks).
 
 <!-- charts -->
 
@@ -71,13 +66,8 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 22.23.4 and R versi
 
 ## Size
 
-Each entry point bundled alone with esbuild, as a host's bundler makes it ([method](../../validation/README.md#sizes-and-peak-memory)). The bytes and the
-modules are those of the entry chunk and the chunks it imports statically, which load with it; a module that a dynamic
-`import()` loads later is a chunk of its own and is not counted.
-The modules each holds are those the import rules of [AGENTS.md](../../AGENTS.md#dependencies) allow it.
+Each entry point bundled alone with esbuild ([method](../../validation/README.md#sizes-and-peak-memory)).
 
 | Entry point        | Minified (bytes) | Gzip (bytes) | Modules it holds besides its own |
 | ------------------ | ---------------: | -----------: | -------------------------------- |
 | `@measurekit/core` |           16,671 |        6,924 | nothing                          |
-
-The table is of Node.js 22, the runner's version; the gzip of Node.js 26 is up to 1.2 percent less.

@@ -1,8 +1,7 @@
 # Performance of knowledge-tracing
 
 What the hot paths of `@measurekit/knowledge-tracing` cost against their references, how much each entry point adds to a
-bundle, and the memory that each reader of untrusted input needs on its worst input. A budget holds each number and
-fails a gate of CI: `pnpm bench` for the time, `pnpm test` for the size and the memory.
+bundle, and the memory that each reader of untrusted input needs on its worst input.
 
 ```mermaid
 flowchart LR
@@ -14,11 +13,8 @@ flowchart LR
 ## Speed
 
 Each benchmark times the hot path of each module against pyBKT, or the R package that its [validation](validation.md)
-uses, on the same data, with one thread. The ratio is the time of measurekit over the time of the reference: above 1,
-measurekit is slower, and above 1.5 the row is in bold. A benchmark fails `pnpm bench` when its fastest sample is above
-its budget in `packages/knowledge-tracing/test/budgets.ts`: five times the fastest sample of the CI runner, rounded up
-to one significant digit, as STANDARDS.md section 11 sets every budget. How each side is timed, how the budgets were
-measured and how to refresh this page are in [validation](../../validation/README.md#benchmarks).
+uses, on the same data. How each side is timed, how the ratio is read, how the budgets are set and how to refresh this
+page are in the [method](../../validation/README.md#benchmarks).
 
 <!-- charts -->
 
@@ -113,10 +109,7 @@ Measured on Apple M5 with 10 cores, 16 GB of memory, Node.js 22.23.4 and R versi
 
 ## Size
 
-Each entry point bundled alone with esbuild, as a host's bundler makes it ([method](../../validation/README.md#sizes-and-peak-memory)). The bytes and the
-modules are those of the entry chunk and the chunks it imports statically, which load with it; a module that a dynamic
-`import()` loads later is a chunk of its own and is not counted.
-The modules each holds are those the import rules of [AGENTS.md](../../AGENTS.md#dependencies) allow it. Every package
+Each entry point bundled alone with esbuild ([method](../../validation/README.md#sizes-and-peak-memory)). Every package
 declares `sideEffects: false`, so a named import holds only what that name needs.
 
 | Entry point                              | Minified (bytes) | Gzip (bytes) | Modules it holds besides its own |
@@ -131,8 +124,6 @@ declares `sideEffects: false`, so a named import holds only what that name needs
 | `@measurekit/knowledge-tracing/logistic` |           50,319 |       16,571 | core, data, math, model          |
 | `@measurekit/knowledge-tracing/practice` |            6,712 |        2,482 | core, data, model                |
 | `@measurekit/knowledge-tracing/sim`      |            5,046 |        1,879 | core, data, model                |
-
-The table is of Node.js 22, the runner's version; the gzip of Node.js 26 is up to 1.2 percent less.
 
 ## Memory
 
