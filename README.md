@@ -3,9 +3,8 @@
 Psychometrics and knowledge tracing for JavaScript and TypeScript, validated against R, pyBKT and RSMTool: IRT, CTT,
 adaptive testing, cognitive diagnosis, BKT.
 
-This repository holds two libraries and the core that they share. They run in any JavaScript runtime:
-[`compat/`](https://github.com/measurekit/measurekit/blob/main/compat/README.md) runs them on Node.js, Deno, Bun and
-workerd.
+This repository holds two libraries and the core that they share. They use no platform API and run on Node.js, Deno,
+Bun and workerd, where [`compat/`](https://github.com/measurekit/measurekit/blob/main/compat/README.md) tests them.
 
 ```mermaid
 flowchart LR
@@ -28,11 +27,6 @@ npm install @measurekit/knowledge-tracing
 
 Each library installs `@measurekit/core` with it, and re-exports `createRandom`, `DataError`, `MeasurekitError` and the
 types of core that its API names, such as `Random` and `QMatrix`, so you do not import core yourself.
-
-- **Psychometrics** analyzes a test after the fact: item statistics, calibration, ability estimates, fit, bias and
-  equating. It also runs adaptive tests and standard setting, reports and predicts scores, and checks dimensionality.
-- **Knowledge tracing** follows a learner over time: each event updates the learner's state, which models predict from
-  and practice recommendations use.
 
 The libraries do not import each other. They share core, and conventions: both validate input and throw
 `DataError`, take a seeded `Random` and never return `NaN`, and a Q-matrix has the same shape in both.
