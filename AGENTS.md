@@ -387,8 +387,8 @@ listed here with its reason. A file is written `<package>/<path below src>`, and
   page on the docs site, any other file at its address in the repository.
 - Every package has `supported.md`, `evidence.md` and `choosing.md` (`pnpm check:standards` fails without one);
   psychometrics has `coming-from-r.md` and knowledge tracing `coming-from-pybkt.md`. A number on them is one that a file of
-  the repository holds (a fixture, a reference script, `validation.md`, `performance.md`) and states with its commit or date;
-  a number with no such file is left out. `choosing.md` names, for each comparator read at a stated version and date, what
+  the repository holds (a fixture, a reference script, `validation.md`, `performance.md`) or a run of the tests gives,
+  stated with its commit and date, and with the Node.js of a run; a number with no such source is left out. `choosing.md` names, for each comparator read at a stated version and date, what
   it has that the package lacks, with a link to the guide whose Not included table gives the reason.
 - Every guide's `#` heading names its subject ("Events and logs", not "Data"), since the site titles the page with it, and
   every entry point of a package is a `@module` named by its import path, so that its pages sit apart from the guides.
