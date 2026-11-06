@@ -7,6 +7,15 @@ scores of equated scores, percentile ranks and norms with their standard errors 
 posterior of theta, and joint draws of theta from separate posteriors. Every function is validated against R ([validation](validation.md)). The growth between the groups of a vertical scale, `scaleGrowth`,
 has [its own guide](vertical-scaling.md).
 
+```mermaid
+flowchart LR
+  S["Scales: scaleScore"] --> T["conversionTable, conditionalScaleError<br/>summed or true score to scale score"]
+  T --> E["scaleConversion: scale scores of equated scores"]
+  T --> N["percentileRanks, normStatistics"]
+  I["Calibrated items"] --> P["predictFormScore, predictThetaScore"]
+  I --> J["drawJointThetas: plausible values"]
+```
+
 ## Quick start
 
 Report two thetas on a scale of 200 to 800 in steps of 10:

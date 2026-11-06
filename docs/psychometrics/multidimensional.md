@@ -10,6 +10,19 @@ number of dimensions; and computes information matrices. Every estimate is valid
 R ([validation](validation.md)). The dimensions have mean 0 and variance 1, in the first group of a calibration of
 several groups.
 
+```mermaid
+flowchart LR
+  R["Responses, with loadings for a confirmatory model"] --> E["calibrateMultidimensional<br/>EM up to 3 dimensions, MH-RM above"]
+  R --> B["calibrateBifactor<br/>bifactor and two-tier models"]
+  R --> L["calibrateLongitudinal<br/>two or three occasions"]
+  E --> C["Items, correlations of the dimensions, standard errors"]
+  B --> C
+  L --> C
+  C --> O["rotateLoadings: varimax, oblimin"]
+  C --> S["multidimensionalEstimates: posterior mean and mode, maximum and weighted likelihood"]
+  C --> N["multidimensionalInformation, multidimensionalDiscrimination, multidimensionalDifficulty"]
+```
+
 ## Quick start
 
 Calibrate a confirmatory 2PL of two correlated dimensions, and estimate a person's thetas:

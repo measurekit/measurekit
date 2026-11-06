@@ -4,6 +4,16 @@
 standard error of measurement, the value of subscores and augmented subscores from a [response matrix](data.md). Every statistic is validated against R
 ([validation](validation.md)).
 
+```mermaid
+flowchart LR
+  M["Response matrix"] --> I["itemStatistics: mean, correlations, D, alpha if deleted"]
+  I --> L["classifyDifficulty, classifyDiscrimination: labels"]
+  M --> O["distractorAnalysis: each option"]
+  M --> R["cronbachAlpha, kr20, kr21, splitHalf, mcdonaldOmega"]
+  R --> S["standardErrorOfMeasurement"]
+  M --> V["subscoreValue, augmentedSubscores: sections of a test"]
+```
+
 ## Quick start
 
 Compute alpha and the statistics of each item for six persons on five items:

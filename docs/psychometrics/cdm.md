@@ -6,6 +6,17 @@ mastery probabilities and profiles, classification accuracy and consistency, Wal
 item, Q-matrix validation, model and item fit, the identifiability of the DINA, and a nonparametric classification for
 small samples. Each is validated against GDINA, CDM or NPCD ([validation](validation.md)).
 
+```mermaid
+flowchart LR
+  Q["Q-matrix: the attributes of each item"] --> C["calibrateCdm<br/>G-DINA, DINA, DINO, A-CDM, LLM, R-RUM"]
+  R["Responses"] --> C
+  C --> P["attributeProfiles, cdmClassificationAccuracy"]
+  C --> V["validateQMatrix"]
+  C --> M["compareItemModels, cdmModelFit, cdmItemFit"]
+  Q --> I["qMatrixIdentifiability"]
+  Q --> N["nonparametricClassification<br/>with the responses, for small samples"]
+```
+
 ## Quick start
 
 Calibrate the DINA model of two attributes on six persons, and classify them:

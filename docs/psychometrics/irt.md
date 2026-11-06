@@ -7,6 +7,19 @@ abilities, converts summed scores to theta, and computes information and reliabi
 against mirt, ltm, TAM, the GGUM package and base R ([validation](validation.md)). Theta is
 on the N(0, 1) scale unless a calibration estimates its distribution.
 
+```mermaid
+flowchart LR
+  R["Responses: matrix or records"] --> C["calibrate: marginal maximum likelihood<br/>groups, covariates, testlets, priors"]
+  R --> J["jointMaximumLikelihood, conditionalMaximumLikelihood<br/>Rasch, partial credit, rating scale"]
+  R --> U["calibrateUnfolding<br/>agree-disagree items"]
+  C --> I["Items, standard errors, a distribution of theta"]
+  J --> I
+  U --> I
+  I --> A["Abilities: maximumLikelihoodEstimate, weightedLikelihoodEstimate,<br/>posteriorModeEstimate, posteriorMeanEstimate"]
+  I --> T["summedScoreTable"]
+  I --> N["itemInformation, testInformation, marginalReliability, empiricalReliability"]
+```
+
 ## Quick start
 
 Simulate 1,000 persons on ten 2PL items, calibrate the items back, and estimate the first person's theta:

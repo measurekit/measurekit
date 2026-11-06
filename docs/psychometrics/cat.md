@@ -9,6 +9,19 @@ step; content bounds against a replay in base R and mirtCAT's shadow test; diagn
 against a replay in base R and against mirtCAT; testlets against a replay in base R and mirtCAT's ordered groups;
 routing cuts against root finders in base R ([validation](validation.md)).
 
+```mermaid
+flowchart LR
+  P["Pool of calibrated items"] --> A["createAdaptiveTest<br/>selection, content, exposure, stopping"]
+  P --> G["createDiagnosticAdaptiveTest<br/>profiles of attributes"]
+  P --> M["createMultidimensionalAdaptiveTest"]
+  P --> S["createMultistageTest<br/>modules, with routing cuts from multistageCuts"]
+  P --> F["assembleForms: forms from a pool"]
+  A --> X["simulateAdaptiveTest, simulateDiagnosticTest,<br/>simulateMultidimensionalAdaptiveTest, simulateMultistageTest"]
+  G --> X
+  M --> X
+  S --> X
+```
+
 ## Quick start
 
 Run an adaptive test from a pool of 50 2PL items for a person of theta 1, until the standard error falls below 0.4 or 20 items are given:

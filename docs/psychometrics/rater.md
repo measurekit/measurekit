@@ -12,6 +12,15 @@ raters who are harsher or milder than usual on one item. The agreement statistic
 effsize and RSMTool, the routing curve, the mappings and the replay against base R, the model against base R and TAM
 ([validation](validation.md)).
 
+```mermaid
+flowchart LR
+  R["Ratings: subject, rater, score"] --> A["exactAgreement, adjacentAgreement, cohenKappa, fleissKappa,<br/>intraclassCorrelation, ratingCorrelation"]
+  R --> M["manyFacetRasch: severity, difficulty, bias"]
+  M --> E["manyFacetEstimates, manyFacetFit, expectedRating"]
+  H["Human and machine scores"] --> S["automatedScoreAgreement, standardizedMeanDifference,<br/>validateAutomatedScores"]
+  H --> W["automatedScoreDrift, routingCurve, scoreMapping, replayShift"]
+```
+
 ## Quick start
 
 Score the agreement of three raters on four essays:

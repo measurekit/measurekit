@@ -10,6 +10,17 @@ all purify their matching criterion or their link on request. The dichotomous st
 polytomous ones against base R, rms, MASS and lordif, SIBTEST against mirt and difR, the likelihood-ratio tests against
 mirt, the differential functioning against DFIT, and the sparse-data rule against base R ([validation](validation.md)).
 
+```mermaid
+flowchart LR
+  D["Response matrix and one group per person"] --> M["Matching on the total score"]
+  D --> C["Calibration of the groups"]
+  M --> O["mantelHaenszel, logisticRegressionDif, mantelTest,<br/>ordinalLogisticRegressionDif, logisticDiscriminantDif, sibtest"]
+  C --> I["lordChiSquare, rajuAreaDif, irtLikelihoodRatioDif"]
+  O --> P["Purification: the anchors without DIF"]
+  I --> P
+  C --> F["differentialFunctioning: NCDIF, CDIF, DTF"]
+```
+
 ## Quick start
 
 Simulate 500 persons per group on 10 items, one harder for the focal group, and test them by three methods:

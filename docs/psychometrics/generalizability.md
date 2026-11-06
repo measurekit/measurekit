@@ -9,6 +9,12 @@ others. Components are validated against base R's `aov`, the expected mean squar
 lme4's REML estimates, unbalanced designs against Method 1 written out in base R and against GeneralizIT, and decision
 studies against the textbook formulas of each design ([validation](validation.md)).
 
+```mermaid
+flowchart LR
+  S["Scores by the levels of each facet"] --> G["generalizabilityStudy: variance components<br/>by the analysis of variance, or Method 1 with empty cells"]
+  G --> Dd["decisionStudy: error variances, generalizability and dependability<br/>of a procedure with other numbers of items and raters"]
+```
+
 ## Quick start
 
 Estimate the variance components of six persons by four items, p × i:
