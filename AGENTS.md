@@ -220,16 +220,11 @@ Knowledge tracing: the model families never import each other, nor does anything
 
 ## Deviations from the standards
 
-Where the code departs from `STANDARDS.md`, with the reason:
+Where the code departs from `STANDARDS.md`, with the reason.
 
-- Section 4, "Small and stable surface": the root of each library re-exports the core names the package's API uses:
-  `createRandom`, `DataError` and `MeasurekitError`, and every type of core that its declarations name, such as `Random`,
-  `QMatrix` and `ThresholdItem`. These names have two entries, core's and the root's. A user installs one library, and
-  pnpm does not let a program import a dependency of a dependency, so a user who names one of them would otherwise have
-  to install core; `instanceof DataError` holds for both entries, as they are one module. `scripts/test/root-types.test.ts`
-  holds each root to exactly these names. The roots hold nothing else but knowledge tracing's `LearnerModel` and
-  `ModelFit`, which no module owns, and no module entry re-exports core: every other name has one entry, its module's
-  subpath.
+| Standard                                                                                                          | What the repository does                                                                                                                                                                                                                                                              | Reason                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Section 4, Small and stable surface: each name is exported by the entry that owns it, never re-exported by a root | The root of each library re-exports the core names the package's API uses: `createRandom`, `DataError` and `MeasurekitError`, and every type of core that its declarations name, such as `Random`, `QMatrix` and `ThresholdItem`. These names have two entries, core's and the root's | A user installs one library, and pnpm does not let a program import a dependency of a dependency, so a user who names one of them would otherwise have to install core; `instanceof DataError` holds for both entries, as they are one module. `scripts/test/root-types.test.ts` holds each root to exactly these names. The roots hold nothing else but knowledge tracing's `LearnerModel` and `ModelFit`, which no module owns, and no module entry re-exports core: every other name has one entry, its module's subpath. |
 
 ## Naming
 
