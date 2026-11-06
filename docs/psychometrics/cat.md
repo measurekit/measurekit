@@ -1270,10 +1270,9 @@ constrained areas and the test `information` at each target theta, to check the 
 form is `assembleForms(pool, length, options)[0]`. A form is short, with fewer than `length` items, where the pool, the
 enemies or `overlap` leave it no unit; two forms share the ids that their items share. A count deviates by items and
 information by its own units: weight the targets to balance them. The method meets feasible blueprints in practice, but
-it does not prove optimality or feasibility as integer programming does: on 85 blueprints built from a hidden feasible
-form of 30 items, two or three facets and margins of 0 or 1, it met every bound of four forms, 340 forms in all, and
-kept all but 3 within 5% of the information target, the worst within 7.3% and the median within 1.4%. A solver's minimax
-forms were within 0.3% of the target. Check the counts, the information and the length of each form.
+it does not prove optimality or feasibility as integer programming does: on 85 feasible blueprints it met every bound and
+kept the information near the target, and [validation](validation.md#references) gives the gaps, beside a solver's.
+Check the counts, the information and the length of each form.
 
 ```ts
 import { createRandom } from "@measurekit/psychometrics";
