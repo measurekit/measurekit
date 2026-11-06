@@ -36,6 +36,14 @@ pnpm install
 [psychometrics](docs/psychometrics/architecture.md) and [knowledge tracing](docs/knowledge-tracing/architecture.md)
 state the design principles of each package.
 
+## Issues
+
+| Kind            | What to give                                                                                                     |
+| --------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Bug report      | The smallest code and data that run as pasted, and the reference value or the formula of the result you expected |
+| Feature request | A statistic or a model with the paper, the formula or the reference implementation that defines it               |
+| Vulnerability   | A private report, as [SECURITY.md](SECURITY.md) describes                                                        |
+
 ## Validation
 
 A new or changed statistic needs a reference and a fixture: extend the script for its module in
